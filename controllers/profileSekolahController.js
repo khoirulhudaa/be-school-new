@@ -9,10 +9,6 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-/**
- * Mendapatkan Profil Sekolah
- * Jika data tidak ada, tetap return 200 dengan data null
- */
 exports.getSchoolProfile = async (req, res) => {
   try {
     const { schoolId } = req.query;
@@ -47,7 +43,8 @@ exports.createSchoolProfile = async (req, res) => {
   try {
     const { 
       schoolId, heroTitle, heroSubTitle, linkYoutube, headmasterWelcome, headmasterName, schoolName,
-      studentCount, teacherCount, roomCount, achievementCount, latitude, longitude 
+      studentCount, teacherCount, roomCount, achievementCount, latitude, longitude,
+      address, phoneNumber, email  
     } = req.body;
 
     if (!schoolId || !heroTitle || !headmasterWelcome || !headmasterName || !schoolName) {
@@ -77,14 +74,9 @@ exports.createSchoolProfile = async (req, res) => {
       photoHeadmasterUrl = result.secure_url;
     }
 
-    const newProfile = await SchoolProfile.create({ 
+   const newProfile = await SchoolProfile.create({ 
       schoolId: parseInt(schoolId),
-      heroTitle, 
-      heroSubTitle, 
-      linkYoutube, 
-      headmasterWelcome, 
-      headmasterName, 
-      schoolName,
+      heroTitle, heroSubTitle, linkYoutube, headmasterWelcome, headmasterName, schoolName,
       photoHeadmasterUrl,
       studentCount: parseInt(studentCount) || 0,
       teacherCount: parseInt(teacherCount) || 0,
@@ -92,6 +84,9 @@ exports.createSchoolProfile = async (req, res) => {
       achievementCount: parseInt(achievementCount) || 0,
       latitude: parseFloat(latitude) || null,
       longitude: parseFloat(longitude) || null,
+      address: address || null,
+      phoneNumber: phoneNumber || null,
+      email: email || null,
     });
 
     res.status(201).json({ success: true, data: newProfile });
@@ -111,16 +106,17 @@ exports.updateSchoolProfile = async (req, res) => {
 
     const { 
       heroTitle, heroSubTitle, linkYoutube, headmasterWelcome, headmasterName, schoolName,
-      studentCount, teacherCount, roomCount, achievementCount, latitude, longitude 
+      studentCount, teacherCount, roomCount, achievementCount, latitude, longitude,
+      address, phoneNumber, email    // ← tambah ini
     } = req.body;
 
     // Update fields
-    if (heroTitle) profile.heroTitle = heroTitle;
-    if (heroSubTitle) profile.heroSubTitle = heroSubTitle;
-    if (linkYoutube) profile.linkYoutube = linkYoutube;
-    if (headmasterWelcome) profile.headmasterWelcome = headmasterWelcome;
-    if (headmasterName) profile.headmasterName = headmasterName;
-    if (schoolName) profile.schoolName = schoolName;
+    if (heroTitle !== undefined) profile.heroTitle = heroTitle;
+    if (heroSubTitle !== undefined) profile.heroSubTitle = heroSubTitle;
+    if (linkYoutube !== undefined) profile.linkYoutube = linkYoutube;
+    if (headmasterWelcome !== undefined) profile.headmasterWelcome = headmasterWelcome;
+    if (headmasterName !== undefined) profile.headmasterName = headmasterName;
+    if (schoolName !== undefined) profile.schoolName = schoolName;
 
     if (studentCount !== undefined) profile.studentCount = parseInt(studentCount) || 0;
     if (teacherCount !== undefined) profile.teacherCount = parseInt(teacherCount) || 0;
@@ -128,6 +124,11 @@ exports.updateSchoolProfile = async (req, res) => {
     if (achievementCount !== undefined) profile.achievementCount = parseInt(achievementCount) || 0;
     if (latitude !== undefined) profile.latitude = parseFloat(latitude) || null;
     if (longitude !== undefined) profile.longitude = parseFloat(longitude) || null;
+
+    // Update field baru
+    if (address !== undefined) profile.address = address || null;
+    if (phoneNumber !== undefined) profile.phoneNumber = phoneNumber || null;
+    if (email !== undefined) profile.email = email || null;
 
     if (req.file) {
       if (profile.photoHeadmasterUrl) {

@@ -1,4 +1,3 @@
-// models/schoolProfile.js
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 
@@ -13,59 +12,57 @@ const SchoolProfile = sequelize.define('SchoolProfile', {
     allowNull: false,
     unique: true,
   },
-  heroTitle: {
+  schoolName: {
     type: DataTypes.STRING,
-    allowNull: false,
-  },
-  linkYoutube: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
-  heroSubTitle: {
-    type: DataTypes.STRING,
-    allowNull: true, 
-  },
-  headmasterWelcome: {
-    type: DataTypes.TEXT,
     allowNull: false,
   },
   headmasterName: {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  schoolName: {
+  headmasterWelcome: {
+    type: DataTypes.TEXT,
+    allowNull: false,
+  },
+  heroTitle: {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  // Tambahan baru: Foto Kepala Sekolah
+  heroSubTitle: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  linkYoutube: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   photoHeadmasterUrl: {
-    type: DataTypes.STRING(500), // Cloudinary URL bisa panjang
+    type: DataTypes.STRING(500),
     allowNull: true,
   },
-  studentCount: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0,
+  // === FIELD BARU ===
+  address: {
+    type: DataTypes.STRING(500),   // alamat lengkap sekolah
+    allowNull: true,               // boleh kosong, tapi sebaiknya diisi
   },
-  teacherCount: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0,
-  },
-  roomCount: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0,
-  },
-  achievementCount: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0,
-  },
-  latitude: {
-    type: DataTypes.FLOAT,
+  phoneNumber: {
+    type: DataTypes.STRING(50),    // nomor telepon / WA (string agar support +62, ext, dll)
     allowNull: true,
   },
-  longitude: {
-    type: DataTypes.FLOAT,
+  email: {
+    type: DataTypes.STRING(100),
     allowNull: true,
+    validate: {
+      isEmail: true,               // validasi format email (opsional, bisa dihapus jika tidak mau strict)
+    },
   },
+  // field yang sudah ada
+  studentCount: { type: DataTypes.INTEGER, defaultValue: 0 },
+  teacherCount: { type: DataTypes.INTEGER, defaultValue: 0 },
+  roomCount: { type: DataTypes.INTEGER, defaultValue: 0 },
+  achievementCount: { type: DataTypes.INTEGER, defaultValue: 0 },
+  latitude: { type: DataTypes.FLOAT, allowNull: true },
+  longitude: { type: DataTypes.FLOAT, allowNull: true },
   isActive: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
