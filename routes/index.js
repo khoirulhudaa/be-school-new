@@ -1,0 +1,38 @@
+// routes/index.js
+const express = require('express');
+const router = express.Router();
+
+// Import semua route handlers
+const albumRouter       = require('./albumRoutes');
+const alumniRouter      = require('./alumniRoutes');
+const galleryRouter     = require('./galleryRoutes');
+const beritaRouter      = require('./beritaRoutes');
+const pengumumanRouter  = require('./pengumumanRoutes');
+const fasilitasRouter   = require('./fasilitasRoutes');
+const profileRouter     = require('./profileSekolahRoutes');   
+
+router.use('/auth', require('./authRoutes'));
+
+// ── Mount routes dengan limiter khusus ────────────────────────────────
+
+// Route sensitif (create/update banyak) → pakai strictLimiter
+router.use('/berita', beritaRouter);
+router.use('/pengumuman', pengumumanRouter);
+router.use('/alumni', alumniRouter);
+
+// Route dengan upload/file berat → pakai uploadLimiter
+router.use('/gallery', galleryRouter);
+router.use('/fasilitas', fasilitasRouter);
+router.use('/albums', albumRouter);
+router.use('/profileSekolah', profileRouter);
+
+// Route testing (hanya ikut global limiter dari app.js)
+router.get('/testing', (req, res) => {
+  res.json({
+    success: true,
+    message: 'API OK dari routes/index (1.0.0)',
+    timestamp: new Date().toISOString()
+  });
+});
+
+module.exports = router;
