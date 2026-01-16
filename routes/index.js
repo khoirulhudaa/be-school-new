@@ -10,6 +10,8 @@ const beritaRouter      = require('./beritaRoutes');
 const pengumumanRouter  = require('./pengumumanRoutes');
 const fasilitasRouter   = require('./fasilitasRoutes');
 const profileRouter     = require('./profileSekolahRoutes');   
+const visiMisiRouter     = require('./visiMisiRoutes');   
+const prestasiRouter     = require('./prestasiRoutes');   
 
 router.use('/auth', require('./authRoutes'));
 
@@ -25,6 +27,8 @@ router.use('/gallery', galleryRouter);
 router.use('/fasilitas', fasilitasRouter);
 router.use('/albums', albumRouter);
 router.use('/profileSekolah', profileRouter);
+router.use('/visi-misi', visiMisiRouter);
+router.use('/prestasi', prestasiRouter);
 
 // Route testing (hanya ikut global limiter dari app.js)
 router.get('/testing', (req, res) => {
