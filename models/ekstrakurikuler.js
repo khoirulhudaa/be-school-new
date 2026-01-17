@@ -1,8 +1,7 @@
-// models/achievement.js
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 
-const Achievement = sequelize.define('Achievement', {
+const Ekstrakurikuler = sequelize.define('Ekstrakurikuler', {
   id: {
     type: DataTypes.INTEGER,
     autoIncrement: true,
@@ -15,22 +14,32 @@ const Achievement = sequelize.define('Achievement', {
   name: {
     type: DataTypes.STRING,
     allowNull: false,
+    comment: 'Nama ekstrakurikuler (contoh: Pramuka, Basket, Tari, dll)',
   },
   description: {
     type: DataTypes.TEXT,
     allowNull: false,
   },
-  year: {
-    type: DataTypes.INTEGER,
+  schedule: {
+    type: DataTypes.STRING(150),
     allowNull: true,
+    comment: 'Jadwal kegiatan (contoh: Setiap Selasa pukul 15:00)',
   },
-  level: {
-    type: DataTypes.STRING,
-    allowNull: true, 
+  mentor: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    comment: 'Nama pembina/mentor',
   },
-  organizer: {                    
-    type: DataTypes.STRING,
-    allowNull: true,              
+  category: {
+    type: DataTypes.ENUM(
+      'Olahraga',
+      'Seni',
+      'Keagamaan',
+      'Keterampilan',
+      'Keilmuan',
+      'Lainnya'
+    ),
+    defaultValue: 'Lainnya',
   },
   imageUrl: {
     type: DataTypes.STRING(255),
@@ -44,6 +53,7 @@ const Achievement = sequelize.define('Achievement', {
   timestamps: true,
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
+  tableName: 'ekstrakurikuler',
 });
 
-module.exports = Achievement;
+module.exports = Ekstrakurikuler;
