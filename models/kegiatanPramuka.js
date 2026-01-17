@@ -29,15 +29,7 @@ const KegiatanPramuka = sequelize.define('KegiatanPramuka', {
     allowNull: true,
   },
   category: {
-    type: DataTypes.ENUM(
-      'Kegiatan Rutin',
-      'Kegiatan Khusus',
-      'Lomba/Kompetisi',
-      'Bakti Sosial',
-      'Pelatihan',
-      'Perkemahan',
-      'Lainnya'
-    ),
+    type: DataTypes.STRING(50),
     defaultValue: 'Kegiatan Rutin',
   },
   imageUrl: {
