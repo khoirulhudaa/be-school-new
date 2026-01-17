@@ -31,14 +31,7 @@ const Ekstrakurikuler = sequelize.define('Ekstrakurikuler', {
     comment: 'Nama pembina/mentor',
   },
   category: {
-    type: DataTypes.ENUM(
-      'Olahraga',
-      'Seni',
-      'Keagamaan',
-      'Keterampilan',
-      'Keilmuan',
-      'Lainnya'
-    ),
+    type: DataTypes.STRING(50),
     defaultValue: 'Lainnya',
   },
   imageUrl: {
