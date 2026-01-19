@@ -21,7 +21,7 @@ const KegiatanPramuka = sequelize.define('KegiatanPramuka', {
     allowNull: false,
   },
   date: {
-    type: DataTypes.DATEONLY,       // format YYYY-MM-DD
+    type: DataTypes.DATEONLY,      
     allowNull: false,
   },
   location: {

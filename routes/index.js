@@ -14,6 +14,8 @@ const visiMisiRouter     = require('./visiMisiRoutes');
 const prestasiRouter     = require('./prestasiRoutes');   
 const pramukaRouter     = require('./kegiatanPramukaRoutes');   
 const ekstrakurikulerRouter     = require('./ekstrakurikulerRoutes');   
+const layananRouter = require('./layananRoutes');
+const programRouter = require('./programRoutes');
 
 router.use('/auth', require('./authRoutes'));
 
@@ -25,6 +27,8 @@ router.use('/pengumuman', pengumumanRouter);
 router.use('/alumni', alumniRouter);
 router.use('/pramuka', pramukaRouter);
 router.use('/ekstrakurikuler', ekstrakurikulerRouter);
+router.use('/layanan', layananRouter);
+router.use('/program', programRouter);
 
 // Route dengan upload/file berat → pakai uploadLimiter
 router.use('/gallery', galleryRouter);
