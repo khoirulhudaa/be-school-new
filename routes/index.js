@@ -19,6 +19,10 @@
   const guruTendikRouter = require('./guruTendikRoutes');
   const ppdbRouter = require('./ppdbRoutes');
   const osisRouter = require('./osisRoutes');
+  const kalenderRouter = require('./kalenderRoutes');
+  const jadwalRouter = require('./jadwalRoutes');
+  const kurikulumRouter = require('./kurikulumRoutes');
+  const ppidRouter = require('./ppidRoutes');
 
   router.use('/auth', require('./authRoutes'));
 
@@ -36,6 +40,10 @@
   router.use('/guruTendik', guruTendikRouter); 
   router.use('/ppdb', ppdbRouter); 
   router.use('/osis', osisRouter); 
+  router.use('/kalender', kalenderRouter); 
+  router.use('/jadwal', jadwalRouter); 
+  router.use('/kurikulum', kurikulumRouter); 
+  router.use('/ppid', ppidRouter); 
 
   // Route dengan upload/file berat → pakai uploadLimiter
   router.use('/gallery', galleryRouter);
