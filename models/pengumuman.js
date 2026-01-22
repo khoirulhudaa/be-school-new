@@ -20,6 +20,10 @@ const Announcement = sequelize.define('Announcement', {
     type: DataTypes.TEXT,
     allowNull: false,
   },
+  imageUrl: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+  },
   publishDate: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
@@ -32,6 +36,7 @@ const Announcement = sequelize.define('Announcement', {
   timestamps: true,
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
+  tableName: 'pengumuman'
 });
 
 module.exports = Announcement;
