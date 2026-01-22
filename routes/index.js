@@ -23,6 +23,7 @@
   const jadwalRouter = require('./jadwalRoutes');
   const kurikulumRouter = require('./kurikulumRoutes');
   const ppidRouter = require('./ppidRoutes');
+  const ratingRouter = require('./komentarRoutes');
 
   router.use('/auth', require('./authRoutes'));
 
@@ -44,6 +45,7 @@
   router.use('/jadwal', jadwalRouter); 
   router.use('/kurikulum', kurikulumRouter); 
   router.use('/ppid', ppidRouter); 
+  router.use('/rating', ratingRouter); 
 
   // Route dengan upload/file berat → pakai uploadLimiter
   router.use('/gallery', galleryRouter);
