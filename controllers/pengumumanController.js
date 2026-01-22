@@ -25,7 +25,7 @@ exports.getAllAnnouncements = async (req, res) => {
 
 exports.createAnnouncement = async (req, res) => {
   try {
-    const { title, content, schoolId, publishDate } = req.body;
+    const { title, content, schoolId, publishDate, category, source } = req.body;
     if (!title || !content || !schoolId) {
       return res.status(400).json({ success: false, message: 'title, content, dan schoolId wajib diisi' });
     }
@@ -51,6 +51,8 @@ exports.createAnnouncement = async (req, res) => {
       imageUrl,
       schoolId: parseInt(schoolId),
       publishDate: publishDate ? new Date(publishDate) : new Date(),
+      category: category || 'Umum',      // ambil dari body atau default
+      source: source || 'Sekolah',
     });
 
     res.json({ success: true, data: newAnnouncement });
@@ -62,7 +64,7 @@ exports.createAnnouncement = async (req, res) => {
 exports.updateAnnouncement = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, content, publishDate } = req.body;
+    const { title, content, publishDate, category, source } = req.body;
 
     const announcement = await Announcement.findByPk(id);
     if (!announcement) return res.status(404).json({ success: false, message: 'Pengumuman tidak ditemukan' });
@@ -70,6 +72,8 @@ exports.updateAnnouncement = async (req, res) => {
     if (title) announcement.title = title;
     if (content) announcement.content = content;
     if (publishDate) announcement.publishDate = new Date(publishDate);
+    if (category) announcement.category = category;      // update jika dikirim
+    if (source) announcement.source = source;
 
     if (req.file) {
       if (announcement.imageUrl) {

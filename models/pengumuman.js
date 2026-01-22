@@ -1,4 +1,3 @@
-// models/announcement.js
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 
@@ -31,6 +30,17 @@ const Announcement = sequelize.define('Announcement', {
   isActive: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
+  },
+  // Tambahan field baru
+  category: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    defaultValue: 'Umum',  // default jika tidak diisi
+  },
+  source: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+    defaultValue: 'Sekolah',  // contoh: 'Sekolah', 'Dinas', 'Lainnya'
   },
 }, {
   timestamps: true,

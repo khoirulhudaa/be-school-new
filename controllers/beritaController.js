@@ -27,7 +27,7 @@ exports.getAllNews = async (req, res) => {
 
 exports.createNews = async (req, res) => {
   try {
-    const { title, content, schoolId, publishDate } = req.body;
+    const { title, content, schoolId, publishDate, category, source } = req.body;
     if (!title || !content || !schoolId) {
       return res.status(400).json({ success: false, message: 'title, content, dan schoolId wajib diisi' });
     }
@@ -53,6 +53,8 @@ exports.createNews = async (req, res) => {
       imageUrl,
       schoolId: parseInt(schoolId),
       publishDate: publishDate ? new Date(publishDate) : new Date(),
+      category: category || 'Umum',
+      source: source || 'Sekolah',
     });
 
     res.json({ success: true, data: newNews });
@@ -64,7 +66,7 @@ exports.createNews = async (req, res) => {
 exports.updateNews = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, content, publishDate } = req.body;
+    const { title, content, publishDate, category, source } = req.body;
 
     const news = await News.findByPk(id);
     if (!news) return res.status(404).json({ success: false, message: 'Berita tidak ditemukan' });
@@ -72,9 +74,10 @@ exports.updateNews = async (req, res) => {
     if (title) news.title = title;
     if (content) news.content = content;
     if (publishDate) news.publishDate = new Date(publishDate);
+    if (category) news.category = category;
+    if (source) news.source = source;
 
     if (req.file) {
-      // Hapus gambar lama jika ada
       if (news.imageUrl) {
         const publicId = news.imageUrl.split('/').pop().split('.')[0];
         try {
@@ -84,7 +87,6 @@ exports.updateNews = async (req, res) => {
         }
       }
 
-      // Upload gambar baru
       const result = await new Promise((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
           { resource_type: 'image' },
