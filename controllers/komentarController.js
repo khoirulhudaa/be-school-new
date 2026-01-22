@@ -24,20 +24,27 @@ exports.getAllComments = async (req, res) => {
 
 exports.createComment = async (req, res) => {
   try {
-    const { email, name, comment, rating } = req.body;
-    if ( !email || !name || !comment || !rating) {
-      return res.status(400).json({ success: false, message: 'email, name, comment, dan rating wajib diisi' });
+    const { email, name, comment, rating, schoolId } = req.body;
+
+    // Validasi semua field yang dibutuhkan
+    if (!schoolId || !email || !name || !comment || !rating) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'schoolId, email, name, comment, dan rating wajib diisi' 
+      });
     }
 
     const newComment = await Comment.create({ 
-      email: parseInt(email),
-      name,
-      comment,
+      schoolId: parseInt(schoolId),     // <-- WAJIB ditambahkan
+      email: email.trim(),              // jangan parseInt!
+      name: name.trim(),
+      comment: comment.trim(),
       rating: parseInt(rating),
     });
 
     res.json({ success: true, data: newComment });
   } catch (err) {
+    console.error(err);  // untuk debug di server
     res.status(500).json({ success: false, message: err.message });
   }
 };
