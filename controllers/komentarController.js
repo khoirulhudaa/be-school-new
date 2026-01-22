@@ -24,13 +24,12 @@ exports.getAllComments = async (req, res) => {
 
 exports.createComment = async (req, res) => {
   try {
-    const { userId, email, name, comment, rating } = req.body;
-    if (!userId || !email || !name || !comment || !rating) {
-      return res.status(400).json({ success: false, message: 'userId, email, name, comment, dan rating wajib diisi' });
+    const { email, name, comment, rating } = req.body;
+    if ( !email || !name || !comment || !rating) {
+      return res.status(400).json({ success: false, message: 'email, name, comment, dan rating wajib diisi' });
     }
 
     const newComment = await Comment.create({ 
-      userId: parseInt(userId),
       email: parseInt(email),
       name,
       comment,
