@@ -25,6 +25,7 @@
   const ppidRouter = require('./ppidRoutes');
   const ratingRouter = require('./komentarRoutes');
   const organisasiRouter = require('./organisasiRoutes');
+  const partnerRouter = require('./partnerRoutes');
 
   router.use('/auth', require('./authRoutes'));
 
@@ -48,6 +49,7 @@
   router.use('/ppid', ppidRouter); 
   router.use('/rating', ratingRouter); 
   router.use('/organisasi', organisasiRouter); 
+  router.use('/partner', partnerRouter); 
 
   // Route dengan upload/file berat → pakai uploadLimiter
   router.use('/gallery', galleryRouter);
