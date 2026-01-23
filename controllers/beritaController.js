@@ -69,7 +69,7 @@ exports.updateNews = async (req, res) => {
     const { title, content, publishDate, category, source } = req.body;
 
     const news = await News.findByPk(id);
-    if (!news) return res.status(404).json({ success: false, message: 'Berita tidak ditemukan' });
+    if (!news) return res.status(200).json({ success: false, message: [] });
 
     if (title) news.title = title;
     if (content) news.content = content;
