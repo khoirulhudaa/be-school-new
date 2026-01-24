@@ -22,6 +22,7 @@ router.get('/kandidat', votingController.getCandidates);
 // Tambahkan cpUpload di POST dan PUT
 router.post('/kandidat', cpUpload, votingController.createCandidate); 
 router.post('/submit', cpUpload, votingController.submitVote); 
+router.post('/verifikasi-kode', votingController.verifyCode);
 router.put('/kandidat/:id', cpUpload, votingController.updateCandidate);
 
 router.delete('/kandidat/:id', votingController.deleteCandidate);

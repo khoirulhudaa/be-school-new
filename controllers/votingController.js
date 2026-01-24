@@ -255,3 +255,36 @@ exports.deleteSelectedCodes = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// Cek validasi kode tanpa melakukan voting
+exports.verifyCode = async (req, res) => {
+  try {
+    const { code, schoolId } = req.body;
+
+    if (!code || !schoolId) {
+      return res.status(400).json({ success: false, message: "Data tidak lengkap" });
+    }
+
+    const validCode = await VoteCode.findOne({
+      where: { 
+        code: code.toUpperCase(), 
+        schoolId, 
+        isActive: true 
+      }
+    });
+
+    if (!validCode) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Kode tidak valid atau sudah digunakan' 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Kode valid, silakan berikan suara Anda' 
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
