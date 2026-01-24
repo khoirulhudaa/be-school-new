@@ -5,7 +5,7 @@ const rateLimit = require('express-rate-limit');
 // Cocok untuk proteksi umum terhadap abuse/DoS sederhana
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,        // 15 menit
-  limit: 300,                      // max 300 request per IP dalam 15 menit
+  limit: 500,                      // max 300 request per IP dalam 15 menit
   standardHeaders: 'draft-8',      // kirim header RateLimit modern (draft-8)
   legacyHeaders: false,            // matikan header lama X-RateLimit-*
   message: { success: false, message: 'Terlalu banyak permintaan, coba lagi nanti.' },
