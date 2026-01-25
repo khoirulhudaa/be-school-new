@@ -4,28 +4,27 @@ const GuruTendik = require('../models/guruTendik');
 exports.getAllSchoolOrganizations = async (req, res) => {
   try {
     const { schoolId } = req.query;
+    if (!schoolId) return res.status(400).json({ success: false, message: 'schoolId wajib' });
 
-    if (!schoolId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'schoolId wajib disertakan di query' 
-      });
-    }
-
+    // Ambil semua data posisi yang aktif
     const organizations = await SchoolOrganization.findAll({
-      where: { 
-        schoolId: parseInt(schoolId),
-        isActive: true 
-      },
-      include: [
-        { model: SchoolOrganization, as: 'Parent' },
-        { model: SchoolOrganization, as: 'Children' },
-        { model: GuruTendik, as: 'GuruTendik' } 
-      ],
-      order: [['position', 'ASC']], 
+      where: { schoolId: parseInt(schoolId), isActive: true },
+      include: [{ model: GuruTendik }],
+      order: [['id', 'ASC']], 
     });
 
-    res.json({ success: true, data: organizations });
+    // Fungsi untuk merubah array flat menjadi Tree
+    const buildTree = (data, parentId = null) => {
+      return data
+        .filter(item => item.parentId === parentId)
+        .map(item => ({
+          ...item.toJSON(),
+          Children: buildTree(data, item.id)
+        }));
+    };
+
+    const treeData = buildTree(organizations);
+    res.json({ success: true, data: treeData });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
