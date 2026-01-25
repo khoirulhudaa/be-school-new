@@ -62,7 +62,7 @@ app.use((err, req, res, next) => {
 sequelize.authenticate()
   .then(() => {
     console.log('MySQL connected!');
-    return sequelize.sync({ alter: true, force: true });
+    return sequelize.sync({ alter: false, force: false });
   })
   .then(() => {
     console.log('Tables synced');
