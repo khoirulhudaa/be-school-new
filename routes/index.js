@@ -27,6 +27,8 @@
   const organisasiRouter = require('./organisasiRoutes');
   const partnerRouter = require('./partnerRoutes');
   const votingRouter = require('./votingRoutes');
+  const faqRouter = require('./faqRoutes');
+  const ruleRouter = require('./ruleRoutes');
 
   router.use('/auth', require('./authRoutes'));
 
@@ -52,6 +54,8 @@
   router.use('/organisasi', organisasiRouter); 
   router.use('/partner', partnerRouter); 
   router.use('/voting', votingRouter); 
+  router.use('/faq', faqRouter); 
+  router.use('/tata-tertib', ruleRouter); 
 
   // Route dengan upload/file berat → pakai uploadLimiter
   router.use('/gallery', galleryRouter);
