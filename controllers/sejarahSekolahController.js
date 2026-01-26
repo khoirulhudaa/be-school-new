@@ -118,44 +118,67 @@ exports.createSejarah = async (req, res) => {
 exports.updateSejarah = async (req, res) => {
   try {
     const { id } = req.params;
-    const { deskripsi, tahunBerdiri, jumlahKompetensiKeahlian, timeline, daftarKepalaSekolah } = req.body;
+    const { deskripsi, tahunBerdiri, jumlahKompetensiKeahlian, timeline, daftarKepalaSekolah, photoIndices } = req.body;
 
     const sejarah = await SejarahSekolah.findByPk(id);
     if (!sejarah) {
       return res.status(404).json({ success: false, message: 'Sejarah tidak ditemukan' });
     }
 
-    // Update fields
+    // Update fields dasar
     if (deskripsi) sejarah.deskripsi = deskripsi;
     if (tahunBerdiri) sejarah.tahunBerdiri = parseInt(tahunBerdiri);
-    if (jumlahKompetensiKeahlian !== undefined) sejarah.jumlahKompetensiKeahlian = parseInt(jumlahKompetensiKeahlian);
+    if (jumlahKompetensiKeahlian !== undefined) {
+      sejarah.jumlahKompetensiKeahlian = parseInt(jumlahKompetensiKeahlian);
+    }
 
-    let timelineParsed = timeline ? (typeof timeline === 'string' ? JSON.parse(timeline) : timeline) : sejarah.timeline;
-    let daftarParsed = daftarKepalaSekolah ? (typeof daftarKepalaSekolah === 'string' ? JSON.parse(daftarKepalaSekolah) : daftarKepalaSekolah) : sejarah.daftarKepalaSekolah;
+    // Parse array kompleks (timeline & daftar kepsek)
+    let timelineParsed = timeline 
+      ? (typeof timeline === 'string' ? JSON.parse(timeline) : timeline) 
+      : sejarah.timeline;
 
-    // Handle foto: jika ada files baru, hapus semua foto lama, upload baru sesuai urutan
+    let daftarParsed = daftarKepalaSekolah 
+      ? (typeof daftarKepalaSekolah === 'string' ? JSON.parse(daftarKepalaSekolah) : daftarKepalaSekolah) 
+      : sejarah.daftarKepalaSekolah;
+
+    // Handle partial upload foto kepala sekolah
     if (req.files && req.files.length > 0) {
-      if (!daftarParsed || req.files.length !== daftarParsed.length) {
+      // photoIndices bisa string tunggal atau array
+      const indices = photoIndices 
+        ? (Array.isArray(photoIndices) ? photoIndices : [photoIndices])
+        : [];
+
+      if (indices.length !== req.files.length) {
         return res.status(400).json({ 
           success: false, 
-          message: 'Jumlah foto harus sesuai dengan jumlah daftar kepala sekolah' 
+          message: 'Jumlah index foto tidak sesuai dengan jumlah file yang diupload' 
         });
       }
-      // Hapus foto lama
-      if (sejarah.daftarKepalaSekolah) {
-        for (const kepala of sejarah.daftarKepalaSekolah) {
-          await deletePhoto(kepala.fotoUrl);
+
+      for (let i = 0; i < indices.length; i++) {
+        const idx = parseInt(indices[i]);
+
+        // Validasi index
+        if (isNaN(idx) || idx < 0 || idx >= daftarParsed.length) {
+          console.warn(`Index foto tidak valid: ${idx}`);
+          continue;
         }
-      }
-      // Upload baru
-      for (let i = 0; i < daftarParsed.length; i++) {
+
+        // Hapus foto lama jika ada
+        if (daftarParsed[idx]?.fotoUrl) {
+          await deletePhoto(daftarParsed[idx].fotoUrl);
+        }
+
+        // Upload foto baru
         const url = await uploadPhoto(req.files[i].buffer);
-        daftarParsed[i].fotoUrl = url;
+        daftarParsed[idx].fotoUrl = url;
       }
     }
 
-    const jumlahKepala = daftarParsed ? daftarParsed.length : (sejarah.daftarKepalaSekolah ? sejarah.daftarKepalaSekolah.length : 0);
+    // Hitung ulang jumlah kepala sekolah
+    const jumlahKepala = daftarParsed?.length || 0;
 
+    // Simpan perubahan
     sejarah.timeline = timelineParsed;
     sejarah.daftarKepalaSekolah = daftarParsed;
     sejarah.jumlahKepalaSekolah = jumlahKepala;
@@ -164,7 +187,8 @@ exports.updateSejarah = async (req, res) => {
 
     res.json({ success: true, data: sejarah });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    console.error(err);
+    res.status(500).json({ success: false, message: err.message || 'Terjadi kesalahan server' });
   }
 };
 
