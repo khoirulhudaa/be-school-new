@@ -184,6 +184,63 @@ exports.listCodes = async (req, res) => {
   }
 };
 
+exports.getVotingStatus = async (req, res) => {
+  try {
+    const { schoolId } = req.query;
+    if (!schoolId) {
+      return res.status(400).json({ success: false, message: 'schoolId diperlukan' });
+    }
+
+    // Hitung total kode yang dibuat
+    const totalCodes = await VoteCode.count({ where: { schoolId } });
+
+    // Hitung kode yang masih aktif (belum dipakai)
+    const activeCodes = await VoteCode.count({ 
+      where: { schoolId, isActive: true } 
+    });
+
+    const usedCodes = totalCodes - activeCodes;
+    const percentageUsed = totalCodes > 0 ? Math.round((usedCodes / totalCodes) * 100) : 0;
+
+    // Ambil kandidat dengan suara terbanyak (jika voting sudah selesai)
+    let winner = null;
+    if (activeCodes === 0 && totalCodes > 0) {
+      const topCandidate = await Candidate.findOne({
+        where: { schoolId },
+        order: [['votes', 'DESC']],
+        limit: 1,
+      });
+
+      if (topCandidate) {
+        winner = {
+          id: topCandidate.id,
+          chairmanName: topCandidate.chairmanName,
+          viceChairmanName: topCandidate.viceChairmanName,
+          chairmanImageUrl: topCandidate.chairmanImageUrl,
+          viceChairmanImageUrl: topCandidate.viceChairmanImageUrl,
+          votes: topCandidate.votes,
+          vision: topCandidate.vision,
+          mission: topCandidate.mission,
+        };
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        totalCodes,
+        usedCodes,
+        activeCodes,
+        percentageUsed,
+        isVotingFinished: activeCodes === 0 && totalCodes > 0,
+        winner,
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 // Digunakan oleh siswa saat submit suara
 exports.submitVote = async (req, res) => {
   try {
