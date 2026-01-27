@@ -184,6 +184,30 @@ exports.listCodes = async (req, res) => {
   }
 };
 
+exports.getResults = async (req, res) => {
+  try {
+    const { schoolId } = req.query;
+    if (!schoolId) return res.status(400).json({ success: false, message: 'schoolId required' });
+
+    const candidates = await Candidate.findAll({
+      where: { schoolId },
+      attributes: ['id', 'chairmanName', 'viceChairmanName', 'votes'],
+      order: [['votes', 'DESC']],
+    });
+
+    res.json({
+      success: true,
+      data: candidates.map(c => ({
+        id: c.id,
+        name: `${c.chairmanName} & ${c.viceChairmanName}`,
+        votes: c.votes || 0,
+      })),
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 exports.getVotingStatus = async (req, res) => {
   try {
     const { schoolId } = req.query;

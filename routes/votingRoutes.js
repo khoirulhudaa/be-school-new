@@ -30,6 +30,7 @@ router.delete('/kandidat/:id', votingController.deleteCandidate);
 // --- Route untuk Token ---
 router.post('/generate-kode', votingController.generateCodes);
 router.get('/list-kode', votingController.listCodes);
+router.get('/suara', votingController.getResults);
 router.get('/voting-status', votingController.getVotingStatus);
 router.delete('/kode/:id', votingController.deleteCode);
 router.delete('/bulk-delete-kode', votingController.bulkDeleteCodes);
