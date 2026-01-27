@@ -29,6 +29,7 @@
   const votingRouter = require('./votingRoutes');
   const faqRouter = require('./faqRoutes');
   const ruleRouter = require('./ruleRoutes');
+  const jadwalSDRouter = require('./jadwalSDRoutes');
 
   router.use('/auth', require('./authRoutes'));
 
@@ -56,6 +57,7 @@
   router.use('/voting', votingRouter); 
   router.use('/faq', faqRouter); 
   router.use('/tata-tertib', ruleRouter); 
+  router.use('/jadwal-sd', jadwalSDRouter); 
 
   // Route dengan upload/file berat → pakai uploadLimiter
   router.use('/gallery', galleryRouter);
