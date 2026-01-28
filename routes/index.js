@@ -30,6 +30,7 @@
   const faqRouter = require('./faqRoutes');
   const ruleRouter = require('./ruleRoutes');
   const jadwalSDRouter = require('./jadwalSDRoutes');
+  const feedRouter = require('./feedRoutes');
 
   router.use('/auth', require('./authRoutes'));
 
@@ -58,6 +59,7 @@
   router.use('/faq', faqRouter); 
   router.use('/tata-tertib', ruleRouter); 
   router.use('/jadwal-sd', jadwalSDRouter); 
+  router.use('/feed', feedRouter); 
 
   // Route dengan upload/file berat → pakai uploadLimiter
   router.use('/gallery', galleryRouter);
