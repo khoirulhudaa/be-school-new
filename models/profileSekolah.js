@@ -1,3 +1,4 @@
+// models/profileSekolah.js  (atau nama file model Anda)
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 
@@ -32,6 +33,10 @@ const SchoolProfile = sequelize.define('SchoolProfile', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  heroImageUrl: {                   // ← FIELD BARU
+    type: DataTypes.STRING(500),
+    allowNull: true,
+  },
   linkYoutube: {
     type: DataTypes.STRING,
     allowNull: true,
@@ -40,23 +45,19 @@ const SchoolProfile = sequelize.define('SchoolProfile', {
     type: DataTypes.STRING(500),
     allowNull: true,
   },
-  // === FIELD BARU ===
   address: {
-    type: DataTypes.STRING(500),   // alamat lengkap sekolah
-    allowNull: true,               // boleh kosong, tapi sebaiknya diisi
+    type: DataTypes.STRING(500),
+    allowNull: true,
   },
   phoneNumber: {
-    type: DataTypes.STRING(50),    // nomor telepon / WA (string agar support +62, ext, dll)
+    type: DataTypes.STRING(50),
     allowNull: true,
   },
   email: {
     type: DataTypes.STRING(100),
     allowNull: true,
-    validate: {
-      isEmail: true,               // validasi format email (opsional, bisa dihapus jika tidak mau strict)
-    },
+    validate: { isEmail: true },
   },
-  // field yang sudah ada
   studentCount: { type: DataTypes.INTEGER, defaultValue: 0 },
   teacherCount: { type: DataTypes.INTEGER, defaultValue: 0 },
   roomCount: { type: DataTypes.INTEGER, defaultValue: 0 },

@@ -1,4 +1,3 @@
-// controllers/schoolProfileController.js
 const SchoolProfile = require('../models/profileSekolah');
 const cloudinary = require('cloudinary').v2;
 const streamifier = require('streamifier');
@@ -27,7 +26,6 @@ exports.getSchoolProfile = async (req, res) => {
       },
     });
 
-    // Perubahan: Gunakan status 200 meskipun data null agar tidak dikira error endpoint
     return res.status(200).json({ 
       success: true, 
       message: profile ? 'Profil berhasil ditemukan' : 'Profil belum dibuat untuk sekolah ini',
@@ -60,24 +58,37 @@ exports.createSchoolProfile = async (req, res) => {
     }
 
     let photoHeadmasterUrl = null;
-    if (req.file) {
+    let heroImageUrl = null;
+
+    // Upload foto kepala sekolah (jika ada)
+    if (req.files?.photoHeadmasterUrl?.[0]) {
       const result = await new Promise((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
-          { resource_type: 'image', folder: 'school_profiles' },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-          }
+          { resource_type: 'image', folder: 'school_profiles' }, // ← folder sama untuk semua
+          (error, result) => error ? reject(error) : resolve(result)
         );
-        streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
+        streamifier.createReadStream(req.files.photoHeadmasterUrl[0].buffer).pipe(uploadStream);
       });
       photoHeadmasterUrl = result.secure_url;
     }
 
-   const newProfile = await SchoolProfile.create({ 
+    // Upload hero image (jika ada)
+    if (req.files?.heroImage?.[0]) {
+      const result = await new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          { resource_type: 'image', folder: 'school_profiles' }, // ← folder sama
+          (error, result) => error ? reject(error) : resolve(result)
+        );
+        streamifier.createReadStream(req.files.heroImage[0].buffer).pipe(uploadStream);
+      });
+      heroImageUrl = result.secure_url;
+    }
+
+    const newProfile = await SchoolProfile.create({ 
       schoolId: parseInt(schoolId),
       heroTitle, heroSubTitle, linkYoutube, headmasterWelcome, headmasterName, schoolName,
       photoHeadmasterUrl,
+      heroImageUrl,
       studentCount: parseInt(studentCount) || 0,
       teacherCount: parseInt(teacherCount) || 0,
       roomCount: parseInt(roomCount) || 0,
@@ -90,7 +101,9 @@ exports.createSchoolProfile = async (req, res) => {
     });
 
     res.status(201).json({ success: true, data: newProfile });
+
   } catch (err) {
+    console.error(err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -101,16 +114,16 @@ exports.updateSchoolProfile = async (req, res) => {
     const profile = await SchoolProfile.findByPk(id);
     
     if (!profile) {
-      return res.status(200).json({ success: false, message: 'Gagal update: Data tidak ditemukan' });
+      return res.status(404).json({ success: false, message: 'Profil tidak ditemukan' });
     }
 
     const { 
       heroTitle, heroSubTitle, linkYoutube, headmasterWelcome, headmasterName, schoolName,
       studentCount, teacherCount, roomCount, achievementCount, latitude, longitude,
-      address, phoneNumber, email    // ← tambah ini
+      address, phoneNumber, email
     } = req.body;
 
-    // Update fields
+    // Update fields yang dikirim
     if (heroTitle !== undefined) profile.heroTitle = heroTitle;
     if (heroSubTitle !== undefined) profile.heroSubTitle = heroSubTitle;
     if (linkYoutube !== undefined) profile.linkYoutube = linkYoutube;
@@ -125,37 +138,59 @@ exports.updateSchoolProfile = async (req, res) => {
     if (latitude !== undefined) profile.latitude = parseFloat(latitude) || null;
     if (longitude !== undefined) profile.longitude = parseFloat(longitude) || null;
 
-    // Update field baru
     if (address !== undefined) profile.address = address || null;
     if (phoneNumber !== undefined) profile.phoneNumber = phoneNumber || null;
     if (email !== undefined) profile.email = email || null;
 
-    if (req.file) {
+    // Ganti foto kepala sekolah jika dikirim file baru
+    if (req.files?.photoHeadmasterUrl?.[0]) {
+      // Hapus yang lama jika ada
       if (profile.photoHeadmasterUrl) {
-        const publicId = profile.photoHeadmasterUrl.split('/').pop().split('.')[0];
         try {
+          const publicId = profile.photoHeadmasterUrl.split('/').pop().split('.')[0];
           await cloudinary.uploader.destroy(`school_profiles/${publicId}`);
-        } catch (err) {
-          console.log(`Gagal hapus foto lama: ${err.message}`);
+        } catch (e) {
+          console.log('Gagal hapus foto kepsek lama:', e.message);
         }
       }
 
       const result = await new Promise((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
           { resource_type: 'image', folder: 'school_profiles' },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-          }
+          (error, result) => error ? reject(error) : resolve(result)
         );
-        streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
+        streamifier.createReadStream(req.files.photoHeadmasterUrl[0].buffer).pipe(uploadStream);
       });
       profile.photoHeadmasterUrl = result.secure_url;
     }
 
+    // Ganti hero image jika dikirim file baru
+    if (req.files?.heroImage?.[0]) {
+      // Hapus yang lama jika ada
+      if (profile.heroImageUrl) {
+        try {
+          const publicId = profile.heroImageUrl.split('/').pop().split('.')[0];
+          await cloudinary.uploader.destroy(`school_profiles/${publicId}`);
+        } catch (e) {
+          console.log('Gagal hapus hero image lama:', e.message);
+        }
+      }
+
+      const result = await new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          { resource_type: 'image', folder: 'school_profiles' },
+          (error, result) => error ? reject(error) : resolve(result)
+        );
+        streamifier.createReadStream(req.files.heroImage[0].buffer).pipe(uploadStream);
+      });
+      profile.heroImageUrl = result.secure_url;
+    }
+
     await profile.save();
     res.json({ success: true, data: profile });
+
   } catch (err) {
+    console.error(err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -169,7 +204,6 @@ exports.deleteSchoolProfile = async (req, res) => {
       return res.status(200).json({ success: false, message: 'Data sudah tidak ada atau tidak ditemukan' });
     }
 
-    // Soft delete logic
     profile.isActive = false;
     await profile.save();
 

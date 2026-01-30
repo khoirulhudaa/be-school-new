@@ -13,7 +13,7 @@ const InstagramPost = sequelize.define('InstagramPost', {
   },
   username: {
     type: DataTypes.STRING,
-    defaultValue: "sman25jkt_official", // Bisa disesuaikan per sekolah
+    allowNull: false
   },
   profilePic: {
     type: DataTypes.STRING(500),
