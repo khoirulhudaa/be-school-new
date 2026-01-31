@@ -30,7 +30,7 @@ exports.getAllPpdb = async (req, res) => {
 
 exports.createPpdb = async (req, res) => {
   try {
-    const { year, description, schoolId, startDate, endDate, requirements, quota, contactEmail, contactPhone } = req.body;
+    const { year, description, schoolId, startDate, endDate, requirements, quota, contactEmail, contactPhone, admissionPaths } = req.body;
 
     if (!year || !description || !schoolId) {
       return res.status(400).json({ 
@@ -60,6 +60,7 @@ exports.createPpdb = async (req, res) => {
       quota: quota ? parseInt(quota) : null,
       contactEmail: contactEmail || null,
       contactPhone: contactPhone || null,
+      admissionPaths: admissionPaths || []
     });
 
     res.status(201).json({ success: true, data: ppdb });
@@ -79,7 +80,8 @@ exports.updatePpdb = async (req, res) => {
       requirements,      // ← ini wajib ada di destructuring
       quota, 
       contactEmail, 
-      contactPhone 
+      contactPhone,
+      admissionPaths
     } = req.body;
 
     const ppdb = await Ppdb.findByPk(id);
@@ -91,6 +93,13 @@ exports.updatePpdb = async (req, res) => {
     if (description !== undefined) ppdb.description = description;
     if (startDate !== undefined) ppdb.startDate = startDate;
     if (endDate !== undefined) ppdb.endDate = endDate;
+    if (admissionPaths !== undefined) {
+      
+    if (!Array.isArray(admissionPaths)) {
+      return res.status(400).json({ success: false, message: 'admissionPaths harus berupa array' });
+    }
+    ppdb.admissionPaths = admissionPaths;
+  }
 
     // Validasi dan update requirements (sekarang aman karena sudah di-destructure)
     if (requirements !== undefined) {

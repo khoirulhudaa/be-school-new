@@ -20,6 +20,11 @@ const Ppdb = sequelize.define('Ppdb', {
     type: DataTypes.TEXT,
     allowNull: false,
   },
+  admissionPaths: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: [], // Struktur: [{ name: "Zonasi", quota: "50%", description: "..." }]
+  },
   startDate: {
     type: DataTypes.DATE,
     allowNull: true,
