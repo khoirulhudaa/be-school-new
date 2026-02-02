@@ -190,14 +190,24 @@ exports.updateSchoolProfile = async (req, res) => {
       profile.heroImageUrl = result.secure_url;
     }
 
+    // === 3. Ganti logo sekolah (Sama dengan heroImage) ===
     if (req.files?.logo?.[0]) {
       if (profile.logoUrl) {
         try {
           const publicId = profile.logoUrl.split('/').pop().split('.')[0];
           await cloudinary.uploader.destroy(`school_profiles/${publicId}`);
-        } catch (e) { console.log('Gagal hapus logo lama:', e.message); }
+        } catch (e) {
+          console.log('Gagal hapus logo lama:', e.message);
+        }
       }
-      const result = await uploadToCloudinary(req.files.logo[0].buffer);
+
+      const result = await new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          { resource_type: 'image', folder: 'school_profiles' },
+          (error, result) => error ? reject(error) : resolve(result)
+        );
+        streamifier.createReadStream(req.files.logo[0].buffer).pipe(uploadStream);
+      });
       profile.logoUrl = result.secure_url;
     }
 
