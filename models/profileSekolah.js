@@ -37,6 +37,10 @@ const SchoolProfile = sequelize.define('SchoolProfile', {
     type: DataTypes.STRING(500),
     allowNull: true,
   },
+  logoUrl: {                   // ← FIELD BARU
+    type: DataTypes.STRING(500),
+    allowNull: true,
+  },
   linkYoutube: {
     type: DataTypes.STRING,
     allowNull: true,

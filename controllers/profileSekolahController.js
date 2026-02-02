@@ -59,29 +59,32 @@ exports.createSchoolProfile = async (req, res) => {
 
     let photoHeadmasterUrl = null;
     let heroImageUrl = null;
+    let logoUrl = null; // ← Inisialisasi baru
 
-    // Upload foto kepala sekolah (jika ada)
-    if (req.files?.photoHeadmasterUrl?.[0]) {
-      const result = await new Promise((resolve, reject) => {
+    // Fungsi pembantu untuk upload ke Cloudinary agar kode tidak duplikat
+    const uploadToCloudinary = (fileBuffer) => {
+      return new Promise((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
-          { resource_type: 'image', folder: 'school_profiles' }, // ← folder sama untuk semua
+          { resource_type: 'image', folder: 'school_profiles' },
           (error, result) => error ? reject(error) : resolve(result)
         );
-        streamifier.createReadStream(req.files.photoHeadmasterUrl[0].buffer).pipe(uploadStream);
+        streamifier.createReadStream(fileBuffer).pipe(uploadStream);
       });
-      photoHeadmasterUrl = result.secure_url;
+    };
+
+    if (req.files?.photoHeadmasterUrl?.[0]) {
+      const res = await uploadToCloudinary(req.files.photoHeadmasterUrl[0].buffer);
+      photoHeadmasterUrl = res.secure_url;
     }
 
-    // Upload hero image (jika ada)
     if (req.files?.heroImage?.[0]) {
-      const result = await new Promise((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-          { resource_type: 'image', folder: 'school_profiles' }, // ← folder sama
-          (error, result) => error ? reject(error) : resolve(result)
-        );
-        streamifier.createReadStream(req.files.heroImage[0].buffer).pipe(uploadStream);
-      });
-      heroImageUrl = result.secure_url;
+      const res = await uploadToCloudinary(req.files.heroImage[0].buffer);
+      heroImageUrl = res.secure_url;
+    }
+
+    if (req.files?.logo?.[0]) { // ← Logic upload logo
+      const res = await uploadToCloudinary(req.files.logo[0].buffer);
+      logoUrl = res.secure_url;
     }
 
     const newProfile = await SchoolProfile.create({ 
@@ -98,6 +101,7 @@ exports.createSchoolProfile = async (req, res) => {
       address: address || null,
       phoneNumber: phoneNumber || null,
       email: email || null,
+      logoUrl
     });
 
     res.status(201).json({ success: true, data: newProfile });
@@ -184,6 +188,17 @@ exports.updateSchoolProfile = async (req, res) => {
         streamifier.createReadStream(req.files.heroImage[0].buffer).pipe(uploadStream);
       });
       profile.heroImageUrl = result.secure_url;
+    }
+
+    if (req.files?.logo?.[0]) {
+      if (profile.logoUrl) {
+        try {
+          const publicId = profile.logoUrl.split('/').pop().split('.')[0];
+          await cloudinary.uploader.destroy(`school_profiles/${publicId}`);
+        } catch (e) { console.log('Gagal hapus logo lama:', e.message); }
+      }
+      const result = await uploadToCloudinary(req.files.logo[0].buffer);
+      profile.logoUrl = result.secure_url;
     }
 
     await profile.save();
