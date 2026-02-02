@@ -25,21 +25,13 @@ const SchoolAccount = sequelize.define('SchoolAccount', {
     type: DataTypes.STRING(500),
     allowNull: false,
   },
-  latitude: {
-    type: DataTypes.FLOAT,
-    allowNull: true,
-  },
-  longitude: {
-    type: DataTypes.FLOAT,
-    allowNull: true,
-  },
+  latitude: { type: DataTypes.FLOAT, allowNull: true },
+  longitude: { type: DataTypes.FLOAT, allowNull: true },
   email: {
     type: DataTypes.STRING(100),
     allowNull: false,
     unique: true,
-    validate: {
-      isEmail: true,
-    },
+    validate: { isEmail: true },
   },
   password: {
     type: DataTypes.STRING(255),
@@ -79,5 +71,10 @@ const SchoolAccount = sequelize.define('SchoolAccount', {
     },
   },
 });
+
+// Method untuk verifikasi password saat login
+SchoolAccount.prototype.validPassword = async function(password) {
+  return await bcrypt.compare(password, this.password);
+};
 
 module.exports = SchoolAccount;

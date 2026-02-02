@@ -2,17 +2,31 @@ const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 const bcrypt = require('bcryptjs');
 
-const User = sequelize.define('User', {
+const SchoolAccount = sequelize.define('SchoolAccount', {
   id: {
     type: DataTypes.INTEGER,
     autoIncrement: true,
     primaryKey: true,
   },
-  username: {
-    type: DataTypes.STRING(50),
+  npsn: {
+    type: DataTypes.STRING(16),
     allowNull: false,
     unique: true,
+    validate: {
+      isNumeric: true,
+      len: [8, 16],
+    },
   },
+  schoolName: {
+    type: DataTypes.STRING(150),
+    allowNull: false,
+  },
+  address: {
+    type: DataTypes.STRING(500),
+    allowNull: false,
+  },
+  latitude: { type: DataTypes.FLOAT, allowNull: true },
+  longitude: { type: DataTypes.FLOAT, allowNull: true },
   email: {
     type: DataTypes.STRING(100),
     allowNull: false,
@@ -23,43 +37,44 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING(255),
     allowNull: false,
   },
-  fullName: {
+  adminName: {
     type: DataTypes.STRING(100),
+    allowNull: false,
+  },
+  logoUrl: {
+    type: DataTypes.STRING(500),
     allowNull: true,
-  },
-  role: {
-    type: DataTypes.ENUM('admin', 'guru', 'staff', 'user'),
-    defaultValue: 'user',
-  },
-  schoolId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,  // user harus terkait sekolah
   },
   isActive: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
   },
+  lastLogin: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
 }, {
   timestamps: true,
+  tableName: 'akunSekolah',
   hooks: {
-    beforeCreate: async (user) => {
-      if (user.password) {
+    beforeCreate: async (account) => {
+      if (account.password) {
         const salt = await bcrypt.genSalt(10);
-        user.password = await bcrypt.hash(user.password, salt);
+        account.password = await bcrypt.hash(account.password, salt);
       }
     },
-    beforeUpdate: async (user) => {
-      if (user.changed('password')) {
+    beforeUpdate: async (account) => {
+      if (account.changed('password')) {
         const salt = await bcrypt.genSalt(10);
-        user.password = await bcrypt.hash(user.password, salt);
+        account.password = await bcrypt.hash(account.password, salt);
       }
     },
   },
 });
 
-// Method untuk validasi password
-User.prototype.validPassword = async function (password) {
+// Method untuk verifikasi password saat login
+SchoolAccount.prototype.validPassword = async function(password) {
   return await bcrypt.compare(password, this.password);
 };
 
-module.exports = User;
+module.exports = SchoolAccount;
