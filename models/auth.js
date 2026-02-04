@@ -17,6 +17,22 @@ const SchoolAccount = sequelize.define('SchoolAccount', {
       len: [8, 16],
     },
   },
+  verificationPin: {
+    type: DataTypes.STRING(6),
+    allowNull: true,
+  },
+  isVerified: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  resetPasswordToken: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  resetPasswordExpires: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
   schoolName: {
     type: DataTypes.STRING(150),
     allowNull: false,
