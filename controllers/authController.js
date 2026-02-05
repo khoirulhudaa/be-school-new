@@ -131,7 +131,7 @@ exports.registerSchool = async (req, res) => {
       return res.status(400).json({ success: false, message: 'NPSN atau Email sudah terdaftar' });
     }
 
-    res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server' });
+    res.status(500).json({ success: false, message: err });
   }
 };
 
@@ -200,7 +200,7 @@ exports.forgotPassword = async (req, res) => {
     await user.save();
 
     // Sesuaikan dengan URL Frontend Anda
-    const resetUrl = `http://localhost:5173/auth/reset-password/${resetToken}`;
+    const resetUrl = `https://admin.kiraproject.id/auth/reset-password/${resetToken}`;
 
     // Template Email Premium
     const emailHtml = `
@@ -208,9 +208,6 @@ exports.forgotPassword = async (req, res) => {
         <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
           <tr>
             <td style="padding: 40px 24px 20px 24px; text-align: center;">
-              <div style="background-color: #3b82f6; width: 48px; height: 48px; border-radius: 12px; display: inline-block; line-height: 48px; margin-bottom: 20px;">
-                <span style="color: white; font-size: 24px; font-weight: bold;">Dashboard</span>
-              </div>
               <h1 style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.025em; color: #111827;">Atur Ulang Password</h1>
             </td>
           </tr>
