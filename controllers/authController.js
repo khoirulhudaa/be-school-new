@@ -327,3 +327,45 @@ exports.login = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// --- UPDATE PROFILE (HANYA NAMA & EMAIL) ---
+exports.updateProfile = async (req, res) => {
+  try {
+    const { adminName, email } = req.body;
+    
+    // 1. Cari user berdasarkan ID dari token (req.user.id dari middleware protect)
+    const user = await SchoolAccount.findByPk(req.user.id);
+    
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Akun tidak ditemukan' });
+    }
+
+    // 2. Validasi Email (Cek jika email baru sudah dipakai akun lain)
+    if (email && email !== user.email) {
+      const emailExists = await SchoolAccount.findOne({ where: { email } });
+      if (emailExists) {
+        return res.status(400).json({ success: false, message: 'Email sudah digunakan oleh akun lain' });
+      }
+      user.email = email;
+    }
+
+    // 3. Update Nama Admin
+    if (adminName) {
+      user.adminName = adminName;
+    }
+
+    // Simpan perubahan
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Profil administrator berhasil diperbarui',
+      data: {
+        adminName: user.adminName,
+        email: user.email
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Gagal memperbarui profil: ' + err.message });
+  }
+};

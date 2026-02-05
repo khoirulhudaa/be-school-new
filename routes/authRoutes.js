@@ -19,5 +19,6 @@ router.post('/login', authController.login);
 router.get('/profile', protect, authController.getProfile);
 router.post('/forgot-password', authController.forgotPassword);
 router.post('/reset-password', authController.resetPassword);
+router.put('/update-profile', protect, authController.updateProfile);
 
 module.exports = router;
