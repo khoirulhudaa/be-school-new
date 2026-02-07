@@ -32,6 +32,8 @@
   const jadwalSDRouter = require('./jadwalSDRoutes');
   const feedRouter = require('./feedRoutes');
   const registerRouter = require('./registerRoutes');
+  const siswaRouter = require('./siswaRoutes');
+  const kelasRouter = require('./kelasRoutes');
 
   router.use('/auth', require('./authRoutes'));
 
@@ -42,6 +44,7 @@
   router.use('/pengumuman', pengumumanRouter);
   router.use('/alumni', alumniRouter);
   router.use('/pramuka', pramukaRouter);
+  router.use('/siswa', siswaRouter);
   router.use('/ekstrakurikuler', ekstrakurikulerRouter);
   router.use('/layanan', layananRouter);
   router.use('/program', programRouter);
@@ -62,7 +65,8 @@
   router.use('/jadwal-sd', jadwalSDRouter); 
   router.use('/feed', feedRouter); 
   router.use('/akun', registerRouter); 
-
+  router.use('/kelas', kelasRouter);
+  
   // Route dengan upload/file berat → pakai uploadLimiter
   router.use('/gallery', galleryRouter);
   router.use('/fasilitas', fasilitasRouter);
