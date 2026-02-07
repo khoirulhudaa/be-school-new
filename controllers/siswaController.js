@@ -70,7 +70,15 @@ exports.createStudent = async (req, res) => {
 exports.getAllStudents = async (req, res) => {
   try {
     const { schoolId, page = 1, limit = 10, class: studentClass, batch } = req.query;
-  
+    
+    // 1. Validasi WAJIB ada schoolId
+    if (!schoolId || schoolId === 'undefined' || isNaN(parseInt(schoolId))) {
+      return res.status(400).json({
+        success: false,
+        message: "Parameter 'schoolId' diperlukan dan harus berupa angka."
+      });
+    }
+
     // Siapkan objek where
     let condition = { schoolId, isActive: true };
     
@@ -220,6 +228,14 @@ exports.getAttendanceReport = async (req, res) => {
   try {
     const { schoolId, year, month, className, batch, page = 1, limit = 50 } = req.query;
 
+    // 1. Validasi WAJIB ada schoolId
+    if (!schoolId || schoolId === 'undefined' || isNaN(parseInt(schoolId))) {
+      return res.status(400).json({
+        success: false,
+        message: "Parameter 'schoolId' diperlukan dan harus berupa angka."
+      });
+    }
+
     let startDate, endDate;
     if (month) {
       startDate = moment(`${year}-${month}-01`, "YYYY-MM-DD").startOf('month').toDate();
@@ -268,6 +284,14 @@ exports.getAttendanceReport = async (req, res) => {
 exports.exportAttendanceExcel = async (req, res) => {
   try {
     const { schoolId, year, month, className, batch } = req.query;
+
+    // 1. Validasi WAJIB ada schoolId
+    if (!schoolId || schoolId === 'undefined' || isNaN(parseInt(schoolId))) {
+      return res.status(400).json({
+        success: false,
+        message: "Parameter 'schoolId' diperlukan dan harus berupa angka."
+      });
+    }
 
     let startDate, endDate, fileName;
     if (month) {
