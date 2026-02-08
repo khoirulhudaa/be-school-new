@@ -59,6 +59,9 @@ exports.createGuruTendik = async (req, res) => {
       photoUrl = result.secure_url;
     }
 
+    // Logic QR Code otomatis tanpa NIP
+    const generatedQR = `QR-STAFF-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
     const newGuruTendik = await GuruTendik.create({ 
       nama, 
       mapel,
@@ -67,7 +70,8 @@ exports.createGuruTendik = async (req, res) => {
       jurusan,
       jenisKelamin,
       photoUrl,
-      schoolId: parseInt(schoolId)
+      schoolId: parseInt(schoolId),
+      qrCodeData: generatedQR
     });
 
     res.json({ success: true, data: newGuruTendik });

@@ -21,6 +21,14 @@ router.delete('/:id', studentController.deleteStudent);
 // Endpoint: /api/siswa/scan
 router.post('/scan', studentController.scanQRCode);
 
+// Mark Absence (Izin, Sakit, Alpha - Satuan atau Bulk)
+router.post('/mark-absence', studentController.markAbsence);
+
+// --- 3. API STATISTIK & LAPORAN ---
+
+// Statistik Dashboard (Hadir, Sakit, Izin, Alpha hari ini)
+router.get('/today-stats', studentController.getTodayStats);
+
 // Endpoint Laporan & Export (Perbaikan ejaan: attendance)
 router.get('/attendance-report', studentController.getAttendanceReport);
 router.get('/export-attendance', studentController.exportAttendanceExcel);
