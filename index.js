@@ -89,7 +89,7 @@ sequelize.authenticate()
     // JIKA ADA PERUBAH MODELS SAJA (LOCAL SAJA)
     // return sequelize.sync({ alter: true, force: false });
 
-    return sequelize.sync({ alter: true, force: false });
+    return sequelize.sync({ alter: false, force: false });
   })
   .then(() => {
     console.log('Tables synced');
