@@ -17,26 +17,7 @@ const apiRoutes = require('./routes');  // → routes/index.js
 const app = express();
 const port = process.env.PORT || 5005;
 
-// --- KONFIGURASI NODE-CRON ---
-cron.schedule('0 0 * * *', async () => {
-  console.log('[CRON]: Memulai reset status kehadiran siswa...');
-  try {
-    const [affectedCount] = await Student.update(
-      { statusKehadiran: 'Belum Hadir' },
-      { 
-        // Hanya reset siswa yang masih aktif
-        where: { isActive: true } 
-      }
-    );
-    console.log(`[CRON]: Berhasil me-reset ${affectedCount} siswa menjadi Belum Hadir.`);
-  } catch (err) {
-    console.error('[CRON ERROR]: Gagal reset status kehadiran:', err.message);
-  }
-}, {
-  scheduled: true,
-  // Sesuaikan dengan zona waktu sekolah
-  timezone: "Asia/Jakarta" 
-});
+app.set('trust proxy', 1);
 
 if (process.env.NODE_ENV !== 'production') {
   app.set('json spaces', 2);
@@ -89,7 +70,7 @@ sequelize.authenticate()
     // JIKA ADA PERUBAH MODELS SAJA (LOCAL SAJA)
     // return sequelize.sync({ alter: true, force: false });
 
-    return sequelize.sync({ alter: true, force: false });
+    return sequelize.sync({ alter: false, force: false });
   })
   .then(() => {
     console.log('Tables synced');

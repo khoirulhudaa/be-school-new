@@ -11,9 +11,11 @@ exports.getAllComments = async (req, res) => {
       });
     }
 
-    const comments = await Comment.findAll({
+   const comments = await Comment.findAll({
+      where: { 
         schoolId: parseInt(schoolId),
-        order: [['createdAt', 'DESC']],
+      },
+      order: [['createdAt', 'DESC']],
     });
 
     res.json({ success: true, data: comments });
@@ -36,7 +38,7 @@ exports.createComment = async (req, res) => {
 
     const newComment = await Comment.create({ 
       schoolId: parseInt(schoolId),     // <-- WAJIB ditambahkan
-      email: email.trim(),              // jangan parseInt!
+      email: String(email).trim().toLowerCase(), // Pastikan string dan lower case
       name: name.trim(),
       comment: comment.trim(),
       rating: parseInt(rating),
