@@ -691,7 +691,7 @@ exports.exportAttendanceExcel = async (req, res) => {
               attributes: ['name', 'nis']
             }
           : {
-              model: Guru, // Pastikan nama model Guru Anda benar
+              model: GuruTendik, // Pastikan nama model Guru Anda benar
               as: 'guru',   // Sesuaikan alias di asosiasi model Anda
               where: { schoolId: parseInt(schoolId) },
               attributes: ['nama', 'role', 'mapel']
@@ -714,7 +714,7 @@ exports.exportAttendanceExcel = async (req, res) => {
             no: count++,
             tanggal: moment(item.createdAt).format('YYYY-MM-DD'),
             waktu: moment(item.createdAt).format('HH:mm'),
-            nama: userRole === 'student' ? person?.name : person?.nama,
+            nama: userRole === 'student' ? (person?.name || '-') : (person?.nama || '-'),
             identitas: userRole === 'student' ? person?.nis : (person?.role || 'Guru/Staff'),
             info_tambahan: userRole === 'student' ? item.currentClass : (person?.mapel || '-'),
             status: item?.isLate ? 'Terlambat' : item.status
