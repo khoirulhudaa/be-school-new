@@ -212,6 +212,95 @@ exports.getAllTeachers = async (req, res) => {
   }
 };
 
+exports.getUserDetail = async (req, res) => {
+  try {
+    const { id } = req.params;
+    // role: 'student' atau 'teacher'
+    const { role, year } = req.query; 
+
+    if (!role || !['student', 'teacher'].includes(role)) {
+      return res.status(400).json({ success: false, message: "Role harus ditentukan (student/teacher)." });
+    }
+
+    // 1. Konfigurasi dinamis berdasarkan Role
+    const isStudent = role === 'student';
+    const Model = isStudent ? Student : GuruTendik;
+    const attendanceAlias = isStudent ? 'studentAttendances' : 'guruAttendances';
+
+    // Rentang waktu 1 tahun
+    const startDate = year 
+      ? moment(`${year}-01-01`).startOf('year').toDate() 
+      : moment().subtract(1, 'years').toDate();
+    const endDate = year 
+      ? moment(`${year}-12-31`).endOf('year').toDate() 
+      : moment().endOf('day').toDate();
+
+    // 2. Query Database
+    const user = await Model.findOne({
+      where: { id, isActive: true },
+      include: [
+        {
+          model: Attendance,
+          as: attendanceAlias,
+          where: {
+            createdAt: { [Op.between]: [startDate, endDate] }
+          },
+          required: false,
+        }
+      ],
+      order: [[ { model: Attendance, as: attendanceAlias }, 'createdAt', 'DESC']]
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Data tidak ditemukan' });
+    }
+
+    // 3. Proses Statistik & Riwayat
+    const stats = { Hadir: 0, Izin: 0, Sakit: 0, Alpha: 0, Terlambat: 0 };
+    const deadline = "07:00:00";
+
+    // Akses array attendance secara dinamis menggunakan alias
+    const rawAttendances = user[attendanceAlias] || [];
+
+    const history = rawAttendances.map(record => {
+      const scanTime = moment(record.createdAt).format("HH:mm:ss");
+      const isLate = record.status === 'Hadir' && scanTime > deadline;
+
+      if (isLate) stats.Terlambat++;
+      if (stats.hasOwnProperty(record.status)) {
+        stats[record.status]++;
+      }
+
+      return {
+        id: record.id,
+        date: moment(record.createdAt).format('YYYY-MM-DD'),
+        time: scanTime,
+        status: record.status,
+        isLate: isLate,
+        info: isStudent ? record.currentClass : 'GURU/STAFF'
+      };
+    });
+
+    // 4. Cleanup Response
+    const profile = user.toJSON();
+    delete profile[attendanceAlias]; // Hapus data mentah agar tidak duplikat di JSON
+
+    res.json({
+      success: true,
+      data: {
+        role,
+        profile,
+        statistics: stats,
+        attendanceHistory: history
+      }
+    });
+
+  } catch (err) {
+    console.error("Error Detail User:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 exports.scanQRCode = async (req, res) => {
   const { qrCodeData, role } = req.body; // role: 'student' atau 'teacher'
   const todayStart = moment().startOf('day').toDate();
@@ -503,56 +592,6 @@ exports.exportAttendanceExcel = async (req, res) => {
     }
   }
 };
-
-// exports.markAbsence = async (req, res) => {
-//   try {
-//     let data = req.body;
-//     if (!Array.isArray(data)) data = [data];
-
-//     if (data.length === 0) {
-//       return res.status(400).json({ success: false, message: "Data kosong." });
-//     }
-
-//     const startOfDay = moment().startOf('day').toDate();
-//     const endOfDay = moment().endOf('day').toDate();
-
-//     // Proses semua data secara paralel untuk kecepatan maksimal
-//     const operations = data.map(async (item) => {
-//       const { studentId, schoolId, status, currentClass } = item;
-
-//       // Cari apakah sudah ada absen untuk siswa ini di hari ini
-//       const existing = await Attendance.findOne({
-//         where: {
-//           studentId,
-//           createdAt: { [Op.between]: [startOfDay, endOfDay] }
-//         }
-//       });
-
-//       if (existing) {
-//         // Jika ADA: Update status dan currentClass (updatedAt akan otomatis terisi)
-//         return existing.update({ status, currentClass });
-//       } else {
-//         // Jika TIDAK ADA: Buat baris baru
-//         return Attendance.create({
-//           studentId,
-//           schoolId,
-//           status,
-//           currentClass
-//         });
-//       }
-//     });
-
-//     const records = await Promise.all(operations);
-
-//     res.json({
-//       success: true,
-//       message: `Berhasil memproses ${records.length} data absensi (Update/Insert).`,
-//       data: records
-//     });
-//   } catch (err) {
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
 
 exports.markAbsence = async (req, res) => {
   try {

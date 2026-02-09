@@ -23,7 +23,7 @@ router.post('/scan', studentController.scanQRCode);
 
 // Mark Absence (Izin, Sakit, Alpha - Satuan atau Bulk)
 router.post('/mark-absence', studentController.markAbsence);
-
+router.get('/detail/:id', studentController.getUserDetail);
 // --- 3. API STATISTIK & LAPORAN ---
 
 // Statistik Dashboard (Hadir, Sakit, Izin, Alpha hari ini)
