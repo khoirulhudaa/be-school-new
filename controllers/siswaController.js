@@ -211,6 +211,114 @@ exports.getAllTeachers = async (req, res) => {
   }
 };
 
+exports.scanQRCode = async (req, res) => {
+  const { qrCodeData, role } = req.body; // role: 'student' atau 'teacher'
+  const todayStart = moment().startOf('day').toDate();
+  const todayEnd = moment().endOf('day').toDate();
+
+  try {
+    let user;
+    let updateFields = { schoolId: null, id: null, name: null, class: null, nisn: null, email: null };
+
+    if (role === 'student') {
+      user = await Student.findOne({ where: { qrCodeData, isActive: true } });
+      if (user) {
+        updateFields = { idKey: 'studentId', id: user.id, name: user.name, class: user.class, schoolId: user.schoolId, nisn: user.nisn };
+      }
+    } else {
+      // Untuk Guru, asumsikan qrCodeData disimpan di field tertentu atau pakai ID
+      user = await GuruTendik.findOne({ where: { id: qrCodeData, isActive: true } }); 
+      if (user) {
+        updateFields = { idKey: 'guruId', id: user.id, name: user.nama, class: 'GURU/STAFF', schoolId: user.schoolId, email: user.email };
+      }
+    }
+
+    if (!user) return res.status(404).json({ success: false, message: 'Data tidak ditemukan' });
+
+    // Cek Duplikasi
+    const alreadyExists = await Attendance.findOne({
+      where: { 
+        [updateFields.idKey]: updateFields.id, 
+        createdAt: { [Op.between]: [todayStart, todayEnd] } 
+      }
+    });
+
+    if (alreadyExists) return res.status(400).json({ success: false, message: `${updateFields.name} sudah absen.` });
+
+    // Simpan
+    await Attendance.create({ 
+      [updateFields.idKey]: updateFields.id,
+      userRole: role,
+      schoolId: updateFields.schoolId, 
+      currentClass: updateFields.class,
+      status: 'Hadir'
+    });
+
+     res.json({ 
+      success: true, 
+      message: `Absen berhasil: ${updateFields.name}`,
+      data: {  // Tambahkan objek data ini
+        name: updateFields.name,
+        nisn: updateFields.nisn || updateFields.email, // Sesuaikan field yang ada
+        class: updateFields.class
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.updateStudent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, nis, nisn, gender, birthPlace, birthDate, nik, isActive, class: className, batch } = req.body;
+
+    const student = await Student.findByPk(id);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Siswa tidak ditemukan' });
+    }
+
+   let photoUrl = student.photoUrl;
+
+    if (req.file) {
+      // Optimasi saat update (otomatis menimpa file lama karena public_id sama)
+      photoUrl = await processPhotoUpload(req.file.buffer, student.schoolId, student.nis);
+    }
+
+    await student.update({
+      name, nis, nisn, gender, birthPlace, birthDate, nik, isActive, class: className, batch,
+      photoUrl
+    });
+
+    res.json({ success: true, message: 'Data siswa diperbarui', data: student });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// --- DELETE SISWA (Soft Delete) ---
+exports.deleteStudent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const student = await Student.findByPk(id);
+
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Siswa tidak ditemukan' });
+    }
+
+    // Opsi A: Hard Delete (Hapus permanen)
+    // await student.destroy(); 
+
+    // Opsi B: Soft Delete (Hanya nonaktifkan) -> Lebih aman untuk history absen
+    student.isActive = false;
+    await student.save();
+
+    res.json({ success: true, message: 'Siswa berhasil dinonaktifkan' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 exports.getAttendanceReport = async (req, res) => {
   try {
     const { schoolId, role, year, month, page = 1, limit = 50 } = req.query;
