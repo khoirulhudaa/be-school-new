@@ -426,6 +426,37 @@ exports.deleteStudent = async (req, res) => {
 //   }
 // };
 
+// exports.getAttendanceReport = async (req, res) => {
+//   try {
+//     const { schoolId, role, year, month, page = 1, limit = 50 } = req.query;
+
+//     const startDate = moment(`${year}-${month}-01`).startOf('month').toDate();
+//     const endDate = moment(startDate).endOf('month').toDate();
+
+//     const { count, rows } = await Attendance.findAndCountAll({
+//       where: {
+//         schoolId,
+//         userRole: role,
+//         createdAt: { [Op.between]: [startDate, endDate] }
+//       },
+//       include: [
+//         {
+//           model: role === 'student' ? Student : GuruTendik,
+//           as: role === 'student' ? 'student' : 'guru',
+//           attributes: role === 'student' ? ['name', 'nis'] : ['nama', 'role', 'mapel']
+//         }
+//       ],
+//       limit: parseInt(limit),
+//       offset: (page - 1) * limit,
+//       order: [['createdAt', 'DESC']]
+//     });
+
+//     res.json({ success: true, data: rows, total: count });
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
 exports.getAttendanceReport = async (req, res) => {
   try {
     const { schoolId, role, year, month, page = 1, limit = 50 } = req.query;
@@ -447,11 +478,35 @@ exports.getAttendanceReport = async (req, res) => {
         }
       ],
       limit: parseInt(limit),
-      offset: (page - 1) * limit,
-      order: [['createdAt', 'DESC']]
+      offset: (parseInt(page) - 1) * parseInt(limit),
+      order: [['createdAt', 'DESC']],
+      raw: false // Biarkan false agar kita bisa memanipulasi objek datavalues
     });
 
-    res.json({ success: true, data: rows, total: count });
+    // Batas waktu jam 07:00
+    const deadline = "07:00:00";
+
+    // Modifikasi rows untuk menambahkan status terlambat
+    const processedRows = rows.map(record => {
+      const attendance = record.toJSON();
+      const scanTime = moment(attendance.createdAt).format("HH:mm:ss");
+      
+      // Tambahkan key baru
+      attendance.isLate = attendance.status === 'Hadir' && scanTime > deadline;
+      attendance.scanTime = scanTime; // Opsional: kirim waktu scannya saja untuk memudahkan frontend
+
+      return attendance;
+    });
+
+    res.json({ 
+      success: true, 
+      data: processedRows, 
+      pagination: {
+        totalItems: count,
+        totalPages: Math.ceil(count / limit),
+        currentPage: parseInt(page)
+      }
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -609,36 +664,99 @@ exports.markAbsence = async (req, res) => {
   }
 };
 
+// exports.getTodayStats = async (req, res) => {
+//   try {
+//     const { schoolId, role = 'student' } = req.query; // Tambahkan filter role
+
+//     const stats = await Attendance.findAll({
+//       attributes: [
+//         'status',
+//         [fn('COUNT', col('id')), 'total']
+//       ],
+//       where: {
+//         schoolId: parseInt(schoolId),
+//         userRole: role,
+//         createdAt: {
+//           [Op.between]: [moment().startOf('day').toDate(), moment().endOf('day').toDate()]
+//         }
+//       },
+//       group: ['status'],
+//       raw: true 
+//     });
+
+//     const summary = { Hadir: 0, Sakit: 0, Izin: 0, Alpha: 0 };
+//       stats.forEach(item => {
+//         // Pada raw query, key biasanya langsung nama kolom atau alias
+//         summary[item.status] = parseInt(item.total);
+//       });
+
+//       res.json({ success: true, data: { date: moment().format('YYYY-MM-DD'), ...summary } });
+//     } catch (err) {
+//       res.status(500).json({ success: false, message: err.message });
+//     }
+// };
+
 exports.getTodayStats = async (req, res) => {
   try {
-    const { schoolId, role = 'student' } = req.query; // Tambahkan filter role
+    const { schoolId, role = 'student' } = req.query;
 
-    const stats = await Attendance.findAll({
-      attributes: [
-        'status',
-        [fn('COUNT', col('id')), 'total']
-      ],
+    // Ambil semua data kehadiran hari ini untuk sekolah & role terkait
+    const attendanceData = await Attendance.findAll({
       where: {
         schoolId: parseInt(schoolId),
         userRole: role,
         createdAt: {
-          [Op.between]: [moment().startOf('day').toDate(), moment().endOf('day').toDate()]
+          [Op.between]: [
+            moment().startOf('day').toDate(), 
+            moment().endOf('day').toDate()
+          ]
         }
       },
-      group: ['status'],
       raw: true 
     });
 
-    const summary = { Hadir: 0, Sakit: 0, Izin: 0, Alpha: 0 };
-      stats.forEach(item => {
-        // Pada raw query, key biasanya langsung nama kolom atau alias
-        summary[item.status] = parseInt(item.total);
-      });
+    // Struktur summary dengan key Terlambat yang terpisah
+    const summary = { 
+      Hadir: 0, 
+      Terlambat: 0, // Key baru
+      Sakit: 0, 
+      Izin: 0, 
+      Alpha: 0 
+    };
 
-      res.json({ success: true, data: { date: moment().format('YYYY-MM-DD'), ...summary } });
-    } catch (err) {
-      res.status(500).json({ success: false, message: err.message });
-    }
+    // Definisikan batas waktu (07:00:00)
+    // Gunakan format string 'HH:mm:ss' agar perbandingannya mudah
+    const deadline = "07:00:00";
+
+    attendanceData.forEach(item => {
+      if (item.status === 'Hadir') {
+        // Ambil bagian jam dari createdAt (HH:mm:ss)
+        const scanTime = moment(item.createdAt).format("HH:mm:ss");
+
+        if (scanTime > deadline) {
+          summary.Terlambat += 1;
+        } else {
+          summary.Hadir += 1;
+        }
+      } else {
+        // Mapping untuk status Sakit, Izin, Alpha
+        if (summary.hasOwnProperty(item.status)) {
+          summary[item.status] += 1;
+        }
+      }
+    });
+
+    res.json({ 
+      success: true, 
+      data: { 
+        date: moment().format('YYYY-MM-DD'),
+        deadlineInfo: deadline,
+        ...summary 
+      } 
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 };
 
 // Tambahkan/Update di siswaController.js
