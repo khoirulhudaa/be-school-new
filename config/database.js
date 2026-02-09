@@ -8,19 +8,16 @@ const sequelize = new Sequelize(
   {
     host: process.env.DB_HOST,
     dialect: 'mysql',
-    timezone: '+07:00',
     isolationLevel: Transaction.ISOLATION_LEVELS.REPEATABLE_READ,
     logging: false, 
     pool: {
-      max: 10,           
+      max: 20,           
       min: 5,            
       acquire: 60000,    
       idle: 10000        
     },
     dialectOptions: {
-      connectTimeout: 60000,
-      dateStrings: true,
-      typeCast: true
+      connectTimeout: 60000 
     }
   }
 );

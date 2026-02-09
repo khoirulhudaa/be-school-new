@@ -329,75 +329,12 @@ exports.deleteStudent = async (req, res) => {
   }
 };
 
-// exports.getAttendanceReport = async (req, res) => {
-//   try {
-//     const { schoolId, role, year, month, page = 1, limit = 50 } = req.query;
-
-//     const startDate = moment(`${year}-${month}-01`).startOf('month').toDate();
-//     const endDate = moment(startDate).endOf('month').toDate();
-
-//     const { count, rows } = await Attendance.findAndCountAll({
-//       where: {
-//         schoolId,
-//         userRole: role,
-//         createdAt: { [Op.between]: [startDate, endDate] }
-//       },
-//       include: [
-//         {
-//           model: role === 'student' ? Student : GuruTendik,
-//           as: role === 'student' ? 'student' : 'guru',
-//           attributes: role === 'student' ? ['name', 'nis'] : ['nama', 'role', 'mapel']
-//         }
-//       ],
-//       limit: parseInt(limit),
-//       offset: (parseInt(page) - 1) * parseInt(limit),
-//       order: [['createdAt', 'DESC']],
-//       raw: false // Biarkan false agar kita bisa memanipulasi objek datavalues
-//     });
-
-//     // Batas waktu jam 07:00
-//     const deadline = "07:00:00";
-
-//     // Modifikasi rows untuk menambahkan status terlambat
-//     const processedRows = rows.map(record => {
-//       const attendance = record.toJSON();
-//       const scanTime = moment(attendance.createdAt).format("HH:mm:ss");
-      
-//       // Tambahkan key baru
-//       attendance.isLate = attendance.status === 'Hadir' && scanTime > deadline;
-//       attendance.scanTime = scanTime; // Opsional: kirim waktu scannya saja untuk memudahkan frontend
-
-//       return attendance;
-//     });
-
-//     res.json({ 
-//       success: true, 
-//       data: processedRows, 
-//       pagination: {
-//         totalItems: count,
-//         totalPages: Math.ceil(count / limit),
-//         currentPage: parseInt(page)
-//       }
-//     });
-//   } catch (err) {
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
-
 exports.getAttendanceReport = async (req, res) => {
   try {
     const { schoolId, role, year, month, page = 1, limit = 50 } = req.query;
 
-    // Pastikan nilai adalah angka untuk menghindari error pembagian
-    const pLimit = parseInt(limit) || 50;
-    const pPage = parseInt(page) || 1;
-
-    const queryYear = year || moment().year();
-    const queryMonth = month || (moment().month() + 1);
-
-    // Format string agar sinkron dengan dateStrings: true di config Sequelize
-    const startDate = moment(`${queryYear}-${queryMonth}-01`, "YYYY-MM-DD").startOf('month').format("YYYY-MM-DD HH:mm:ss");
-    const endDate = moment(startDate).endOf('month').format("YYYY-MM-DD HH:mm:ss");
+    const startDate = moment(`${year}-${month}-01`).startOf('month').toDate();
+    const endDate = moment(startDate).endOf('month').toDate();
 
     const { count, rows } = await Attendance.findAndCountAll({
       where: {
@@ -405,26 +342,30 @@ exports.getAttendanceReport = async (req, res) => {
         userRole: role,
         createdAt: { [Op.between]: [startDate, endDate] }
       },
-      include: [{
-        model: role === 'student' ? Student : GuruTendik,
-        as: role === 'student' ? 'student' : 'guru',
-        attributes: role === 'student' ? ['name', 'nis'] : ['nama', 'role', 'mapel']
-      }],
-      limit: pLimit,
-      offset: (pPage - 1) * pLimit,
-      order: [['createdAt', 'DESC']]
+      include: [
+        {
+          model: role === 'student' ? Student : GuruTendik,
+          as: role === 'student' ? 'student' : 'guru',
+          attributes: role === 'student' ? ['name', 'nis'] : ['nama', 'role', 'mapel']
+        }
+      ],
+      limit: parseInt(limit),
+      offset: (parseInt(page) - 1) * parseInt(limit),
+      order: [['createdAt', 'DESC']],
+      raw: false // Biarkan false agar kita bisa memanipulasi objek datavalues
     });
 
-    const DEADLINE_ABSEN = "07:00:00"; // Pindah ke luar map
+    // Batas waktu jam 07:00
+    const deadline = "07:00:00";
 
+    // Modifikasi rows untuk menambahkan status terlambat
     const processedRows = rows.map(record => {
       const attendance = record.toJSON();
-      const timeObj = moment(attendance.createdAt);
-      const scanTime = timeObj.format("HH:mm:ss");
+      const scanTime = moment(attendance.createdAt).format("HH:mm:ss");
       
-      attendance.isLate = attendance.status === 'Hadir' && scanTime > DEADLINE_ABSEN;
-      attendance.scanTime = scanTime;
-      attendance.scanDate = timeObj.format("YYYY-MM-DD");
+      // Tambahkan key baru
+      attendance.isLate = attendance.status === 'Hadir' && scanTime > deadline;
+      attendance.scanTime = scanTime; // Opsional: kirim waktu scannya saja untuk memudahkan frontend
 
       return attendance;
     });
@@ -434,8 +375,8 @@ exports.getAttendanceReport = async (req, res) => {
       data: processedRows, 
       pagination: {
         totalItems: count,
-        totalPages: Math.ceil(count / pLimit) || 0,
-        currentPage: pPage
+        totalPages: Math.ceil(count / limit),
+        currentPage: parseInt(page)
       }
     });
   } catch (err) {
