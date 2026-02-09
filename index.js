@@ -71,6 +71,7 @@ app.use('/', apiRoutes);
 // Global error handler
 app.use((err, req, res, next) => {
   console.error('[GLOBAL ERROR]:', err.message, err.stack?.substring(0, 300));
+  console.error('[ERROR]');
   
   if (err.status === 429) {
     return res.status(429).json(err);
