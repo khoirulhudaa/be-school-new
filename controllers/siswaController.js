@@ -109,14 +109,14 @@ exports.getAllStudents = async (req, res) => {
     const dataWithStatus = rows.map(s => {
       const student = s.toJSON();
       // Ambil data absen hari ini (jika ada)
-      const attendanceToday = student.attendances?.[0]; 
+      const attendanceToday = student.studentAttendances?.[0]; 
       
       // Jika ada data absen, pakai statusnya (Hadir/Izin/Sakit/Alpha)
       // Jika tidak ada, statusnya "Belum Hadir"
       student.statusKehadiran = attendanceToday ? attendanceToday.status : 'Belum Hadir';
       
       // Hapus array attendances agar JSON lebih ringan dikirim ke client
-      delete student.attendances; 
+      delete student.studentAttendances; 
       
       return student;
     });
