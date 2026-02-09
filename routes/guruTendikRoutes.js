@@ -12,6 +12,7 @@ const upload = multer({ storage });
 
 // Routes
 router.get('/', guruTendikController.getAllGuruTendik);
+router.get('/mark-absence', siswaController.markAbsence);
 router.get('/absensi', siswaController.getAllTeachers);
 router.post('/', upload.single('photo'), guruTendikController.createGuruTendik);
 router.put('/:id', upload.single('photo'), guruTendikController.updateGuruTendik);

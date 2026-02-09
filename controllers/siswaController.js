@@ -504,6 +504,56 @@ exports.exportAttendanceExcel = async (req, res) => {
   }
 };
 
+// exports.markAbsence = async (req, res) => {
+//   try {
+//     let data = req.body;
+//     if (!Array.isArray(data)) data = [data];
+
+//     if (data.length === 0) {
+//       return res.status(400).json({ success: false, message: "Data kosong." });
+//     }
+
+//     const startOfDay = moment().startOf('day').toDate();
+//     const endOfDay = moment().endOf('day').toDate();
+
+//     // Proses semua data secara paralel untuk kecepatan maksimal
+//     const operations = data.map(async (item) => {
+//       const { studentId, schoolId, status, currentClass } = item;
+
+//       // Cari apakah sudah ada absen untuk siswa ini di hari ini
+//       const existing = await Attendance.findOne({
+//         where: {
+//           studentId,
+//           createdAt: { [Op.between]: [startOfDay, endOfDay] }
+//         }
+//       });
+
+//       if (existing) {
+//         // Jika ADA: Update status dan currentClass (updatedAt akan otomatis terisi)
+//         return existing.update({ status, currentClass });
+//       } else {
+//         // Jika TIDAK ADA: Buat baris baru
+//         return Attendance.create({
+//           studentId,
+//           schoolId,
+//           status,
+//           currentClass
+//         });
+//       }
+//     });
+
+//     const records = await Promise.all(operations);
+
+//     res.json({
+//       success: true,
+//       message: `Berhasil memproses ${records.length} data absensi (Update/Insert).`,
+//       data: records
+//     });
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
 exports.markAbsence = async (req, res) => {
   try {
     let data = req.body;
@@ -516,28 +566,42 @@ exports.markAbsence = async (req, res) => {
     const startOfDay = moment().startOf('day').toDate();
     const endOfDay = moment().endOf('day').toDate();
 
-    // Proses semua data secara paralel untuk kecepatan maksimal
     const operations = data.map(async (item) => {
-      const { studentId, schoolId, status, currentClass } = item;
+      // Ambil guruId, studentId, dan userRole dari body
+      const { studentId, guruId, schoolId, status, currentClass, userRole } = item;
 
-      // Cari apakah sudah ada absen untuk siswa ini di hari ini
-      const existing = await Attendance.findOne({
-        where: {
-          studentId,
-          createdAt: { [Op.between]: [startOfDay, endOfDay] }
-        }
-      });
+      // 1. Tentukan kondisi pencarian (Cari berdasarkan ID yang ada)
+      let searchCondition = {
+        schoolId,
+        createdAt: { [Op.between]: [startOfDay, endOfDay] }
+      };
+
+      if (userRole === 'teacher' || guruId) {
+        searchCondition.guruId = guruId;
+        searchCondition.userRole = 'teacher';
+      } else {
+        searchCondition.studentId = studentId;
+        searchCondition.userRole = 'student';
+      }
+
+      // 2. Cari data existing
+      const existing = await Attendance.findOne({ where: searchCondition });
 
       if (existing) {
-        // Jika ADA: Update status dan currentClass (updatedAt akan otomatis terisi)
-        return existing.update({ status, currentClass });
+        // Update data jika sudah ada
+        return existing.update({ 
+          status, 
+          currentClass: userRole === 'student' ? currentClass : null // Guru biasanya tidak punya currentClass
+        });
       } else {
-        // Jika TIDAK ADA: Buat baris baru
+        // Buat data baru jika belum ada
         return Attendance.create({
-          studentId,
+          studentId: userRole === 'student' ? studentId : null,
+          guruId: (userRole === 'teacher' || guruId) ? guruId : null,
           schoolId,
           status,
-          currentClass
+          userRole: userRole || (guruId ? 'teacher' : 'student'),
+          currentClass: userRole === 'student' ? currentClass : null
         });
       }
     });
@@ -546,10 +610,11 @@ exports.markAbsence = async (req, res) => {
 
     res.json({
       success: true,
-      message: `Berhasil memproses ${records.length} data absensi (Update/Insert).`,
+      message: `Berhasil memproses ${records.length} data absensi (Guru/Siswa).`,
       data: records
     });
   } catch (err) {
+    console.error("Error markAbsence:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
