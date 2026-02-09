@@ -36,6 +36,7 @@ const Student = sequelize.define('Student', {
   schoolId: { type: DataTypes.INTEGER, allowNull: false },
   name: { type: DataTypes.STRING, allowNull: false },
   nis: { type: DataTypes.STRING, allowNull: false },
+  nisn: { type: DataTypes.STRING, allowNull: true },
   class: { type: DataTypes.STRING, allowNull: false },
   batch: { type: DataTypes.STRING, allowNull: false },
   photoUrl: { type: DataTypes.STRING },
