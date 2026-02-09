@@ -512,51 +512,163 @@ exports.getAttendanceReport = async (req, res) => {
   }
 };
 
+// exports.exportAttendanceExcel = async (req, res) => {
+//   try {
+//     const { schoolId, year, month, className, batch } = req.query;
+
+//     // 1. Validasi WAJIB ada schoolId
+//     if (!schoolId || schoolId === 'undefined' || isNaN(parseInt(schoolId))) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Parameter 'schoolId' diperlukan dan harus berupa angka."
+//       });
+//     }
+
+//     let startDate, endDate, fileName;
+//     if (month) {
+//       startDate = moment(`${year}-${month}-01`).startOf('month');
+//       endDate = moment(startDate).endOf('month');
+//       fileName = `Laporan_Absen_${month}_${year}.xlsx`;
+//     } else {
+//       startDate = moment(`${year}-01-01`).startOf('year');
+//       endDate = moment(startDate).endOf('year');
+//       fileName = `Laporan_Absen_Tahun_${year}.xlsx`;
+//     }
+
+//     // 1. Set Header HTTP
+//     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+//     res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
+
+//     // 2. Gunakan stream: res agar data langsung dialirkan ke user
+//     const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
+//       stream: res,
+//       useStyles: true, // Opsional: jika ingin styling tebal/warna
+//       useSharedStrings: true
+//     });
+    
+//     const worksheet = workbook.addWorksheet('Presensi');
+
+//     worksheet.columns = [
+//       { header: 'No', key: 'no', width: 5 },
+//       { header: 'Tanggal', key: 'tanggal', width: 15 },
+//       { header: 'Waktu', key: 'waktu', width: 10 },
+//       { header: 'Nama Siswa', key: 'nama', width: 30 },
+//       { header: 'NIS', key: 'nis', width: 15 },
+//       { header: 'Kelas', key: 'kelas', width: 10 },
+//       { header: 'Status', key: 'status', width: 12 },
+//     ];
+
+//     let count = 1;
+//     const batchSize = 1000;
+//     let offset = 0;
+//     let hasMoreData = true;
+
+//     while (hasMoreData) {
+//       const attendances = await Attendance.findAll({
+//         where: {
+//           createdAt: { [Op.between]: [startDate.toDate(), endDate.toDate()] },
+//           ...(className && { currentClass: className })
+//         },
+//         include: [{
+//           model: Student,
+//           as: 'student', // Gunakan alias yang sudah kita set di model
+//           where: { schoolId: parseInt(schoolId), ...(batch && { batch }) },
+//           attributes: ['name', 'nis']
+//         }],
+//         limit: batchSize,
+//         offset: offset,
+//         order: [['createdAt', 'ASC']],
+//         raw: true,
+//         nest: true
+//       });
+
+//       if (attendances.length === 0) {
+//         hasMoreData = false;
+//       } else {
+//         attendances.forEach(item => {
+//           worksheet.addRow({
+//             no: count++,
+//             tanggal: moment(item.createdAt).format('YYYY-MM-DD'),
+//             waktu: moment(item.createdAt).format('HH:mm'),
+//             // Karena menggunakan as: 'student' dan nest: true, aksesnya jadi item.student
+//             nama: item.student ? item.student.name : '-', 
+//             nis: item.student ? item.student.nis : '-',
+//             kelas: item.currentClass,
+//             status: item.status
+//           }).commit(); // Baris dikirim ke stream dan dihapus dari memori
+//         });
+//         offset += batchSize;
+//       }
+//     }
+
+//     // 3. Finalisasi
+//     await workbook.commit();
+//     // Tidak perlu res.end() karena workbook.commit() sudah menutup stream response.
+
+//   } catch (err) {
+//     console.error('Export Error:', err);
+//     // Cek jika header belum dikirim agar tidak terjadi error "Headers already sent"
+//     if (!res.headersSent) {
+//       res.status(500).json({ success: false, message: 'Gagal men-generate excel: ' + err.message });
+//     }
+//   }
+// };
+
 exports.exportAttendanceExcel = async (req, res) => {
   try {
-    const { schoolId, year, month, className, batch } = req.query;
+    // Ambil userRole dari query (default ke student jika tidak ada)
+    const { schoolId, year, month, className, role } = req.query;
+    const userRole = role || 'student'; 
 
-    // 1. Validasi WAJIB ada schoolId
     if (!schoolId || schoolId === 'undefined' || isNaN(parseInt(schoolId))) {
       return res.status(400).json({
         success: false,
-        message: "Parameter 'schoolId' diperlukan dan harus berupa angka."
+        message: "Parameter 'schoolId' diperlukan."
       });
     }
 
     let startDate, endDate, fileName;
+    const roleLabel = userRole === 'teacher' ? 'Guru' : 'Siswa';
+
     if (month) {
       startDate = moment(`${year}-${month}-01`).startOf('month');
       endDate = moment(startDate).endOf('month');
-      fileName = `Laporan_Absen_${month}_${year}.xlsx`;
+      fileName = `Laporan_Absen_${roleLabel}_${month}_${year}.xlsx`;
     } else {
       startDate = moment(`${year}-01-01`).startOf('year');
       endDate = moment(startDate).endOf('year');
-      fileName = `Laporan_Absen_Tahun_${year}.xlsx`;
+      fileName = `Laporan_Absen_${roleLabel}_Tahun_${year}.xlsx`;
     }
 
-    // 1. Set Header HTTP
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
 
-    // 2. Gunakan stream: res agar data langsung dialirkan ke user
     const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
       stream: res,
-      useStyles: true, // Opsional: jika ingin styling tebal/warna
+      useStyles: true,
       useSharedStrings: true
     });
     
     const worksheet = workbook.addWorksheet('Presensi');
 
-    worksheet.columns = [
+    // Kolom Dinamis berdasarkan Role
+    const columns = [
       { header: 'No', key: 'no', width: 5 },
       { header: 'Tanggal', key: 'tanggal', width: 15 },
       { header: 'Waktu', key: 'waktu', width: 10 },
-      { header: 'Nama Siswa', key: 'nama', width: 30 },
-      { header: 'NIS', key: 'nis', width: 15 },
-      { header: 'Kelas', key: 'kelas', width: 10 },
-      { header: 'Status', key: 'status', width: 12 },
+      { header: roleLabel, key: 'nama', width: 30 }, // Header jadi "Siswa" atau "Guru"
     ];
+
+    if (userRole === 'student') {
+      columns.push({ header: 'NIS', key: 'identitas', width: 15 });
+      columns.push({ header: 'Kelas', key: 'info_tambahan', width: 15 });
+    } else {
+      columns.push({ header: 'Jabatan/Role', key: 'identitas', width: 15 });
+      columns.push({ header: 'Mapel', key: 'info_tambahan', width: 15 });
+    }
+
+    columns.push({ header: 'Status', key: 'status', width: 12 });
+    worksheet.columns = columns;
 
     let count = 1;
     const batchSize = 1000;
@@ -566,15 +678,25 @@ exports.exportAttendanceExcel = async (req, res) => {
     while (hasMoreData) {
       const attendances = await Attendance.findAll({
         where: {
+          userRole: userRole, // Filter berdasarkan role yang diminta
           createdAt: { [Op.between]: [startDate.toDate(), endDate.toDate()] },
-          ...(className && { currentClass: className })
+          ...(userRole === 'student' && className && { currentClass: className })
         },
-        include: [{
-          model: Student,
-          as: 'student', // Gunakan alias yang sudah kita set di model
-          where: { schoolId: parseInt(schoolId), ...(batch && { batch }) },
-          attributes: ['name', 'nis']
-        }],
+        include: [
+          userRole === 'student' 
+          ? {
+              model: Student,
+              as: 'student',
+              where: { schoolId: parseInt(schoolId) },
+              attributes: ['name', 'nis']
+            }
+          : {
+              model: Guru, // Pastikan nama model Guru Anda benar
+              as: 'guru',   // Sesuaikan alias di asosiasi model Anda
+              where: { schoolId: parseInt(schoolId) },
+              attributes: ['nama', 'role', 'mapel']
+            }
+        ],
         limit: batchSize,
         offset: offset,
         order: [['createdAt', 'ASC']],
@@ -586,28 +708,26 @@ exports.exportAttendanceExcel = async (req, res) => {
         hasMoreData = false;
       } else {
         attendances.forEach(item => {
+          const person = userRole === 'student' ? item.student : item.guru;
+          
           worksheet.addRow({
             no: count++,
             tanggal: moment(item.createdAt).format('YYYY-MM-DD'),
             waktu: moment(item.createdAt).format('HH:mm'),
-            // Karena menggunakan as: 'student' dan nest: true, aksesnya jadi item.student
-            nama: item.student ? item.student.name : '-', 
-            nis: item.student ? item.student.nis : '-',
-            kelas: item.currentClass,
-            status: item.status
-          }).commit(); // Baris dikirim ke stream dan dihapus dari memori
+            nama: userRole === 'student' ? person?.name : person?.nama,
+            identitas: userRole === 'student' ? person?.nis : (person?.role || 'Guru/Staff'),
+            info_tambahan: userRole === 'student' ? item.currentClass : (person?.mapel || '-'),
+            status: item?.isLate ? 'Terlambat' : item.status
+          }).commit();
         });
         offset += batchSize;
       }
     }
 
-    // 3. Finalisasi
     await workbook.commit();
-    // Tidak perlu res.end() karena workbook.commit() sudah menutup stream response.
 
   } catch (err) {
     console.error('Export Error:', err);
-    // Cek jika header belum dikirim agar tidak terjadi error "Headers already sent"
     if (!res.headersSent) {
       res.status(500).json({ success: false, message: 'Gagal men-generate excel: ' + err.message });
     }
