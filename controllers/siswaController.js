@@ -212,22 +212,112 @@ exports.getAllTeachers = async (req, res) => {
   }
 };
 
+// exports.getUserDetail = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     // role: 'student' atau 'teacher'
+//     const { role, year } = req.query; 
+
+//     if (!role || !['student', 'teacher'].includes(role)) {
+//       return res.status(400).json({ success: false, message: "Role harus ditentukan (student/teacher)." });
+//     }
+
+//     // 1. Konfigurasi dinamis berdasarkan Role
+//     const isStudent = role === 'student';
+//     const Model = isStudent ? Student : GuruTendik;
+//     const attendanceAlias = isStudent ? 'studentAttendances' : 'guruAttendances';
+
+//     // Rentang waktu 1 tahun
+//     const startDate = year 
+//       ? moment(`${year}-01-01`).startOf('year').toDate() 
+//       : moment().subtract(1, 'years').toDate();
+//     const endDate = year 
+//       ? moment(`${year}-12-31`).endOf('year').toDate() 
+//       : moment().endOf('day').toDate();
+
+//     // 2. Query Database
+//     const user = await Model.findOne({
+//       where: { id, isActive: true },
+//       include: [
+//         {
+//           model: Attendance,
+//           as: attendanceAlias,
+//           where: {
+//             createdAt: { [Op.between]: [startDate, endDate] }
+//           },
+//           required: false,
+//         }
+//       ],
+//       order: [[ { model: Attendance, as: attendanceAlias }, 'createdAt', 'DESC']]
+//     });
+
+//     if (!user) {
+//       return res.status(404).json({ success: false, message: 'Data tidak ditemukan' });
+//     }
+
+//     // 3. Proses Statistik & Riwayat
+//     const stats = { Hadir: 0, Izin: 0, Sakit: 0, Alpha: 0, Terlambat: 0 };
+//     const deadline = "07:00:00";
+
+//     // Akses array attendance secara dinamis menggunakan alias
+//     const rawAttendances = user[attendanceAlias] || [];
+
+//     const history = rawAttendances.map(record => {
+//       const scanTime = moment(record.createdAt).format("HH:mm:ss");
+//       const isLate = record.status === 'Hadir' && scanTime > deadline;
+
+//       if (isLate) stats.Terlambat++;
+//       if (stats.hasOwnProperty(record.status)) {
+//         stats[record.status]++;
+//       }
+
+//       return {
+//         id: record.id,
+//         date: moment(record.createdAt).format('YYYY-MM-DD'),
+//         time: scanTime,
+//         status: record.status,
+//         isLate: isLate,
+//         info: isStudent ? record.currentClass : 'GURU/STAFF'
+//       };
+//     });
+
+//     // 4. Cleanup Response
+//     const profile = user.toJSON();
+//     delete profile[attendanceAlias]; // Hapus data mentah agar tidak duplikat di JSON
+
+//     res.json({
+//       success: true,
+//       data: {
+//         role,
+//         profile,
+//         statistics: stats,
+//         attendanceHistory: history
+//       }
+//     });
+
+//   } catch (err) {
+//     console.error("Error Detail User:", err);
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
+
+// GET USER DETAIL YANG SUDAH PAGINATION
+
 exports.getUserDetail = async (req, res) => {
   try {
     const { id } = req.params;
-    // role: 'student' atau 'teacher'
-    const { role, year } = req.query; 
+    const { role, year, page = 1, limit = 10 } = req.query; // Default page 1, limit 10
 
     if (!role || !['student', 'teacher'].includes(role)) {
-      return res.status(400).json({ success: false, message: "Role harus ditentukan (student/teacher)." });
+      return res.status(400).json({ success: false, message: "Role harus ditentukan." });
     }
 
-    // 1. Konfigurasi dinamis berdasarkan Role
     const isStudent = role === 'student';
     const Model = isStudent ? Student : GuruTendik;
     const attendanceAlias = isStudent ? 'studentAttendances' : 'guruAttendances';
 
-    // Rentang waktu 1 tahun
+    // Konfigurasi Waktu
     const startDate = year 
       ? moment(`${year}-01-01`).startOf('year').toDate() 
       : moment().subtract(1, 'years').toDate();
@@ -235,55 +325,62 @@ exports.getUserDetail = async (req, res) => {
       ? moment(`${year}-12-31`).endOf('year').toDate() 
       : moment().endOf('day').toDate();
 
-    // 2. Query Database
-    const user = await Model.findOne({
+    // 1. Ambil Profil & Statistik (Tanpa limit untuk hitung total stats)
+    const userWithAllAttendance = await Model.findOne({
       where: { id, isActive: true },
-      include: [
-        {
-          model: Attendance,
-          as: attendanceAlias,
-          where: {
-            createdAt: { [Op.between]: [startDate, endDate] }
-          },
-          required: false,
-        }
-      ],
-      order: [[ { model: Attendance, as: attendanceAlias }, 'createdAt', 'DESC']]
+      include: [{
+        model: Attendance,
+        as: attendanceAlias,
+        where: { createdAt: { [Op.between]: [startDate, endDate] } },
+        required: false
+      }]
     });
 
-    if (!user) {
+    if (!userWithAllAttendance) {
       return res.status(404).json({ success: false, message: 'Data tidak ditemukan' });
     }
 
-    // 3. Proses Statistik & Riwayat
+    // 2. Hitung Statistik (Logic tetap sama)
     const stats = { Hadir: 0, Izin: 0, Sakit: 0, Alpha: 0, Terlambat: 0 };
     const deadline = "07:00:00";
-
-    // Akses array attendance secara dinamis menggunakan alias
-    const rawAttendances = user[attendanceAlias] || [];
-
-    const history = rawAttendances.map(record => {
+    const allRecords = userWithAllAttendance[attendanceAlias] || [];
+    
+    allRecords.forEach(record => {
       const scanTime = moment(record.createdAt).format("HH:mm:ss");
-      const isLate = record.status === 'Hadir' && scanTime > deadline;
+      if (record.status === 'Hadir' && scanTime > deadline) stats.Terlambat++;
+      if (stats.hasOwnProperty(record.status)) stats[record.status]++;
+    });
 
-      if (isLate) stats.Terlambat++;
-      if (stats.hasOwnProperty(record.status)) {
-        stats[record.status]++;
-      }
+    // 3. Query Terpisah untuk Riwayat (Dengan Pagination)
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Kita ambil datanya langsung dari model Attendance agar pagination lebih akurat
+    const { count, rows } = await Attendance.findAndCountAll({
+      where: {
+        // Sesuaikan foreign key berdasarkan role
+        [isStudent ? 'studentId' : 'guruId']: id, 
+        createdAt: { [Op.between]: [startDate, endDate] }
+      },
+      order: [['createdAt', 'DESC']],
+      limit: parseInt(limit),
+      offset: offset
+    });
 
+    const history = rows.map(record => {
+      const scanTime = moment(record.createdAt).format("HH:mm:ss");
       return {
         id: record.id,
         date: moment(record.createdAt).format('YYYY-MM-DD'),
         time: scanTime,
         status: record.status,
-        isLate: isLate,
+        isLate: record.status === 'Hadir' && scanTime > deadline,
         info: isStudent ? record.currentClass : 'GURU/STAFF'
       };
     });
 
-    // 4. Cleanup Response
-    const profile = user.toJSON();
-    delete profile[attendanceAlias]; // Hapus data mentah agar tidak duplikat di JSON
+    // 4. Response
+    const profile = userWithAllAttendance.toJSON();
+    delete profile[attendanceAlias];
 
     res.json({
       success: true,
@@ -291,7 +388,13 @@ exports.getUserDetail = async (req, res) => {
         role,
         profile,
         statistics: stats,
-        attendanceHistory: history
+        attendanceHistory: history,
+        pagination: {
+          totalItems: count,
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(count / limit),
+          limit: parseInt(limit)
+        }
       }
     });
 
