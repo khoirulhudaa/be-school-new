@@ -12,6 +12,11 @@ const GuruTendik = sequelize.define('GuruTendik', {
     allowNull: true, 
     validate: { isEmail: true } 
   },
+  nip: {
+    type: DataTypes.STRING(18),
+    allowNull: true,          // boleh kosong untuk tendik non-PNS
+    unique: true,
+  },
   role: { type: DataTypes.STRING, allowNull: false },
   jurusan: { type: DataTypes.STRING, allowNull: true },
   jenisKelamin: { type: DataTypes.STRING(10), allowNull: false },

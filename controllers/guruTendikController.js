@@ -35,7 +35,7 @@ exports.getAllGuruTendik = async (req, res) => {
 
 exports.createGuruTendik = async (req, res) => {
   try {
-    const { nama, mapel, email, role, jurusan, jenisKelamin, schoolId } = req.body;
+    const { nama, mapel, email, role, jurusan, jenisKelamin, schoolId, nip } = req.body;
 
     if (!nama || !role || !jenisKelamin || !schoolId) {
       return res.status(400).json({ 
@@ -71,7 +71,8 @@ exports.createGuruTendik = async (req, res) => {
       jenisKelamin,
       photoUrl,
       schoolId: parseInt(schoolId),
-      qrCodeData: generatedQR
+      qrCodeData: generatedQR,
+      nip
     });
 
     res.json({ success: true, data: newGuruTendik });
@@ -83,7 +84,7 @@ exports.createGuruTendik = async (req, res) => {
 exports.updateGuruTendik = async (req, res) => {
   try {
     const { id } = req.params;
-    const { nama, mapel, email, role, jurusan, jenisKelamin } = req.body;
+    const { nama, mapel, email, role, jurusan, jenisKelamin, nip } = req.body;
 
     const guru = await GuruTendik.findByPk(id);
     if (!guru) {
@@ -96,6 +97,7 @@ exports.updateGuruTendik = async (req, res) => {
     if (nama) guru.nama = nama;
     if (mapel !== undefined) guru.mapel = mapel;
     if (email !== undefined) guru.email = email;
+    if (nip !== undefined) guru.nip = nip;
     if (role) guru.role = role;
     if (jurusan !== undefined) guru.jurusan = jurusan;
     if (jenisKelamin) guru.jenisKelamin = jenisKelamin;
