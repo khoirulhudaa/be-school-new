@@ -596,19 +596,20 @@ exports.exportSiswaBySchoolExcel = async (req, res) => {
 
     const siswa = await Siswa.findAll({
       where: { schoolId }, // Pastikan kolom di model Siswa adalah schoolId
-      order: [['nama', 'ASC']]
+      attributes: ['nisn', 'name', 'class', 'batch', 'nis'],
+      order: [['name', 'ASC']] // Sesuai model
     });
 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Data Siswa');
 
     worksheet.columns = [
-      { header: 'NISN', key: 'nisn', width: 15 },
-      { header: 'Nama Lengkap', key: 'nama', width: 30 },
-      { header: 'Kelas', key: 'kelas', width: 10 },
-      { header: 'Jurusan', key: 'jurusan', width: 20 },
-      { header: 'Email', key: 'email', width: 25 }
-    ];
+        { header: 'NISN', key: 'nisn', width: 15 },
+        { header: 'NIS', key: 'nis', width: 15 },
+        { header: 'Nama Lengkap', key: 'name', width: 30 },
+        { header: 'Kelas', key: 'class', width: 10 },
+        { header: 'Angkatan', key: 'batch', width: 15 }
+      ];
 
     siswa.forEach(item => worksheet.addRow(item.toJSON()));
     worksheet.getRow(1).font = { bold: true };
@@ -640,11 +641,11 @@ exports.exportGuruBySchoolExcel = async (req, res) => {
     const worksheet = workbook.addWorksheet('Data Guru Tendik');
 
     worksheet.columns = [
-      { header: 'NIP/NUPTK', key: 'nip', width: 20 },
+      { header: 'NIP', key: 'nip', width: 20 },
       { header: 'Nama Guru', key: 'nama', width: 30 },
-      { header: 'Jabatan', key: 'jabatan', width: 20 },
+      { header: 'Mapel', key: 'mapel', width: 20 },
       { header: 'Email', key: 'email', width: 25 },
-      { header: 'No. Telepon', key: 'noTelp', width: 15 }
+      { header: 'Jenis Kelamin', key: 'jenisKelamin', width: 15 }
     ];
 
     guru.forEach(item => worksheet.addRow(item.toJSON()));
