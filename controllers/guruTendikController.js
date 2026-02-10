@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const GuruTendik = require('../models/guruTendik');
 const cloudinary = require('cloudinary').v2;
 const streamifier = require('streamifier');
