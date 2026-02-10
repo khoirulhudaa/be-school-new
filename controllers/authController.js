@@ -5,6 +5,8 @@ const streamifier = require('streamifier');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const { Op } = require('sequelize');
+const Siswa = require('../models/siswa'); 
+const GuruTendik = require('../models/guruTendik'); 
 
 // --- CONFIGURATIONS ---
 
@@ -364,5 +366,115 @@ exports.updateProfile = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Gagal memperbarui profil: ' + err.message });
+  }
+};
+
+exports.getAllSchools = async (req, res) => {
+  try {
+    const { status, name } = req.query; 
+    let whereCondition = {};
+
+    if (status === 'active') {
+      whereCondition.isActive = true;
+    } else if (status === 'inactive') {
+      whereCondition.isActive = false;
+    }
+
+    // Filter pencarian berdasarkan nama sekolah (Search)
+    if (name) {
+      whereCondition.schoolName = {
+        [Op.iLike]: `%${name}%` // iLike untuk case-insensitive (PostgreSQL)
+        // Jika menggunakan MySQL, gunakan [Op.like]: `%${name}%`
+      };
+    }
+
+    const schools = await SchoolAccount.findAll({
+      where: whereCondition,
+      attributes: [
+        ['schoolName', 'namaSekolah'], 
+        ['address', 'alamat'], 
+        'npsn', 
+        ['logoUrl', 'logo'], 
+        ['latitude', 'lat'], 
+        ['longitude', 'long'],
+        'isActive'
+      ],
+      order: [['schoolName', 'ASC']]
+    });
+
+    res.json({
+      success: true,
+      count: schools.length,
+      filters: {
+        status: status || 'all',
+        searchName: name || null
+      },
+      data: schools
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Gagal mengambil data sekolah: ' + err.message });
+  }
+};
+
+exports.getDashboardStats = async (req, res) => {
+  try {
+    // Menghitung data secara paralel untuk efisiensi
+    const [totalSekolah, totalGuru, totalSiswa] = await Promise.all([
+      SchoolAccount.count({ where: { isActive: true } }),
+      GuruTendik.count(),
+      Siswa.count()
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        totalSekolah,
+        totalGuru,
+        totalSiswa,
+        lastUpdated: new Date()
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Gagal memuat statistik: ' + err.message });
+  }
+};
+
+exports.updateSchoolStatus = async (req, res) => {
+  try {
+    // ids: [1, 2, 3], status: true/false
+    const { ids, status } = req.body; 
+
+    // 1. Validasi Input
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, message: 'Daftar ID sekolah harus berupa array dan tidak boleh kosong' });
+    }
+
+    if (typeof status !== 'boolean') {
+      return res.status(400).json({ success: false, message: 'Status harus berupa boolean (true atau false)' });
+    }
+
+    // 2. Update status sekolah di database
+    const [updatedCount] = await SchoolAccount.update(
+      { isActive: status },
+      { 
+        where: { 
+          id: { [Op.in]: ids } 
+        } 
+      }
+    );
+
+    // 3. Response
+    const statusMsg = status ? 'diaktifkan' : 'dinonaktifkan';
+    res.json({
+      success: true,
+      message: `${updatedCount} sekolah berhasil ${statusMsg}`,
+      data: {
+        updatedCount,
+        newStatus: status
+      }
+    });
+
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Gagal memperbarui status sekolah: ' + err.message });
   }
 };
