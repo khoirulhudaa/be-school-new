@@ -440,6 +440,70 @@ exports.getDashboardStats = async (req, res) => {
   }
 };
 
+exports.getAllSchoolsPaginated = async (req, res) => {
+  try {
+    // Ambil query params dengan nilai default
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+    const { status, name } = req.query;
+
+    let whereCondition = {};
+
+    // Filter Status
+    if (status === 'active') {
+      whereCondition.isActive = true;
+    } else if (status === 'inactive') {
+      whereCondition.isActive = false;
+    }
+
+    // Filter Search Name
+    if (name) {
+      whereCondition.schoolName = {
+        [Op.iLike]: `%${name}%` // Gunakan Op.like jika menggunakan MySQL
+      };
+    }
+
+    // Query findAndCountAll untuk mendapatkan data sekaligus total row
+    const { count, rows } = await SchoolAccount.findAndCountAll({
+      where: whereCondition,
+      attributes: [
+        ['id', 'id'], 
+        ['schoolName', 'namaSekolah'], 
+        ['address', 'alamat'], 
+        'npsn', 
+        ['logoUrl', 'logo'], 
+        ['latitude', 'lat'], 
+        ['longitude', 'long'],
+        'isActive'
+      ],
+      order: [['schoolName', 'ASC']],
+      limit: limit,
+      offset: offset
+    });
+
+    const totalPages = Math.ceil(count / limit);
+
+    res.json({
+      success: true,
+      data: rows,
+      pagination: {
+        totalItems: count,
+        totalPages: totalPages,
+        currentPage: page,
+        itemsPerPage: limit,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Gagal mengambil data sekolah terpaginasi: ' + err.message 
+    });
+  }
+};
+
 exports.updateSchoolStatus = async (req, res) => {
   try {
     // ids: [1, 2, 3], status: true/false
