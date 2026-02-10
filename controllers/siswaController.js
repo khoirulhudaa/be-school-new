@@ -475,7 +475,7 @@ exports.scanQRCode = async (req, res) => {
       }
     } else {
       // Untuk Guru, asumsikan qrCodeData disimpan di field tertentu atau pakai ID
-      user = await GuruTendik.findOne({ where: { id: qrCodeData, isActive: true } }); 
+      user = await GuruTendik.findOne({ where: { qrCodeData, isActive: true } }); 
       if (user) {
         updateFields = { idKey: 'guruId', id: user.id, name: user.nama, class: 'GURU/STAFF', schoolId: user.schoolId, email: user.email };
       }
