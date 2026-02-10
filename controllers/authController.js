@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const { Op } = require('sequelize');
 const Siswa = require('../models/siswa'); 
 const GuruTendik = require('../models/guruTendik'); 
+const ExcelJS = require('exceljs');
 
 // --- CONFIGURATIONS ---
 
@@ -541,5 +542,120 @@ exports.updateSchoolStatus = async (req, res) => {
 
   } catch (err) {
     res.status(500).json({ success: false, message: 'Gagal memperbarui status sekolah: ' + err.message });
+  }
+};
+
+exports.exportAllSchoolsExcel = async (req, res) => {
+  try {
+    const schools = await SchoolAccount.findAll({
+      attributes: ['npsn', 'schoolName', 'address', 'email', 'adminName', 'isActive', 'createdAt'],
+      order: [['schoolName', 'ASC']]
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Daftar Sekolah');
+
+    worksheet.columns = [
+      { header: 'NPSN', key: 'npsn', width: 15 },
+      { header: 'Nama Sekolah', key: 'schoolName', width: 30 },
+      { header: 'Alamat', key: 'address', width: 40 },
+      { header: 'Email', key: 'email', width: 25 },
+      { header: 'Admin', key: 'adminName', width: 20 },
+      { header: 'Status', key: 'isActive', width: 12 },
+      { header: 'Tanggal Daftar', key: 'createdAt', width: 20 },
+    ];
+
+    schools.forEach(s => {
+      worksheet.addRow({
+        ...s.toJSON(),
+        isActive: s.isActive ? 'Aktif' : 'Non-Aktif',
+        createdAt: s.createdAt.toISOString().split('T')[0]
+      });
+    });
+
+    // Formatting header
+    worksheet.getRow(1).font = { bold: true };
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=Daftar_Sekolah.xlsx');
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// 2. Export Semua Siswa berdasarkan schoolId
+exports.exportSiswaBySchoolExcel = async (req, res) => {
+  try {
+    const { schoolId } = req.params;
+    
+    const school = await SchoolAccount.findByPk(schoolId);
+    if (!school) return res.status(404).json({ message: 'Sekolah tidak ditemukan' });
+
+    const siswa = await Siswa.findAll({
+      where: { schoolId }, // Pastikan kolom di model Siswa adalah schoolId
+      order: [['nama', 'ASC']]
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Data Siswa');
+
+    worksheet.columns = [
+      { header: 'NISN', key: 'nisn', width: 15 },
+      { header: 'Nama Lengkap', key: 'nama', width: 30 },
+      { header: 'Kelas', key: 'kelas', width: 10 },
+      { header: 'Jurusan', key: 'jurusan', width: 20 },
+      { header: 'Email', key: 'email', width: 25 }
+    ];
+
+    siswa.forEach(item => worksheet.addRow(item.toJSON()));
+    worksheet.getRow(1).font = { bold: true };
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=Siswa_${school.schoolName.replace(/ /g, '_')}.xlsx`);
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// 3. Export Semua Guru/Tendik berdasarkan schoolId
+exports.exportGuruBySchoolExcel = async (req, res) => {
+  try {
+    const { schoolId } = req.params;
+
+    const school = await SchoolAccount.findByPk(schoolId);
+    if (!school) return res.status(404).json({ message: 'Sekolah tidak ditemukan' });
+
+    const guru = await GuruTendik.findAll({
+      where: { schoolId },
+      order: [['nama', 'ASC']]
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Data Guru Tendik');
+
+    worksheet.columns = [
+      { header: 'NIP/NUPTK', key: 'nip', width: 20 },
+      { header: 'Nama Guru', key: 'nama', width: 30 },
+      { header: 'Jabatan', key: 'jabatan', width: 20 },
+      { header: 'Email', key: 'email', width: 25 },
+      { header: 'No. Telepon', key: 'noTelp', width: 15 }
+    ];
+
+    guru.forEach(item => worksheet.addRow(item.toJSON()));
+    worksheet.getRow(1).font = { bold: true };
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=Guru_${school.schoolName.replace(/ /g, '_')}.xlsx`);
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
