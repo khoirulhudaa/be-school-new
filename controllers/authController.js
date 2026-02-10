@@ -595,7 +595,7 @@ exports.exportSiswaBySchoolExcel = async (req, res) => {
     if (!school) return res.status(404).json({ message: 'Sekolah tidak ditemukan' });
 
     const siswa = await Siswa.findAll({
-      where: { schoolId }, // Pastikan kolom di model Siswa adalah schoolId
+      where: { schoolId, isActive: 1 }, // Pastikan kolom di model Siswa adalah schoolId
       attributes: ['nisn', 'name', 'class', 'batch', 'nis'],
       order: [['name', 'ASC']] // Sesuai model
     });
@@ -633,7 +633,7 @@ exports.exportGuruBySchoolExcel = async (req, res) => {
     if (!school) return res.status(404).json({ message: 'Sekolah tidak ditemukan' });
 
     const guru = await GuruTendik.findAll({
-      where: { schoolId },
+      where: { schoolId, isActive: 1 },
       order: [['nama', 'ASC']]
     });
 
