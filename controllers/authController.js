@@ -391,6 +391,7 @@ exports.getAllSchools = async (req, res) => {
     const schools = await SchoolAccount.findAll({
       where: whereCondition,
       attributes: [
+        ['id', 'id'], 
         ['schoolName', 'namaSekolah'], 
         ['address', 'alamat'], 
         'npsn', 
