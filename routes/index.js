@@ -34,6 +34,7 @@
   const registerRouter = require('./registerRoutes');
   const siswaRouter = require('./siswaRoutes');
   const kelasRouter = require('./kelasRoutes');
+  const exportExcel = require('./exportExcelAttedancesYearly');
 
   router.use('/auth', require('./authRoutes'));
 
@@ -66,6 +67,7 @@
   router.use('/feed', feedRouter); 
   router.use('/akun', registerRouter); 
   router.use('/kelas', kelasRouter);
+  router.use('/export-excel', exportExcel);
   
   // Route dengan upload/file berat → pakai uploadLimiter
   router.use('/gallery', galleryRouter);

@@ -404,6 +404,59 @@ exports.getUserDetail = async (req, res) => {
   }
 };
 
+// Export excel per-individual (history 1 tahun)
+
+exports.exportUserAttendance = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role, year } = req.query;
+
+    if (!role) return res.status(400).json({ success: false, message: "Role diperlukan." });
+
+    const isStudent = role === 'student';
+    const deadline = "07:00:00";
+
+    // Konfigurasi Waktu (Sama dengan logika utama)
+    const startDate = year 
+      ? moment(`${year}-01-01`).startOf('year').toDate() 
+      : moment().subtract(1, 'years').toDate();
+    const endDate = year 
+      ? moment(`${year}-12-31`).endOf('year').toDate() 
+      : moment().endOf('day').toDate();
+
+    // Ambil SEMUA data tanpa pagination
+    const rows = await Attendance.findAll({
+      where: {
+        [isStudent ? 'studentId' : 'guruId']: id, 
+        createdAt: { [Op.between]: [startDate, endDate] }
+      },
+      order: [['createdAt', 'DESC']]
+    });
+
+    // Mapping data agar siap dibaca Excel
+    const history = rows.map((record, index) => {
+      const scanTime = moment(record.createdAt).format("HH:mm:ss");
+      return {
+        No: index + 1,
+        Tanggal: moment(record.createdAt).format('YYYY-MM-DD'),
+        Jam: scanTime,
+        Status: record.status,
+        Keterangan: (record.status === 'Hadir' && scanTime > deadline) ? 'Terlambat' : 'Tepat Waktu',
+        Info: isStudent ? record.currentClass : 'GURU/STAFF'
+      };
+    });
+
+    res.json({
+      success: true,
+      data: history
+    });
+
+  } catch (err) {
+    console.error("Error Export Data:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 exports.scanQRCode = async (req, res) => {
   const { qrCodeData, role } = req.body; // role: 'student' atau 'teacher'
   const todayStart = moment().startOf('day').toDate();
