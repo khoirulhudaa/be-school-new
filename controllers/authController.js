@@ -462,7 +462,7 @@ exports.getAllSchoolsPaginated = async (req, res) => {
     // Filter Search Name
     if (name) {
       whereCondition.schoolName = {
-        [Op.iLike]: `%${name}%` // Gunakan Op.like jika menggunakan MySQL
+        [Op.like]: `%${name}%` // Gunakan Op.like jika menggunakan MySQL
       };
     }
 

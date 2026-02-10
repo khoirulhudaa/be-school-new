@@ -10,7 +10,7 @@ cloudinary.config({
 
 exports.getAllGuruTendik = async (req, res) => {
   try {
-    const { schoolId } = req.query;
+    const { schoolId, name } = req.query;
 
     if (!schoolId) {
       return res.status(400).json({ 
@@ -19,11 +19,21 @@ exports.getAllGuruTendik = async (req, res) => {
       });
     }
 
+   // Susun kondisi WHERE
+    let whereCondition = { 
+      schoolId: parseInt(schoolId),
+      isActive: true 
+    };
+
+    // Tambahkan filter nama jika parameter 'name' dikirim dari frontend
+    if (name) {
+      whereCondition.nama = {
+        [Op.like]: `%${name}%`
+      };
+    }
+
     const guruTendik = await GuruTendik.findAll({
-      where: { 
-        schoolId: parseInt(schoolId),
-        isActive: true 
-      },
+      where: whereCondition,
       order: [['createdAt', 'DESC']],
     });
 
