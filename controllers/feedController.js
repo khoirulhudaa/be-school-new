@@ -39,7 +39,7 @@ exports.createFeed = async (req, res) => {
       const result = await new Promise((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
           { 
-            resource_type: mediaType === 'video' ? 'video' : 'image', 
+            resource_type: 'auto', 
             folder: 'instagram_feeds' 
           },
           (error, result) => {
@@ -94,7 +94,7 @@ exports.updateFeed = async (req, res) => {
       const result = await new Promise((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
           { 
-            resource_type: mediaType || feed.mediaType === 'video' ? 'video' : 'image', 
+            resource_type: 'auto', 
             folder: 'instagram_feeds' 
           },
           (error, result) => {
