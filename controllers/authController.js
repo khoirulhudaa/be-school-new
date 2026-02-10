@@ -475,6 +475,7 @@ exports.getAllSchoolsPaginated = async (req, res) => {
         ['address', 'alamat'], 
         'npsn', 
         ['logoUrl', 'logo'], 
+        ['email', 'email'], 
         ['latitude', 'lat'], 
         ['longitude', 'long'],
         'isActive'
