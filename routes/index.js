@@ -37,6 +37,7 @@
   const exportExcel = require('./exportExcelAttedancesYearly');
   const dataSekolah = require('./sekolahRoutes');
   const tugasSekolah = require('./tugasRouter');
+  const scanQrStatis = require('./scanQrStatis');
 
   router.use('/auth', require('./authRoutes'));
 
@@ -72,6 +73,7 @@
   router.use('/export-excel', exportExcel);
   router.use('/sekolah', dataSekolah);
   router.use('/tugas', tugasSekolah);
+  router.use('/scar-qr', scanQrStatis);
   
   // Route dengan upload/file berat → pakai uploadLimiter
   router.use('/gallery', galleryRouter);

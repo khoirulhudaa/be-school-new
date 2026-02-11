@@ -1,8 +1,6 @@
 const Student = require('../models/siswa');
 const Attendance = require('../models/kehadiran');
-const cloudinary = require('cloudinary').v2;
-const streamifier = require('streamifier');
-const { fn, col, Op } = require('sequelize');
+const { Op } = require('sequelize');
 const moment = require('moment');
 const ExcelJS = require('exceljs');
 const GuruTendik = require('../models/guruTendik');
@@ -11,7 +9,7 @@ const sequelize = require('../config/database');
 
 exports.scanSelf = async (req, res) => {
   const { qrScanned } = req.body; // Data dari hasil scan kamera HP user
-  const { id, role, schoolId } = req.user; // Diambil dari JWT Middleware
+  const { id, role, schoolId } = req.user.profile;
   
   const todayStart = moment().startOf('day').toDate();
   const todayEnd = moment().endOf('day').toDate();
