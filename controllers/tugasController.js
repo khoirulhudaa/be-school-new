@@ -8,7 +8,7 @@ exports.createTugas = async (req, res) => {
   try {
     const { 
       judul, namaGuru, emailGuru, deskripsi, jenisSoal, 
-      nilaiMinimal, linkEksternal, hari, tanggal, deadlineJam 
+      nilaiMinimal, linkEksternal, hari, tanggal, deadlineJam, schoolId 
     } = req.body;
 
     let fileUrl = null;
@@ -30,7 +30,7 @@ exports.createTugas = async (req, res) => {
       judul, namaGuru, emailGuru, deskripsi, jenisSoal,
       nilaiMinimal, linkEksternal, hari, tanggal, deadlineJam,
       fileUrl,
-      schoolId: req.user.id
+      schoolId
     });
 
     res.status(201).json({ success: true, message: 'Tugas berhasil dibuat', data: tugas });
