@@ -7,6 +7,7 @@ const moment = require('moment');
 const ExcelJS = require('exceljs');
 const GuruTendik = require('../models/guruTendik');
 const sequelize = require('../config/database');
+const jwt = require('jsonwebtoken');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -32,6 +33,44 @@ const processPhotoUpload = (buffer, schoolId, nis) => {
     );
     streamifier.createReadStream(buffer).pipe(uploadStream);
   });
+};
+
+exports.checkStudentAuth = async (req, res) => {
+  try {
+    const { nis } = req.body;
+    const student = await Student.findOne({ 
+      where: { nis, isActive: true } 
+    });
+
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Data siswa tidak ditemukan' });
+    }
+
+    // Mengubah instance database menjadi objek plain JSON
+    const profile = student.toJSON();
+
+    // Pastikan role siswa ada di dalam profile jika tidak ada di DB
+    profile.role = 'siswa';
+
+    // Bersihkan data yang tidak diperlukan dalam token
+    delete profile.createdAt;
+    delete profile.updatedAt;
+
+    // Generate Token JWT dengan Profile Lengkap
+    const token = jwt.sign(
+      { profile }, // Payload berisi seluruh profil
+      process.env.JWT_SECRET || 'secret_key_anda',
+      { expiresIn: '1d' }
+    );
+
+    res.json({ 
+      success: true, 
+      token, 
+      data: profile 
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 };
 
 // --- CRUD SISWA ---
@@ -211,98 +250,6 @@ exports.getAllTeachers = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
-// exports.getUserDetail = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     // role: 'student' atau 'teacher'
-//     const { role, year } = req.query; 
-
-//     if (!role || !['student', 'teacher'].includes(role)) {
-//       return res.status(400).json({ success: false, message: "Role harus ditentukan (student/teacher)." });
-//     }
-
-//     // 1. Konfigurasi dinamis berdasarkan Role
-//     const isStudent = role === 'student';
-//     const Model = isStudent ? Student : GuruTendik;
-//     const attendanceAlias = isStudent ? 'studentAttendances' : 'guruAttendances';
-
-//     // Rentang waktu 1 tahun
-//     const startDate = year 
-//       ? moment(`${year}-01-01`).startOf('year').toDate() 
-//       : moment().subtract(1, 'years').toDate();
-//     const endDate = year 
-//       ? moment(`${year}-12-31`).endOf('year').toDate() 
-//       : moment().endOf('day').toDate();
-
-//     // 2. Query Database
-//     const user = await Model.findOne({
-//       where: { id, isActive: true },
-//       include: [
-//         {
-//           model: Attendance,
-//           as: attendanceAlias,
-//           where: {
-//             createdAt: { [Op.between]: [startDate, endDate] }
-//           },
-//           required: false,
-//         }
-//       ],
-//       order: [[ { model: Attendance, as: attendanceAlias }, 'createdAt', 'DESC']]
-//     });
-
-//     if (!user) {
-//       return res.status(404).json({ success: false, message: 'Data tidak ditemukan' });
-//     }
-
-//     // 3. Proses Statistik & Riwayat
-//     const stats = { Hadir: 0, Izin: 0, Sakit: 0, Alpha: 0, Terlambat: 0 };
-//     const deadline = "07:00:00";
-
-//     // Akses array attendance secara dinamis menggunakan alias
-//     const rawAttendances = user[attendanceAlias] || [];
-
-//     const history = rawAttendances.map(record => {
-//       const scanTime = moment(record.createdAt).format("HH:mm:ss");
-//       const isLate = record.status === 'Hadir' && scanTime > deadline;
-
-//       if (isLate) stats.Terlambat++;
-//       if (stats.hasOwnProperty(record.status)) {
-//         stats[record.status]++;
-//       }
-
-//       return {
-//         id: record.id,
-//         date: moment(record.createdAt).format('YYYY-MM-DD'),
-//         time: scanTime,
-//         status: record.status,
-//         isLate: isLate,
-//         info: isStudent ? record.currentClass : 'GURU/STAFF'
-//       };
-//     });
-
-//     // 4. Cleanup Response
-//     const profile = user.toJSON();
-//     delete profile[attendanceAlias]; // Hapus data mentah agar tidak duplikat di JSON
-
-//     res.json({
-//       success: true,
-//       data: {
-//         role,
-//         profile,
-//         statistics: stats,
-//         attendanceHistory: history
-//       }
-//     });
-
-//   } catch (err) {
-//     console.error("Error Detail User:", err);
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
-
-
-// GET USER DETAIL YANG SUDAH PAGINATION
 
 exports.getUserDetail = async (req, res) => {
   try {

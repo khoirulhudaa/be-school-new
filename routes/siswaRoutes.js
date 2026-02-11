@@ -14,6 +14,7 @@ const upload = multer({
 // Endpoint: /api/siswa
 router.get('/', studentController.getAllStudents); // Sesuai fetch di frontend tadi
 router.post('/', upload.single('photo'), studentController.createStudent);
+router.post('/login', studentController.checkStudentAuth);
 router.put('/:id', upload.single('photo'), studentController.updateStudent);
 router.delete('/:id', studentController.deleteStudent);
 

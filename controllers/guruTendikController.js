@@ -2,12 +2,53 @@ const { Op } = require('sequelize');
 const GuruTendik = require('../models/guruTendik');
 const cloudinary = require('cloudinary').v2;
 const streamifier = require('streamifier');
+const jwt = require('jsonwebtoken');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
+
+exports.checkGuruAuth = async (req, res) => {
+  try {
+    const { email, nip } = req.body;
+    
+    const guru = await GuruTendik.findOne({
+      where: {  
+        isActive: true,
+        [Op.or]: [{ email: email }, { nip: nip }]
+      }
+    });
+
+    if (!guru) {
+      return res.status(404).json({ success: false, message: 'Data Guru/Tendik tidak ditemukan' });
+    }
+
+    // Mengubah instance database menjadi objek plain JSON
+    const profile = guru.toJSON();
+
+    // Hapus field sensitif atau yang tidak perlu agar token ringan
+    delete profile.password; 
+    delete profile.createdAt;
+    delete profile.updatedAt;
+
+    // Generate Token JWT dengan Profile Lengkap
+    const token = jwt.sign(
+      { profile }, // Payload berisi seluruh profil
+      process.env.JWT_SECRET || 'secret_key_anda',
+      { expiresIn: '1d' }
+    );
+
+    res.json({ 
+      success: true, 
+      token, 
+      data: profile // Kirim data yang sudah dibersihkan
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
 
 exports.getAllGuruTendik = async (req, res) => {
   try {
