@@ -73,7 +73,7 @@
   router.use('/export-excel', exportExcel);
   router.use('/sekolah', dataSekolah);
   router.use('/tugas', tugasSekolah);
-  router.use('/scar-qr', scanQrStatis);
+  router.use('/scan-qr', scanQrStatis);
   
   // Route dengan upload/file berat → pakai uploadLimiter
   router.use('/gallery', galleryRouter);
