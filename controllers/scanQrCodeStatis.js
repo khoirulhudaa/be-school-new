@@ -60,7 +60,7 @@ exports.scanSelf = async (req, res) => {
     }
 
     const newAttendance = await Attendance.create({ 
-      id,
+      [idKey]: id,
       userRole: attendanceRole,
       schoolId: schoolId, 
       currentClass: currentClassLabel,
@@ -77,7 +77,16 @@ exports.scanSelf = async (req, res) => {
 
   } catch (err) {
     if (t) await t.rollback();
-    console.error("Internal Error Detail:", err); // Cek terminal backend Anda
-    res.status(500).json({ success: false, message: "Server error", details: err.message });
+      // Tampilkan stack trace lengkap di terminal server
+      console.error("===== DATABASE ERROR START =====");
+      console.error(err); 
+      console.error("===== DATABASE ERROR END =====");
+
+      // Kirim detail asli ke client untuk mempermudah debugging saat ini
+      res.status(500).json({ 
+        success: false, 
+        message: "Server database error", 
+        details: err.original?.sqlMessage || err.message // Menampilkan pesan asli MySQL/Postgres
+      });
   }
 };
