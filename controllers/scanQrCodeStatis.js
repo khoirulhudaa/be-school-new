@@ -2,20 +2,21 @@ const Student = require('../models/siswa');
 const Attendance = require('../models/kehadiran');
 const { Op } = require('sequelize');
 const moment = require('moment');
-const ExcelJS = require('exceljs');
 const GuruTendik = require('../models/guruTendik');
 const sequelize = require('../config/database');
 
 
 exports.scanSelf = async (req, res) => {
-  const { qrScanned } = req.body; // Data dari hasil scan kamera HP user
-  const { id, role, schoolId } = req.user.profile;
+  const { qrScanned } = req.body;
   
+  // Ambil data dari req.user (Pastikan middleware JWT Anda sudah benar)
+  const userData = req.user.profile || req.user; 
+  const { id, role, schoolId } = userData;
+
   const todayStart = moment().startOf('day').toDate();
   const todayEnd = moment().endOf('day').toDate();
 
-  // 1. Validasi Kode QR Sekolah (Misal: sekolah_123_attendance_key)
-  // Anda bisa membuat string statis di database per sekolah untuk keamanan
+  // 1. Validasi QR Code
   if (!qrScanned.includes(`SCHOOL_QR_${schoolId}`)) {
     return res.status(403).json({ success: false, message: 'QR Code tidak valid untuk sekolah ini' });
   }
@@ -23,17 +24,18 @@ exports.scanSelf = async (req, res) => {
   const t = await sequelize.transaction();
 
   try {
-    const isStudent = role === 'student';
+    // Normalisasi Role: Cek apakah dia siswa (case-insensitive)
+    const isStudent = role.toLowerCase() === 'siswa';
     const idKey = isStudent ? 'studentId' : 'guruId';
+    const attendanceRole = isStudent ? 'student' : 'teacher'; // Simpan ke DB dengan enum yang ada
 
-    // 2. Cek apakah sudah absen hari ini
+    // 2. Cek Duplikasi Absen Hari Ini
     const alreadyExists = await Attendance.findOne({
       where: { 
         [idKey]: id, 
         createdAt: { [Op.between]: [todayStart, todayEnd] } 
       },
-      transaction: t,
-      lock: true 
+      transaction: t
     });
 
     if (alreadyExists) {
@@ -41,20 +43,27 @@ exports.scanSelf = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Anda sudah melakukan absensi hari ini.' });
     }
 
-    // 3. Ambil data profil untuk log currentClass
+    // 3. Ambil Data Profil & Simpan Absensi
     let userProfile;
+    let currentClassLabel;
+
     if (isStudent) {
-      userProfile = await Student.findByPk(id);
+      userProfile = await Student.findByPk(id, { transaction: t });
+      currentClassLabel = userProfile?.class || userProfile?.kelas || 'N/A';
     } else {
-      userProfile = await GuruTendik.findByPk(id);
+      userProfile = await GuruTendik.findByPk(id, { transaction: t });
+      currentClassLabel = 'GURU/STAFF';
     }
 
-    // 4. Buat record absensi
+    if (!userProfile) {
+      throw new Error(`Data ${role} tidak ditemukan di database`);
+    }
+
     const newAttendance = await Attendance.create({ 
-      [idKey]: id,
-      userRole: isStudent ? 'student' : 'teacher',
+      id,
+      userRole: attendanceRole,
       schoolId: schoolId, 
-      currentClass: isStudent ? userProfile.class : 'GURU/STAFF',
+      currentClass: currentClassLabel,
       status: 'Hadir'
     }, { transaction: t });
 
@@ -65,8 +74,10 @@ exports.scanSelf = async (req, res) => {
       message: `Absensi Berhasil! Halo, ${isStudent ? userProfile.name : userProfile.nama}`,
       time: moment(newAttendance.createdAt).format("HH:mm:ss")
     });
+
   } catch (err) {
     if (t) await t.rollback();
-    res.status(500).json({ success: false, message: err.message });
+    console.error("Internal Error Detail:", err); // Cek terminal backend Anda
+    res.status(500).json({ success: false, message: "Server error", details: err.message });
   }
 };
