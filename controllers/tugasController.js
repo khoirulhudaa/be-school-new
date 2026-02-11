@@ -11,7 +11,7 @@ exports.createTugas = async (req, res) => {
 
     const tugas = await Tugas.create({
       judul, namaGuru, emailGuru, deskripsi, jenisSoal,
-      nilaiMinimal, linkEksternal, hari, tanggal, deadlineJam, kelas, mapel
+      nilaiMinimal, linkEksternal, hari, tanggal, deadlineJam, kelas, mapel,
       schoolId
     });
 
