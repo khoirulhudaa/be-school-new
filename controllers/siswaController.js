@@ -576,10 +576,20 @@ exports.deleteStudent = async (req, res) => {
 
 exports.getAttendanceReport = async (req, res) => {
   try {
-    const { schoolId, role, year, month, page = 1, limit = 50 } = req.query;
+    // Tambahkan 'date' ke destructuring query
+    const { schoolId, role, year, month, date, page = 1, limit = 50 } = req.query;
 
-    const startDate = moment(`${year}-${month}-01`).startOf('month').toDate();
-    const endDate = moment(startDate).endOf('month').toDate();
+    let startDate, endDate;
+
+    if (date) {
+      // Jika ada filter tanggal spesifik (format: YYYY-MM-DD)
+      startDate = moment(date).startOf('day').toDate();
+      endDate = moment(date).endOf('day').toDate();
+    } else {
+      // Default: Filter berdasarkan bulan dan tahun
+      startDate = moment(`${year}-${month}-01`).startOf('month').toDate();
+      endDate = moment(startDate).endOf('month').toDate();
+    }
 
     const { count, rows } = await Attendance.findAndCountAll({
       where: {
@@ -597,20 +607,17 @@ exports.getAttendanceReport = async (req, res) => {
       limit: parseInt(limit),
       offset: (parseInt(page) - 1) * parseInt(limit),
       order: [['createdAt', 'DESC']],
-      raw: false // Biarkan false agar kita bisa memanipulasi objek datavalues
+      raw: false 
     });
 
-    // Batas waktu jam 07:00
     const deadline = "07:00:00";
 
-    // Modifikasi rows untuk menambahkan status terlambat
     const processedRows = rows.map(record => {
       const attendance = record.toJSON();
       const scanTime = moment(attendance.createdAt).format("HH:mm:ss");
       
-      // Tambahkan key baru
       attendance.isLate = attendance.status === 'Hadir' && scanTime > deadline;
-      attendance.scanTime = scanTime; // Opsional: kirim waktu scannya saja untuk memudahkan frontend
+      attendance.scanTime = scanTime;
 
       return attendance;
     });
