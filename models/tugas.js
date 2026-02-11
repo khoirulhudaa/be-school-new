@@ -53,10 +53,6 @@ const Tugas = sequelize.define('Tugas', {
     type: DataTypes.TIME,
     allowNull: false
   },
-  fileUrl: { // File materi dari Cloudinary
-    type: DataTypes.STRING,
-    allowNull: true
-  }
 }, {
   timestamps: true,
   tableName: 'tugas',

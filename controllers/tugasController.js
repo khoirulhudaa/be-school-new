@@ -1,7 +1,5 @@
 const { Op } = require('sequelize');
 const Tugas = require('../models/tugas');
-const cloudinary = require('cloudinary').v2;
-const streamifier = require('streamifier');
 
 // 1. TAMBAH TUGAS
 exports.createTugas = async (req, res) => {
@@ -11,25 +9,9 @@ exports.createTugas = async (req, res) => {
       nilaiMinimal, linkEksternal, hari, tanggal, deadlineJam, schoolId 
     } = req.body;
 
-    let fileUrl = null;
-    if (req.file) {
-      const result = await new Promise((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-          { folder: 'school_tasks', resource_type: 'auto' },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-          }
-        );
-        streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
-      });
-      fileUrl = result.secure_url;
-    }
-
     const tugas = await Tugas.create({
       judul, namaGuru, emailGuru, deskripsi, jenisSoal,
       nilaiMinimal, linkEksternal, hari, tanggal, deadlineJam,
-      fileUrl,
       schoolId
     });
 
