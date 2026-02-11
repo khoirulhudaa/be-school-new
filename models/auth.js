@@ -29,6 +29,10 @@ const SchoolAccount = sequelize.define('SchoolAccount', {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  role: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
   resetPasswordExpires: {
     type: DataTypes.DATE,
     allowNull: true,

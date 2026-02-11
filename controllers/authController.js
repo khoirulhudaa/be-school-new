@@ -151,7 +151,7 @@ exports.getProfile = async (req, res) => {
         id: user.id,
         name: user.adminName,
         email: user.email,
-        role: "admin", // Hardcoded sesuai kebutuhan frontend
+        role: user.role, // Hardcoded sesuai kebutuhan frontend
         sekolah: {
           id: user.id,
           namaSekolah: user.schoolName,
@@ -321,7 +321,7 @@ exports.login = async (req, res) => {
         logoUrl: user.logoUrl,
         lat: user.latitude,
         long: user.longitude,
-        role: 'Admin'
+        role: user.role
       },
     });
   } catch (err) {
@@ -400,6 +400,7 @@ exports.getAllSchools = async (req, res) => {
         ['logoUrl', 'logo'], 
         ['email', 'email'], 
         ['latitude', 'lat'], 
+        ['role', 'role'], 
         ['longitude', 'long'],
         'isActive'
       ],
