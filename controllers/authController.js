@@ -81,7 +81,8 @@ exports.registerSchool = async (req, res) => {
       logoUrl,
       verificationPin,
       isVerified: false,
-      isActive: true
+      isActive: true,
+      role: 'admin'
     });
 
     // Kirim PIN ke Email
