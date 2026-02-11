@@ -8,7 +8,7 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }
 });
 
-router.post('/', upload.single('file'), tugasController.createTugas);
+router.post('/', tugasController.createTugas);
 router.get('/', tugasController.getAllTugas);
 router.get('/:id', tugasController.getTugasById);
 router.put('/:id', tugasController.updateTugas);

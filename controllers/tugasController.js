@@ -73,14 +73,35 @@ exports.getTugasById = async (req, res) => {
   }
 };
 
-// 4. UPDATE TUGAS
+// controllers/tugasController.js
 exports.updateTugas = async (req, res) => {
   try {
-    const tugas = await Tugas.findOne({ where: { id: req.params.id, schoolId: req.user.id } });
-    if (!tugas) return res.status(404).json({ success: false, message: 'Tugas tidak ditemukan' });
+    const { id } = req.params;
+    const { schoolId } = req.body; // Ambil schoolId dari JSON body
 
+    // Cari tugas berdasarkan ID dan schoolId
+    const tugas = await Tugas.findOne({ 
+      where: { 
+        id: id, 
+        schoolId: schoolId 
+      } 
+    });
+
+    if (!tugas) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Tugas tidak ditemukan' 
+      });
+    }
+
+    // Update data
     await tugas.update(req.body);
-    res.json({ success: true, message: 'Tugas berhasil diperbarui', data: tugas });
+
+    res.json({ 
+      success: true, 
+      message: 'Tugas berhasil diperbarui', 
+      data: tugas 
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
