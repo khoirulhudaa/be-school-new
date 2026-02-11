@@ -33,6 +33,14 @@ const Tugas = sequelize.define('Tugas', {
     type: DataTypes.STRING,
     allowNull: false
   },
+  kelas: { // Baru (Contoh: Pilihan Ganda, Essay, Praktik)
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  mapel: { // Baru (Contoh: Pilihan Ganda, Essay, Praktik)
+    type: DataTypes.STRING,
+    allowNull: false
+  },
   nilaiMinimal: { // Baru (KKM)
     type: DataTypes.INTEGER,
     defaultValue: 0

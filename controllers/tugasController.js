@@ -6,12 +6,12 @@ exports.createTugas = async (req, res) => {
   try {
     const { 
       judul, namaGuru, emailGuru, deskripsi, jenisSoal, 
-      nilaiMinimal, linkEksternal, hari, tanggal, deadlineJam, schoolId 
+      nilaiMinimal, linkEksternal, hari, tanggal, deadlineJam, schoolId, kelas, mapel 
     } = req.body;
 
     const tugas = await Tugas.create({
       judul, namaGuru, emailGuru, deskripsi, jenisSoal,
-      nilaiMinimal, linkEksternal, hari, tanggal, deadlineJam,
+      nilaiMinimal, linkEksternal, hari, tanggal, deadlineJam, kelas, mapel
       schoolId
     });
 
