@@ -34,7 +34,7 @@ exports.checkGuruAuth = async (req, res) => {
 
     // Mengubah instance database menjadi objek plain JSON
     const profile = guru.toJSON();
-    profile.schoolLogo = sekolah ? dataSekolah.logoUrl : null;
+    profile.schoolLogo = dataSekolah ? dataSekolah.logoUrl : null;
 
     // Hapus field sensitif atau yang tidak perlu agar token ringan
     delete profile.password; 
