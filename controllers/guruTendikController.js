@@ -3,7 +3,7 @@ const GuruTendik = require('../models/guruTendik');
 const cloudinary = require('cloudinary').v2;
 const streamifier = require('streamifier');
 const jwt = require('jsonwebtoken');
-const SchoolAccount = require('../models/auth');
+const SchoolProfile = require('../models/profileSekolah');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -27,15 +27,14 @@ exports.checkGuruAuth = async (req, res) => {
     }
 
     // 2. Ambil logo sekolah secara manual berdasarkan schoolId dari data guru
-    const dataSekolah = await SchoolAccount.findOne({
-      where: { id: guru.schoolId },
-      attributes: ['logoUrl'] // Hanya ambil logoUrl saja
+    const dataSekolah = await SchoolProfile.findOne({
+      where: { schoolId: guru.schoolId },
+      attributes: ["logoUrl"]
     });
 
     // Mengubah instance database menjadi objek plain JSON
     const profile = guru.toJSON();
-    const sekolah = dataSekolah.toJSON();
-    // profile.schoolLogo = sekolah ? sekolah.logoUrl : null;
+    profile.schoolLogo = sekolah ? dataSekolah.logoUrl : null;
 
     // Hapus field sensitif atau yang tidak perlu agar token ringan
     delete profile.password; 
@@ -52,7 +51,6 @@ exports.checkGuruAuth = async (req, res) => {
     res.json({ 
       success: true, 
       token, 
-      sekolah,
       data: profile // Kirim data yang sudah dibersihkan
     });
   } catch (err) {
