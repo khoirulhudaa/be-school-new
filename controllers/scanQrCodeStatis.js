@@ -10,7 +10,7 @@ exports.scanSelf = async (req, res) => {
   const { qrScanned } = req.body;
   
   // Ambil data dari req.user (Pastikan middleware JWT Anda sudah benar)
-  const userData = req.user.profile || req.user; 
+  const userData = req.user || req.user.profile; 
   const { id, role, schoolId } = userData;
 
   const todayStart = moment().startOf('day').toDate();
