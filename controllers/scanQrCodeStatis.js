@@ -9,8 +9,6 @@ const sequelize = require('../config/database');
 exports.scanSelf = async (req, res) => {
   const { qrScanned } = req.body;
   
-  // Ambil data dari req.user (Pastikan middleware JWT Anda sudah benar)
- // Mengambil profile dengan lebih aman
   const profile = req.user?.profile || req.user; 
   
   if (!profile) {
@@ -79,7 +77,7 @@ exports.scanSelf = async (req, res) => {
 
     res.json({ 
       success: true, 
-      message: `Absensi Berhasil! Halo, ${isStudent ? userProfile.name : userProfile.nama}`,
+      message: `Absensi Anda Berhasil!`,
       time: moment(newAttendance.createdAt).format("HH:mm:ss")
     });
 
