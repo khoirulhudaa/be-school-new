@@ -27,14 +27,15 @@ exports.checkGuruAuth = async (req, res) => {
     }
 
     // 2. Ambil logo sekolah secara manual berdasarkan schoolId dari data guru
-    const sekolah = await SchoolAccount.findOne({
+    const dataSekolah = await SchoolAccount.findOne({
       where: { id: guru.schoolId },
       attributes: ['logoUrl'] // Hanya ambil logoUrl saja
     });
 
     // Mengubah instance database menjadi objek plain JSON
     const profile = guru.toJSON();
-    profile.schoolLogo = sekolah ? sekolah.logoUrl : null;
+    const sekolah = dataSekolah.toJSON();
+    // profile.schoolLogo = sekolah ? sekolah.logoUrl : null;
 
     // Hapus field sensitif atau yang tidak perlu agar token ringan
     delete profile.password; 
@@ -51,6 +52,7 @@ exports.checkGuruAuth = async (req, res) => {
     res.json({ 
       success: true, 
       token, 
+      sekolah,
       data: profile // Kirim data yang sudah dibersihkan
     });
   } catch (err) {
