@@ -10,15 +10,23 @@ exports.scanSelf = async (req, res) => {
   const { qrScanned } = req.body;
   
   // Ambil data dari req.user (Pastikan middleware JWT Anda sudah benar)
-  const userData = req.user || req.user.profile; 
-  const { id, role, schoolId } = userData;
+ // Mengambil profile dengan lebih aman
+  const profile = req.user?.profile || req.user; 
+  
+  if (!profile) {
+    return res.status(401).json({ success: false, message: "Sesi tidak valid" });
+  }
+
+  const { id, role, schoolId } = profile;
+
+  console.log('req.user?.profile', req.user?.profile)
 
   const todayStart = moment().startOf('day').toDate();
   const todayEnd = moment().endOf('day').toDate();
 
   // 1. Validasi QR Code
   if (!qrScanned.includes(`SCHOOL_QR_${schoolId}`)) {
-    return res.status(403).json({ success: false, message: 'QR Code tidak valid untuk sekolah ini' });
+    return res.status(403).json({ success: false, message: `QR Code ${qrScanned} tidak valid untuk sekolah ini ID: ${schoolId}` });
   }
 
   const t = await sequelize.transaction();
