@@ -35,8 +35,8 @@ exports.updateClass = async (req, res) => {
 
 exports.deleteClass = async (req, res) => {
   try {
-    const { id } = req.params;
-    await Class.destroy({ where: { id } });
+    const { id, schoolId } = req.params;
+    await Class.destroy({ where: { id, schoolId } });
     res.json({ success: true, message: "Kelas dihapus" });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

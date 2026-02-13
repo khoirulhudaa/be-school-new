@@ -5,6 +5,6 @@ const kelasController = require('../controllers/kelasController');
 router.get('/', kelasController.getAllClasses);
 router.post('/', kelasController.createClass);
 router.put('/:id', kelasController.updateClass);
-router.delete('/:id', kelasController.deleteClass);
+router.delete('/:id/:schoolId', kelasController.deleteClass);
 
 module.exports = router;
