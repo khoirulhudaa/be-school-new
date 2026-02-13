@@ -12,6 +12,6 @@ router.post('/', tugasController.createTugas);
 router.get('/', tugasController.getAllTugas);
 router.get('/:id', tugasController.getTugasById);
 router.put('/:id', tugasController.updateTugas);
-router.delete('/:id', tugasController.deleteTugas);
+router.delete('/:id/:schoolId', tugasController.deleteTugas);
 
 module.exports = router;

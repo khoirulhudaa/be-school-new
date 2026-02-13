@@ -109,8 +109,9 @@ exports.updateTugas = async (req, res) => {
 
 // 5. HAPUS TUGAS
 exports.deleteTugas = async (req, res) => {
+  const { id, schoolId } = req.params;
   try {
-    const deleted = await Tugas.destroy({ where: { id: req.params.id, schoolId: req.user.id } });
+    const deleted = await Tugas.destroy({ where: { id, schoolId } });
     if (!deleted) return res.status(404).json({ success: false, message: 'Tugas tidak ditemukan' });
     res.json({ success: true, message: 'Tugas berhasil dihapus' });
   } catch (err) {
