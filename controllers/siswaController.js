@@ -107,38 +107,30 @@ exports.createStudent = async (req, res) => {
   }
 };
 
-// backend/controllers/studentController.js
-
 exports.getStudentSearch = async (req, res) => {
   try {
     const { schoolId, name } = req.query;
-
-    if (!schoolId) {
-      return res.status(400).json({ success: false, message: "schoolId diperlukan." });
-    }
+    console.log("Searching for:", name, "in schoolId:", schoolId); // Log ini sangat penting
 
     let condition = { 
-      schoolId: parseInt(schoolId), 
-      isActive: true 
+      schoolId: parseInt(schoolId),
+      // isActive: true // SEMENTARA MATIKAN INI untuk cek apakah data muncul
     };
     
-    // Filter berdasarkan nama jika ada input search
     if (name) {
+      // Gunakan [Op.like] untuk MySQL atau [Op.iLike] untuk PostgreSQL
       condition.name = { [Op.like]: `%${name}%` };
     }
 
     const students = await Student.findAll({
       where: condition,
-      attributes: ['id', 'name', 'class', 'photoUrl'], // Hanya ambil data yang diperlukan saja
-      limit: 20, // Batasi agar tidak overload jika database sangat besar
-      order: [['name', 'ASC']]
+      attributes: ['id', 'name', 'class', 'photoUrl'],
+      limit: 10
     });
 
-    res.json({
-      success: true,
-      data: students
-    });
+    res.json({ success: true, data: students });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
