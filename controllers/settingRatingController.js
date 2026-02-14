@@ -3,12 +3,8 @@ const Setting = require('../models/settingRating');
 exports.getSettings = async (req, res) => {
   try {
     const { schoolId } = req.query;
+    if (!schoolId) return res.status(400).json({ success: false, message: 'schoolId required' });
 
-    if (!schoolId) {
-      return res.status(400).json({ success: false, message: 'schoolId required' });
-    }
-
-    // Cari setting, jika belum ada buat default ON (true)
     const [setting] = await Setting.findOrCreate({
       where: { schoolId: parseInt(schoolId) },
       defaults: { showRatingStats: true }
@@ -23,18 +19,15 @@ exports.getSettings = async (req, res) => {
 exports.updateSettings = async (req, res) => {
   try {
     const { schoolId, showRatingStats } = req.body;
+    if (!schoolId) return res.status(400).json({ success: false, message: 'schoolId required' });
 
-    if (!schoolId) {
-      return res.status(400).json({ success: false, message: 'schoolId required' });
-    }
-
-    // Update jika ada, Insert jika tidak ada
+    // upsert akan mengupdate jika ID ada, atau membuat jika tidak ada
     await Setting.upsert({
       schoolId: parseInt(schoolId),
-      showRatingStats: showRatingStats // nilai boolean true/false
+      showRatingStats: showRatingStats
     });
 
-    res.json({ success: true, message: 'Pengaturan visibilitas berhasil diperbarui' });
+    res.json({ success: true, message: 'Pengaturan berhasil diperbarui' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

@@ -19,10 +19,6 @@ const Comment = sequelize.define('Comment', {
     type: DataTypes.STRING(50),
     allowNull: false
   },
-  isVisible: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: true, // Default ditampilkan
-  },
   comment: {
     type: DataTypes.TEXT,
     allowNull: false,
