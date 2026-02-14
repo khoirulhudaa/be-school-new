@@ -2,7 +2,7 @@ const Comment = require('../models/komentar');
 
 exports.getAllComments = async (req, res) => {
   try {
-    const { schoolId } = req.query;
+    const { schoolId, adminMode } = req.query;
 
     if (!schoolId) {
       return res.status(400).json({ 
@@ -11,14 +11,35 @@ exports.getAllComments = async (req, res) => {
       });
     }
 
-   const comments = await Comment.findAll({
-      where: { 
-        schoolId: parseInt(schoolId),
-      },
+   let whereCondition = { schoolId: parseInt(schoolId) };
+    
+    // Jika bukan admin, hanya tampilkan yang isVisible = true
+    if (adminMode !== 'true') {
+      whereCondition.isVisible = true;
+    }
+
+    const comments = await Comment.findAll({
+      where: whereCondition,
       order: [['createdAt', 'DESC']],
     });
 
     res.json({ success: true, data: comments });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Tambahkan Fungsi Baru untuk Toggle
+exports.toggleVisibility = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const comment = await Comment.findByPk(id);
+    if (!comment) return res.status(404).json({ success: false, message: 'Not found' });
+
+    comment.isVisible = !comment.isVisible;
+    await comment.save();
+
+    res.json({ success: true, data: comment });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
