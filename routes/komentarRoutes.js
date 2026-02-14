@@ -7,7 +7,6 @@ const router = express.Router();
 // Routes
 router.get('/', komentarController.getAllComments);
 router.post('/', komentarController.createComment);
-router.post('/isVisible', komentarController.toggleVisibility);
 router.delete('/:id', komentarController.deleteComment);
 router.get('/settings', settingController.getSettings);
 router.post('/settings', settingController.updateSettings);
