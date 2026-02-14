@@ -5,6 +5,11 @@ const Student = sequelize.define('Student', {
   id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
   schoolId: { type: DataTypes.INTEGER, allowNull: false },
   name: { type: DataTypes.STRING, allowNull: false },
+  parentId: { 
+    type: DataTypes.INTEGER, 
+    allowNull: true,
+    references: { model: 'orangTua', key: 'id' }
+  },
   nis: { type: DataTypes.STRING, allowNull: false },
   nisn: { type: DataTypes.STRING, allowNull: true },
   nik: { type: DataTypes.STRING, allowNull: true },
@@ -24,6 +29,7 @@ const Student = sequelize.define('Student', {
       fields: ['schoolId', 'batch'] 
     }
   ]
-});
+}); 
+
 
 module.exports = Student;

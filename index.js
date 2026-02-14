@@ -1,12 +1,16 @@
-// app.js (atau index.js)
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const sequelize = require('./config/database');
-const cron = require('node-cron'); 
-const Student = require('./models/siswa'); 
+
+const Student = require('./models/siswa');
+const Parent = require('./models/orangTua');
+
+// Definisikan hubungan di sini, di luar file model masing-masing
+Parent.hasMany(Student, { foreignKey: 'parentId', as: 'children' });
+Student.belongsTo(Parent, { foreignKey: 'parentId', as: 'parent' });
 
 // Import limiter global saja (karena yang lain sudah di routes/index.js)
 const { globalLimiter } = require('./middlewares/rateLimiter');
