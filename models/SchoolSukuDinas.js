@@ -14,7 +14,7 @@ const SchoolSukuDinas = sequelize.define('SchoolSukuDinas', {
   schoolId: {
     type: DataTypes.INTEGER,
     allowNull: false,
-    references: { model: 'SchoolAccount', key: 'id' }  // nama table sekolah
+    references: { model: 'akunSekolah', key: 'id' }  // nama table sekolah
   },
   sukuDinasId: {
     type: DataTypes.INTEGER,
