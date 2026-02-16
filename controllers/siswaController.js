@@ -202,6 +202,88 @@ exports.getAllStudents = async (req, res) => {
   }
 };
 
+exports.getAttendanceSummary = async (req, res) => {
+  try {
+    const { schoolId } = req.query;
+
+    if (!schoolId) {
+      return res.status(400).json({ success: false, message: "schoolId diperlukan." });
+    }
+
+    const todayStart = moment().startOf('day').toDate();
+    const todayEnd = moment().endOf('day').toDate();
+
+    // 1. Ambil Total Keseluruhan (Master Data)
+    const totalSiswaTerdaftar = await Student.count({ 
+      where: { schoolId: parseInt(schoolId), isActive: true } 
+    });
+    const totalGuruTerdaftar = await GuruTendik.count({ 
+      where: { schoolId: parseInt(schoolId), isActive: true } 
+    });
+
+    // 2. Ambil Statistik Kehadiran Siswa
+    const studentStats = await Attendance.findAll({
+      where: {
+        schoolId: parseInt(schoolId),
+        userRole: 'student',
+        createdAt: { [Op.between]: [todayStart, todayEnd] }
+      },
+      attributes: ['status', [fn('COUNT', col('id')), 'total']],
+      group: ['status']
+    });
+
+    // 3. Ambil Statistik Kehadiran Guru
+    const guruStats = await Attendance.findAll({
+      where: {
+        schoolId: parseInt(schoolId),
+        userRole: 'teacher',
+        createdAt: { [Op.between]: [todayStart, todayEnd] }
+      },
+      attributes: ['status', [fn('COUNT', col('id')), 'total']],
+      group: ['status']
+    });
+
+    // Helper untuk memetakan hasil query ke objek status
+    const formatStats = (stats) => {
+      const summary = { Hadir: 0, Izin: 0, Sakit: 0, Alpha: 0 };
+      let totalSudahAbsen = 0;
+      
+      stats.forEach(item => {
+        const data = item.toJSON();
+        summary[data.status] = parseInt(data.total);
+        totalSudahAbsen += parseInt(data.total);
+      });
+      
+      return { summary, totalSudahAbsen };
+    };
+
+    const formattedStudent = formatStats(studentStats);
+    const formattedGuru = formatStats(guruStats);
+
+    res.json({
+      success: true,
+      date: moment().format('YYYY-MM-DD'),
+      data: {
+        siswa: {
+          totalSiswa: totalSiswaTerdaftar,
+          sudahAbsen: formattedStudent.totalSudahAbsen,
+          belumAbsen: totalSiswaTerdaftar - formattedStudent.totalSudahAbsen,
+          rincian: formattedStudent.summary
+        },
+        guru: {
+          totalGuru: totalGuruTerdaftar,
+          sudahAbsen: formattedGuru.totalSudahAbsen,
+          belumAbsen: totalGuruTerdaftar - formattedGuru.totalSudahAbsen,
+          rincian: formattedGuru.summary
+        }
+      }
+    });
+
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 exports.getAllTeachers = async (req, res) => {
   try {
     const { schoolId, page = 1, limit = 10, nama, nip, role } = req.query;

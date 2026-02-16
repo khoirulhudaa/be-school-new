@@ -39,6 +39,10 @@
   const tugasSekolah = require('./tugasRouter');
   const scanQrStatis = require('./scanQrStatis');
   const orangTua = require('./orangTuaRoutes');
+  const assignSudinSekolah = require('./assignSchoolSudinRoutes');
+  const pengumumanSudin = require('./announcementSudinRoutes');
+  const authUserSudin = require('./authSudinRoutes');
+  const provinsi = require('./provinsiRoutes');
 
   router.use('/auth', require('./authRoutes'));
 
@@ -76,6 +80,10 @@
   router.use('/tugas', tugasSekolah);
   router.use('/scan-qr', scanQrStatis);
   router.use('/orang-tua', orangTua);
+  router.use('/assign-sekolahSudin', assignSudinSekolah);
+  router.use('/pengumuman-sekolahSudin', pengumumanSudin);
+  router.use('/auth-sudin', authUserSudin);
+  router.use('/provinsi', authUserSudin);
   
   // Route dengan upload/file berat → pakai uploadLimiter
   router.use('/gallery', galleryRouter);
