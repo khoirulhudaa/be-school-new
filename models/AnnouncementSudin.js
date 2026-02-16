@@ -43,7 +43,7 @@ const AnnouncementSudin = sequelize.define('AnnouncementSudin', {
     type: DataTypes.INTEGER,
     allowNull: false,
     references: {
-      model: 'user_sudin',  // asumsi table user_sudin
+      model: 'userSudin',  // asumsi table user_sudin
       key: 'id'
     }
   },
