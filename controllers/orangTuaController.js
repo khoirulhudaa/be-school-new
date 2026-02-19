@@ -1,6 +1,9 @@
 const Parent = require('../models/orangTua');
 const Student = require('../models/siswa');
+const Attendance = require('../models/kehadiran');
 const { Op } = require('sequelize');
+const moment = require('moment');
+const jwt = require('jsonwebtoken')
 
 // --- 1. CREATE ---
 exports.createParent = async (req, res) => {
@@ -85,6 +88,128 @@ exports.deleteParent = async (req, res) => {
     await Student.update({ parentId: null }, { where: { parentId: id } });
 
     res.json({ success: true, message: "Data orang tua berhasil dihapus" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getChildrenAttendance = async (req, res) => {
+  try {
+    const { parentId } = req.params; // ID orang tua dari session atau params
+    const { year } = req.query;
+
+    // 1. Cari semua anak yang terhubung dengan parent ini
+    const children = await Student.findAll({
+      where: { parentId: parentId, isActive: true },
+      attributes: ['id', 'name', 'class', 'nis']
+    });
+
+    if (!children || children.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Tidak ada data anak yang terhubung dengan akun ini." 
+      });
+    }
+
+    const studentIds = children.map(c => c.id);
+
+    // 2. Konfigurasi Waktu (1 tahun terakhir)
+    const startDate = year 
+      ? moment(`${year}-01-01`).startOf('year').toDate() 
+      : moment().subtract(1, 'years').toDate();
+    const endDate = year 
+      ? moment(`${year}-12-31`).endOf('year').toDate() 
+      : moment().endOf('day').toDate();
+
+    // 3. Ambil data kehadiran semua anak tersebut
+    const attendanceRecords = await Attendance.findAll({
+      where: {
+        studentId: { [Op.in]: studentIds },
+        createdAt: { [Op.between]: [startDate, endDate] }
+      },
+      order: [['createdAt', 'DESC']],
+      // Sertakan info siswa agar orang tua tahu ini record milik anak yang mana
+      include: [{
+        model: Student,
+        as: 'student',
+        attributes: ['name', 'class']
+      }]
+    });
+
+    // 4. Mapping data untuk tampilan yang rapi
+    const deadline = "07:00:00";
+    const history = attendanceRecords.map(record => {
+      const scanTime = moment(record.createdAt).format("HH:mm:ss");
+      return {
+        studentName: record.student.name,
+        class: record.currentClass || record.student.class,
+        date: moment(record.createdAt).format('YYYY-MM-DD'),
+        time: scanTime,
+        status: record.status,
+        isLate: record.status === 'Hadir' && scanTime > deadline
+      };
+    });
+
+    res.json({
+      success: true,
+      count: history.length,
+      data: history
+    });
+
+  } catch (err) {
+    console.error("Error Get Children Attendance:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.loginParentWithoutPassword = async (req, res) => {
+  try {
+    const { phoneNumber, childNis } = req.body;
+
+    // 1. Cari orang tua berdasarkan nomor HP
+    const parent = await Parent.findOne({ 
+      where: { phoneNumber, isActive: true } 
+    });
+
+    if (!parent) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Nomor HP tidak terdaftar di sistem sekolah." 
+      });
+    }
+
+    // 2. Validasi: Apakah benar ortu ini punya anak dengan NIS tersebut?
+    const studentMatch = await Student.findOne({
+      where: { 
+        parentId: parent.id, 
+        nis: childNis 
+      }
+    });
+
+    if (!studentMatch) {
+      return res.status(401).json({ 
+        success: false, 
+        message: "Kombinasi Nomor HP dan NIS Anak tidak cocok." 
+      });
+    }
+
+    // 3. Jika cocok, buatkan Token (JWT)
+    const token = jwt.sign(
+      { id: parent.id, role: 'parent', schoolId: parent.schoolId },
+      process.env.JWT_SECRET,
+      { expiresIn: '30d' } // Buat durasi lama agar ortu tidak sering login ulang
+    );
+
+    res.json({
+      success: true,
+      message: "Login berhasil",
+      token,
+      parent: {
+        id: parent.id,
+        name: parent.name,
+        schoolId: parent.schoolId
+      }
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

@@ -6,6 +6,7 @@ router.get('/', parentController.getAllParents);
 router.post('/', parentController.createParent);
 router.put('/:id', parentController.updateParent);
 router.delete('/:id', parentController.deleteParent);
-// Tambahkan route delete jika diperlukan (Soft Delete recommended)
+router.get('/:parentId/kehadiran-siswa', parentController.getChildrenAttendance);
+router.post('/login', parentController.loginParentWithoutPassword);
 
 module.exports = router;
