@@ -31,6 +31,8 @@ router.get('/detail/:id', studentController.getUserDetail);
 // Statistik Dashboard (Hadir, Sakit, Izin, Alpha hari ini)
 router.get('/today-stats', studentController.getTodayStats);
 router.get('/summary-attendances', studentController.getAttendanceSummary);
+router.get('/early-warning', studentController.getEarlyWarningReport);
+router.get('/hall-of-fame', studentController.getPublicHallOfFame);
 
 // Endpoint Laporan & Export (Perbaikan ejaan: attendance)
 router.get('/attendance-report', studentController.getAttendanceReport);

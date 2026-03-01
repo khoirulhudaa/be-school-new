@@ -2,12 +2,13 @@ const Student = require('../models/siswa');
 const Attendance = require('../models/kehadiran');
 const cloudinary = require('cloudinary').v2;
 const streamifier = require('streamifier');
-const { fn, col, Op } = require('sequelize');
+const { fn, col, Op, literal } = require('sequelize');
 const moment = require('moment');
 const ExcelJS = require('exceljs');
 const GuruTendik = require('../models/guruTendik');
 const sequelize = require('../config/database');
 const jwt = require('jsonwebtoken');
+const SchoolProfile = require('../models/profileSekolah');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -46,6 +47,10 @@ exports.checkStudentAuth = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Data siswa tidak ditemukan' });
     }
 
+    const school = await SchoolProfile.findOne({
+      where: { schoolId: student.schoolId }
+    });
+    
     // Mengubah instance database menjadi objek plain JSON
     const profile = student.toJSON();
 
@@ -55,6 +60,13 @@ exports.checkStudentAuth = async (req, res) => {
     // Bersihkan data yang tidak diperlukan dalam token
     delete profile.createdAt;
     delete profile.updatedAt;
+
+    // Tambahkan info lokasi sekolah untuk Geofencing di HP
+    profile.schoolLocation = {
+      lat: school ? school.latitude : null,
+      lng: school ? school.longitude : null,
+      radiusMeter: 100 // Jarak toleransi absen dalam meter
+    };
 
     // Generate Token JWT dengan Profile Lengkap
     const token = jwt.sign(
@@ -514,8 +526,26 @@ exports.exportUserAttendance = async (req, res) => {
   }
 };
 
+// Fungsi Helper Haversine (Gratis & Akurat)
+function getDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371e3; // Radius bumi dalam meter
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // Hasil dalam meter
+}
+
+// SCAM DEVELOPMENT DENGAN KOORDINAT
 exports.scanQRCode = async (req, res) => {
-  const { qrCodeData, role } = req.body; // role: 'student' atau 'teacher'
+  // Terima userLat dan userLon dari aplikasi HP
+  const { qrCodeData, role, userLat, userLon } = req.body; 
   const todayStart = moment().startOf('day').toDate();
   const todayEnd = moment().endOf('day').toDate();
 
@@ -523,23 +553,40 @@ exports.scanQRCode = async (req, res) => {
 
   try {
     let user;
-    let updateFields = { schoolId: null, id: null, name: null, class: null, nisn: null, email: null };
+    let updateFields = {};
 
+    // 1. Cari User
     if (role === 'student') {
       user = await Student.findOne({ where: { qrCodeData, isActive: true } });
-      if (user) {
-        updateFields = { idKey: 'studentId', id: user.id, name: user.name, class: user.class, schoolId: user.schoolId, nisn: user.nisn };
-      }
+      if (user) updateFields = { idKey: 'studentId', id: user.id, name: user.name, class: user.class, schoolId: user.schoolId, nisn: user.nisn };
     } else {
-      // Untuk Guru, asumsikan qrCodeData disimpan di field tertentu atau pakai ID
       user = await GuruTendik.findOne({ where: { qrCodeData, isActive: true } }); 
-      if (user) {
-        updateFields = { idKey: 'guruId', id: user.id, name: user.nama, class: 'GURU/STAFF', schoolId: user.schoolId, email: user.email };
-      }
+      if (user) updateFields = { idKey: 'guruId', id: user.id, name: user.nama, class: 'GURU/STAFF', schoolId: user.schoolId, email: user.email };
     }
 
     if (!user) return res.status(404).json({ success: false, message: 'Data tidak ditemukan' });
 
+    // 2. VALIDASI GEOFENCING
+    const school = await SchoolProfile.findOne({ where: { schoolId: updateFields.schoolId } });
+    
+    if (school && school.latitude && school.longitude) {
+      if (!userLat || !userLon) {
+        return res.status(400).json({ success: false, message: 'Lokasi GPS diperlukan' });
+      }
+
+      const distance = getDistance(userLat, userLon, school.latitude, school.longitude);
+      const maxRadius = 100; // Toleransi 100 meter
+
+      if (distance > maxRadius) {
+        await t.rollback();
+        return res.status(403).json({ 
+          success: false, 
+          message: `Anda berada di luar jangkauan sekolah (${Math.round(distance)}m).` 
+        });
+      }
+    }
+
+    // 3. Cek Absen Ganda
     const alreadyExists = await Attendance.findOne({
       where: { 
         [updateFields.idKey]: updateFields.id, 
@@ -551,34 +598,99 @@ exports.scanQRCode = async (req, res) => {
 
     if (alreadyExists) {
       await t.rollback();
-      return res.status(400).json({ success: false, message: 'sudah absen.' });
+      return res.status(400).json({ success: false, message: 'Sudah absen hari ini.' });
     }
 
-    // Simpan
+    // 4. Simpan dengan Koordinat
     await Attendance.create({ 
       [updateFields.idKey]: updateFields.id,
       userRole: role,
       schoolId: updateFields.schoolId, 
       currentClass: updateFields.class,
-      status: 'Hadir'
+      status: 'Hadir',
+      latitude: userLat,
+      longitude: userLon
     }, { transaction: t });
 
     await t.commit();
 
-     res.json({ 
+    res.json({ 
       success: true, 
       message: `Absen berhasil: ${updateFields.name}`,
-      data: {  // Tambahkan objek data ini
-        name: updateFields.name,
-        nisn: updateFields.nisn || updateFields.email, // Sesuaikan field yang ada
-        class: updateFields.class
-      }
+      data: { name: updateFields.name, class: updateFields.class }
     });
   } catch (err) {
     if (t) await t.rollback();
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// SCAN YANG ASLI TANPA KOORDINAT (PROD)
+// exports.scanQRCode = async (req, res) => {
+//   const { qrCodeData, role } = req.body; // role: 'student' atau 'teacher'
+//   const todayStart = moment().startOf('day').toDate();
+//   const todayEnd = moment().endOf('day').toDate();
+
+//   const t = await sequelize.transaction();
+
+//   try {
+//     let user;
+//     let updateFields = { schoolId: null, id: null, name: null, class: null, nisn: null, email: null };
+
+//     if (role === 'student') {
+//       user = await Student.findOne({ where: { qrCodeData, isActive: true } });
+//       if (user) {
+//         updateFields = { idKey: 'studentId', id: user.id, name: user.name, class: user.class, schoolId: user.schoolId, nisn: user.nisn };
+//       }
+//     } else {
+//       // Untuk Guru, asumsikan qrCodeData disimpan di field tertentu atau pakai ID
+//       user = await GuruTendik.findOne({ where: { qrCodeData, isActive: true } }); 
+//       if (user) {
+//         updateFields = { idKey: 'guruId', id: user.id, name: user.nama, class: 'GURU/STAFF', schoolId: user.schoolId, email: user.email };
+//       }
+//     }
+
+//     if (!user) return res.status(404).json({ success: false, message: 'Data tidak ditemukan' });
+
+//     const alreadyExists = await Attendance.findOne({
+//       where: { 
+//         [updateFields.idKey]: updateFields.id, 
+//         createdAt: { [Op.between]: [todayStart, todayEnd] } 
+//       },
+//       transaction: t,
+//       lock: true 
+//     });
+
+//     if (alreadyExists) {
+//       await t.rollback();
+//       return res.status(400).json({ success: false, message: 'sudah absen.' });
+//     }
+
+//     // Simpan
+//     await Attendance.create({ 
+//       [updateFields.idKey]: updateFields.id,
+//       userRole: role,
+//       schoolId: updateFields.schoolId, 
+//       currentClass: updateFields.class,
+//       status: 'Hadir'
+//     }, { transaction: t });
+
+//     await t.commit();
+
+//      res.json({ 
+//       success: true, 
+//       message: `Absen berhasil: ${updateFields.name}`,
+//       data: {  // Tambahkan objek data ini
+//         name: updateFields.name,
+//         nisn: updateFields.nisn || updateFields.email, // Sesuaikan field yang ada
+//         class: updateFields.class
+//       }
+//     });
+//   } catch (err) {
+//     if (t) await t.rollback();
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
 
 exports.updateStudent = async (req, res) => {
   try {
@@ -626,6 +738,70 @@ exports.deleteStudent = async (req, res) => {
     await student.save();
 
     res.json({ success: true, message: 'Siswa berhasil dinonaktifkan' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
+exports.getTodayStats = async (req, res) => {
+  try {
+    const { schoolId, role = 'student' } = req.query;
+
+    // Ambil semua data kehadiran hari ini untuk sekolah & role terkait
+    const attendanceData = await Attendance.findAll({
+      where: {
+        schoolId: parseInt(schoolId),
+        userRole: role,
+        createdAt: {
+          [Op.between]: [
+            moment().startOf('day').toDate(), 
+            moment().endOf('day').toDate()
+          ]
+        }
+      },
+      raw: true 
+    });
+
+    // Struktur summary dengan key Terlambat yang terpisah
+    const summary = { 
+      Hadir: 0, 
+      Terlambat: 0, // Key baru
+      Sakit: 0, 
+      Izin: 0, 
+      Alpha: 0 
+    };
+
+    // Definisikan batas waktu (07:00:00)
+    // Gunakan format string 'HH:mm:ss' agar perbandingannya mudah
+    const deadline = "07:00:00";
+
+    attendanceData.forEach(item => {
+      if (item.status === 'Hadir') {
+        // Ambil bagian jam dari createdAt (HH:mm:ss)
+        const scanTime = moment(item.createdAt).format("HH:mm:ss");
+
+        if (scanTime > deadline) {
+          summary.Terlambat += 1;
+        } else {
+          summary.Hadir += 1;
+        }
+      } else {
+        // Mapping untuk status Sakit, Izin, Alpha
+        if (summary.hasOwnProperty(item.status)) {
+          summary[item.status] += 1;
+        }
+      }
+    });
+
+    res.json({ 
+      success: true, 
+      data: { 
+        date: moment().format('YYYY-MM-DD'),
+        deadlineInfo: deadline,
+        ...summary 
+      } 
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -878,65 +1054,150 @@ exports.markAbsence = async (req, res) => {
   }
 };
 
-exports.getTodayStats = async (req, res) => {
-  try {
-    const { schoolId, role = 'student' } = req.query;
+exports.getEarlyWarningReport = async (req, res) => {
+    try {
+        const { schoolId } = req.query;
+        const deadline = "07:00:00";
+        const oneWeekAgo = moment().subtract(7, 'days').startOf('day').toDate();
 
-    // Ambil semua data kehadiran hari ini untuk sekolah & role terkait
-    const attendanceData = await Attendance.findAll({
-      where: {
-        schoolId: parseInt(schoolId),
-        userRole: role,
-        createdAt: {
-          [Op.between]: [
-            moment().startOf('day').toDate(), 
-            moment().endOf('day').toDate()
-          ]
-        }
-      },
-      raw: true 
-    });
+        // 1. TIDAK MASUK > 3 HARI (Status 'Alpha') dalam 7 hari terakhir
+        const chronicAbsents = await Attendance.findAll({
+            where: {
+                schoolId,
+                userRole: 'student',
+                status: 'Alpha',
+                createdAt: { [Op.gte]: oneWeekAgo }
+            },
+            attributes: ['studentId', [fn('COUNT', col('studentId')), 'totalAlpa']],
+            include: [{ model: Student, as: 'student', attributes: ['name', 'class', 'nis'] }],
+            group: ['studentId', 'student.id'],
+            having: literal('totalAlpa >= 3'),
+            raw: false
+        });
 
-    // Struktur summary dengan key Terlambat yang terpisah
-    const summary = { 
-      Hadir: 0, 
-      Terlambat: 0, // Key baru
-      Sakit: 0, 
-      Izin: 0, 
-      Alpha: 0 
-    };
+        // 2. TERLAMBAT > 3x (Status 'Hadir' tapi jam > 07:00) dalam 7 hari terakhir
+        const habitualLaters = await Attendance.findAll({
+            where: {
+                schoolId,
+                userRole: 'student',
+                status: 'Hadir',
+                createdAt: { 
+                    [Op.gte]: oneWeekAgo,
+                    [Op.and]: [literal(`TIME(Attendance.createdAt) > "${deadline}"`)]
+                }
+            },
+            attributes: ['studentId', [fn('COUNT', col('studentId')), 'totalLate']],
+            include: [{ model: Student, as: 'student', attributes: ['name', 'class'] }],
+            group: ['studentId', 'student.id'],
+            having: literal('totalLate >= 3'),
+            raw: false
+        });
 
-    // Definisikan batas waktu (07:00:00)
-    // Gunakan format string 'HH:mm:ss' agar perbandingannya mudah
-    const deadline = "07:00:00";
+        // 3. EXTREMES HARI INI (Paling Pagi vs Paling Telat)
+        const todayAttendance = await Attendance.findAll({
+            where: {
+                schoolId,
+                userRole: 'student',
+                status: 'Hadir',
+                createdAt: {
+                    [Op.between]: [moment().startOf('day').toDate(), moment().endOf('day').toDate()]
+                }
+            },
+            include: [{ model: Student, as: 'student', attributes: ['name', 'class'] }],
+            order: [['createdAt', 'ASC']] 
+        });
 
-    attendanceData.forEach(item => {
-      if (item.status === 'Hadir') {
-        // Ambil bagian jam dari createdAt (HH:mm:ss)
-        const scanTime = moment(item.createdAt).format("HH:mm:ss");
+        res.json({
+            success: true,
+            warnings: {
+                unexcusedAbsence: chronicAbsents,
+                habitualLaters: habitualLaters,
+            },
+            todayExtremes: {
+                earliest: todayAttendance[0] || null,
+                latest: todayAttendance[todayAttendance.length - 1] || null
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
 
-        if (scanTime > deadline) {
-          summary.Terlambat += 1;
-        } else {
-          summary.Hadir += 1;
-        }
-      } else {
-        // Mapping untuk status Sakit, Izin, Alpha
-        if (summary.hasOwnProperty(item.status)) {
-          summary[item.status] += 1;
-        }
-      }
-    });
+exports.getPublicHallOfFame = async (req, res) => {
+    try {
+        const { schoolId } = req.query;
 
-    res.json({ 
-      success: true, 
-      data: { 
-        date: moment().format('YYYY-MM-DD'),
-        deadlineInfo: deadline,
-        ...summary 
-      } 
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
+        // Karena DB Anda menyimpan waktu lokal (WIB), 
+        // pastikan startOfDay dan endOfDay juga dalam konteks lokal server.
+        const startOfDay = moment().startOf('day').toDate();
+        const endOfDay = moment().endOf('day').toDate();
+        const startOfMonth = moment().startOf('month').toDate();
+
+        // 1. TOP 10 DATANG PALING AWAL HARI INI
+        const top10Today = await Attendance.findAll({
+            where: {
+                schoolId,
+                userRole: 'student',
+                status: 'Hadir',
+                createdAt: {
+                    [Op.between]: [startOfDay, endOfDay]
+                }
+            },
+            include: [{ 
+                model: Student, 
+                as: 'student', 
+                attributes: ['name', 'class'] 
+            }],
+            limit: 10,
+            order: [['createdAt', 'ASC']]
+        });
+
+        // 2. TOP 5 KONSISTENSI (Bulanan)
+        const deadline = "07:00:00";
+        const top5Monthly = await Attendance.findAll({
+            where: {
+                schoolId,
+                userRole: 'student',
+                status: 'Hadir',
+                createdAt: { [Op.gte]: startOfMonth },
+                // Gunakan Attendance.createdAt untuk menghindari Ambiguous Error
+                [Op.and]: [
+                    literal(`TIME(Attendance.createdAt) <= "${deadline}"`)
+                ]
+            },
+            attributes: [
+                'studentId', 
+                [fn('COUNT', col('studentId')), 'ontimeCount']
+            ],
+            include: [{ 
+                model: Student, 
+                as: 'student', 
+                attributes: ['name', 'class'] 
+            }],
+            group: ['studentId', 'student.id', 'student.name', 'student.class'],
+            order: [[literal('ontimeCount'), 'DESC']],
+            limit: 5
+        });
+
+        res.json({
+            success: true,
+            data: {
+                dailyEarlyBirds: top10Today.map(t => ({
+                    name: t.student?.name || "Siswa",
+                    class: t.student?.class || "-",
+                    // JANGAN gunakan .utc() atau .tz() jika value DB sudah 13:24
+                    // Cukup format jam:menit saja
+                    time: moment(t.createdAt)
+                })),
+                monthlyChampions: top5Monthly.map(m => ({
+                    name: m.student?.name || "Siswa",
+                    class: m.student?.class || "-",
+                    totalOnTime: parseInt(m.get('ontimeCount'))
+                }))
+            }
+        });
+    } catch (err) {
+        console.error("Error Hall of Fame:", err);
+        res.status(500).json({ success: false, message: err.message });
+    }
 };
