@@ -97,7 +97,7 @@
   router.get('/testing', (req, res) => {
     res.json({
       success: true,
-      message: 'API OK dari routes/index (1.0.0)',
+      message: 'API SEKOLAH (1.0.1)',
       timestamp: new Date().toISOString()
     });
   });
