@@ -2,7 +2,6 @@
 const express = require('express');
 const multer = require('multer');
 const alumniController = require('../controllers/alumniController');
-const submissionController = require('../controllers/alumniSubmitController');
 
 const router = express.Router();
 
