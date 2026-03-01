@@ -528,106 +528,24 @@ exports.exportUserAttendance = async (req, res) => {
 
 // Fungsi Helper Haversine (Gratis & Akurat)
 function getDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371e3; // Radius bumi dalam meter
-    const φ1 = lat1 * Math.PI / 180;
-    const φ2 = lat2 * Math.PI / 180;
-    const Δφ = (lat2 - lat1) * Math.PI / 180;
-    const Δλ = (lon2 - lon1) * Math.PI / 180;
+  const R = 6371e3; // Radius bumi dalam meter
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
 
-    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-    return R * c; // Hasil dalam meter
+  return R * c; // Hasil dalam meter
 }
 
 // SCAM DEVELOPMENT DENGAN KOORDINAT
-exports.scanQRCode = async (req, res) => {
-  // Terima userLat dan userLon dari aplikasi HP
-  const { qrCodeData, role, userLat, userLon } = req.body; 
-  const todayStart = moment().startOf('day').toDate();
-  const todayEnd = moment().endOf('day').toDate();
-
-  const t = await sequelize.transaction();
-
-  try {
-    let user;
-    let updateFields = {};
-
-    // 1. Cari User
-    if (role === 'student') {
-      user = await Student.findOne({ where: { qrCodeData, isActive: true } });
-      if (user) updateFields = { idKey: 'studentId', id: user.id, name: user.name, class: user.class, schoolId: user.schoolId, nisn: user.nisn };
-    } else {
-      user = await GuruTendik.findOne({ where: { qrCodeData, isActive: true } }); 
-      if (user) updateFields = { idKey: 'guruId', id: user.id, name: user.nama, class: 'GURU/STAFF', schoolId: user.schoolId, email: user.email };
-    }
-
-    if (!user) return res.status(404).json({ success: false, message: 'Data tidak ditemukan' });
-
-    // 2. VALIDASI GEOFENCING
-    const school = await SchoolProfile.findOne({ where: { schoolId: updateFields.schoolId } });
-    
-    if (school && school.latitude && school.longitude) {
-      if (!userLat || !userLon) {
-        return res.status(400).json({ success: false, message: 'Lokasi GPS diperlukan' });
-      }
-
-      const distance = getDistance(userLat, userLon, school.latitude, school.longitude);
-      const maxRadius = 100; // Toleransi 100 meter
-
-      if (distance > maxRadius) {
-        await t.rollback();
-        return res.status(403).json({ 
-          success: false, 
-          message: `Anda berada di luar jangkauan sekolah (${Math.round(distance)}m).` 
-        });
-      }
-    }
-
-    // 3. Cek Absen Ganda
-    const alreadyExists = await Attendance.findOne({
-      where: { 
-        [updateFields.idKey]: updateFields.id, 
-        createdAt: { [Op.between]: [todayStart, todayEnd] } 
-      },
-      transaction: t,
-      lock: true 
-    });
-
-    if (alreadyExists) {
-      await t.rollback();
-      return res.status(400).json({ success: false, message: 'Sudah absen hari ini.' });
-    }
-
-    // 4. Simpan dengan Koordinat
-    await Attendance.create({ 
-      [updateFields.idKey]: updateFields.id,
-      userRole: role,
-      schoolId: updateFields.schoolId, 
-      currentClass: updateFields.class,
-      status: 'Hadir',
-      latitude: userLat,
-      longitude: userLon
-    }, { transaction: t });
-
-    await t.commit();
-
-    res.json({ 
-      success: true, 
-      message: `Absen berhasil: ${updateFields.name}`,
-      data: { name: updateFields.name, class: updateFields.class }
-    });
-  } catch (err) {
-    if (t) await t.rollback();
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-// SCAN YANG ASLI TANPA KOORDINAT (PROD)
 // exports.scanQRCode = async (req, res) => {
-//   const { qrCodeData, role } = req.body; // role: 'student' atau 'teacher'
+//   // Terima userLat dan userLon dari aplikasi HP
+//   const { qrCodeData, role, userLat, userLon } = req.body; 
 //   const todayStart = moment().startOf('day').toDate();
 //   const todayEnd = moment().endOf('day').toDate();
 
@@ -635,23 +553,40 @@ exports.scanQRCode = async (req, res) => {
 
 //   try {
 //     let user;
-//     let updateFields = { schoolId: null, id: null, name: null, class: null, nisn: null, email: null };
+//     let updateFields = {};
 
+//     // 1. Cari User
 //     if (role === 'student') {
 //       user = await Student.findOne({ where: { qrCodeData, isActive: true } });
-//       if (user) {
-//         updateFields = { idKey: 'studentId', id: user.id, name: user.name, class: user.class, schoolId: user.schoolId, nisn: user.nisn };
-//       }
+//       if (user) updateFields = { idKey: 'studentId', id: user.id, name: user.name, class: user.class, schoolId: user.schoolId, nisn: user.nisn };
 //     } else {
-//       // Untuk Guru, asumsikan qrCodeData disimpan di field tertentu atau pakai ID
 //       user = await GuruTendik.findOne({ where: { qrCodeData, isActive: true } }); 
-//       if (user) {
-//         updateFields = { idKey: 'guruId', id: user.id, name: user.nama, class: 'GURU/STAFF', schoolId: user.schoolId, email: user.email };
-//       }
+//       if (user) updateFields = { idKey: 'guruId', id: user.id, name: user.nama, class: 'GURU/STAFF', schoolId: user.schoolId, email: user.email };
 //     }
 
 //     if (!user) return res.status(404).json({ success: false, message: 'Data tidak ditemukan' });
 
+//     // 2. VALIDASI GEOFENCING
+//     const school = await SchoolProfile.findOne({ where: { schoolId: updateFields.schoolId } });
+    
+//     if (school && school.latitude && school.longitude) {
+//       if (!userLat || !userLon) {
+//         return res.status(400).json({ success: false, message: 'Lokasi GPS diperlukan' });
+//       }
+
+//       const distance = getDistance(userLat, userLon, school.latitude, school.longitude);
+//       const maxRadius = 100; // Toleransi 100 meter
+
+//       if (distance > maxRadius) {
+//         await t.rollback();
+//         return res.status(403).json({ 
+//           success: false, 
+//           message: `Anda berada di luar jangkauan sekolah (${Math.round(distance)}m).` 
+//         });
+//       }
+//     }
+
+//     // 3. Cek Absen Ganda
 //     const alreadyExists = await Attendance.findOne({
 //       where: { 
 //         [updateFields.idKey]: updateFields.id, 
@@ -663,34 +598,100 @@ exports.scanQRCode = async (req, res) => {
 
 //     if (alreadyExists) {
 //       await t.rollback();
-//       return res.status(400).json({ success: false, message: 'sudah absen.' });
+//       return res.status(400).json({ success: false, message: 'Sudah absen hari ini.' });
 //     }
 
-//     // Simpan
+//     // 4. Simpan dengan Koordinat
 //     await Attendance.create({ 
 //       [updateFields.idKey]: updateFields.id,
 //       userRole: role,
 //       schoolId: updateFields.schoolId, 
 //       currentClass: updateFields.class,
-//       status: 'Hadir'
+//       status: 'Hadir',
+//       latitude: userLat,
+//       longitude: userLon
 //     }, { transaction: t });
 
 //     await t.commit();
 
-//      res.json({ 
+//     res.json({ 
 //       success: true, 
 //       message: `Absen berhasil: ${updateFields.name}`,
-//       data: {  // Tambahkan objek data ini
-//         name: updateFields.name,
-//         nisn: updateFields.nisn || updateFields.email, // Sesuaikan field yang ada
-//         class: updateFields.class
-//       }
+//       data: { name: updateFields.name, class: updateFields.class }
 //     });
 //   } catch (err) {
 //     if (t) await t.rollback();
 //     res.status(500).json({ success: false, message: err.message });
 //   }
 // };
+
+// SCAN YANG ASLI TANPA KOORDINAT (PROD)
+exports.scanQRCode = async (req, res) => {
+  // role: 'student' atau 'teacher'
+  const { qrCodeData, role } = req.body; 
+  const todayStart = moment().startOf('day').toDate();
+  const todayEnd = moment().endOf('day').toDate();
+
+  const t = await sequelize.transaction();
+
+  try {
+    let user;
+    let updateFields = { schoolId: null, id: null, name: null, class: null, nisn: null, email: null };
+
+    if (role === 'student') {
+      user = await Student.findOne({ where: { qrCodeData, isActive: true } });
+      if (user) {
+        updateFields = { idKey: 'studentId', id: user.id, name: user.name, class: user.class, schoolId: user.schoolId, nisn: user.nisn };
+      }
+    } else {
+      // Untuk Guru, asumsikan qrCodeData disimpan di field tertentu atau pakai ID
+      user = await GuruTendik.findOne({ where: { qrCodeData, isActive: true } }); 
+      if (user) {
+        updateFields = { idKey: 'guruId', id: user.id, name: user.nama, class: 'GURU/STAFF', schoolId: user.schoolId, email: user.email };
+      }
+    }
+
+    if (!user) return res.status(404).json({ success: false, message: 'Data tidak ditemukan' });
+
+    const alreadyExists = await Attendance.findOne({
+      where: { 
+        [updateFields.idKey]: updateFields.id, 
+        createdAt: { [Op.between]: [todayStart, todayEnd] } 
+      },
+      transaction: t,
+      lock: true 
+    });
+
+    if (alreadyExists) {
+      await t.rollback();
+      return res.status(400).json({ success: false, message: 'sudah absen.' });
+    }
+
+    // Simpan
+    await Attendance.create({ 
+      [updateFields.idKey]: updateFields.id,
+      userRole: role,
+      schoolId: updateFields.schoolId, 
+      currentClass: updateFields.class,
+      status: 'Hadir'
+    }, { transaction: t });
+
+    await t.commit();
+
+     res.json({ 
+      success: true, 
+      message: `Absen berhasil: ${updateFields.name}`,
+      data: {  // Tambahkan objek data ini
+        name: updateFields.name,
+        nisn: updateFields.nisn || updateFields.email, // Sesuaikan field yang ada
+        class: updateFields.class
+      }
+    });
+  } catch (err) {
+    if (t) await t.rollback();
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
 
 exports.updateStudent = async (req, res) => {
   try {
