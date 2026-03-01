@@ -122,8 +122,8 @@ function getDistance(lat1, lon1, lat2, lon2) {
 
 exports.scanSelf = async (req, res) => {
     // 1. Ambil qrScanned DAN koordinat dari body
-    const { qrScanned, userLat, userLon } = req.body;
-    
+    const { qrCodeData, userLat, userLon } = req.body; // Ganti qrScanned jadi qrCodeData
+
     const profile = req.user?.profile || req.user; 
     if (!profile) return res.status(401).json({ success: false, message: "Sesi tidak valid" });
 
@@ -132,7 +132,7 @@ exports.scanSelf = async (req, res) => {
     const todayEnd = moment().endOf('day').toDate();
 
     // 2. Validasi QR Code Sekolah
-    if (!qrScanned.includes(`SCHOOL_QR_${schoolId}`)) {
+    if (!qrCodeData.includes(`SCHOOL_QR_${schoolId}`)) {
         return res.status(403).json({ success: false, message: `QR Code tidak valid untuk sekolah ini.` });
     }
 
