@@ -1,6 +1,6 @@
 const Alumni = require('../models/alumni');
 const cloudinary = require('cloudinary').v2;
-const streamifier = require('streamifier'); // Untuk upload dari buffer, install "streamifier": "^0.1.1"
+const streamifier = require('streamifier');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -48,7 +48,6 @@ exports.createAlumni = async (req, res) => {
 
     let photoUrl = null;
     if (req.file) {
-      // Upload ke Cloudinary dari buffer
       const result = await new Promise((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
           { resource_type: 'image' },
@@ -88,14 +87,11 @@ exports.updateAlumni = async (req, res) => {
 
     const oldPhotoUrl = alumni.photoUrl;
 
-    // Update field yang dikirim
     if (name) alumni.name = name;
     if (graduationYear) alumni.graduationYear = parseInt(graduationYear);
     if (description) alumni.description = description;
 
-    // Jika ada file photo baru
     if (req.file) {
-      // Hapus photo lama dari Cloudinary jika ada
       if (oldPhotoUrl) {
         const publicId = oldPhotoUrl.split('/').pop().split('.')[0]; // Extract public_id
         try {
@@ -106,7 +102,6 @@ exports.updateAlumni = async (req, res) => {
         }
       }
 
-      // Upload photo baru
       const result = await new Promise((resolve, reject) => {
         const uploadStream = cloudinary.uploader.upload_stream(
           { resource_type: 'image' },
@@ -136,8 +131,6 @@ exports.deleteAlumni = async (req, res) => {
     if (!alumni) {
       return res.status(404).json({ success: false, message: 'Alumni tidak ditemukan' });
     }
-
-    // Hapus photo dari Cloudinary jika ada
     if (alumni.photoUrl) {
       const publicId = alumni.photoUrl.split('/').pop().split('.')[0];
       try {
@@ -148,12 +141,8 @@ exports.deleteAlumni = async (req, res) => {
       }
     }
 
-    // Soft delete
     alumni.isActive = false;
     await alumni.save();
-
-    // Optional: hard delete
-    // await alumni.destroy();
 
     res.json({ success: true, message: 'Alumni berhasil dihapus (soft delete)' });
   } catch (err) {
