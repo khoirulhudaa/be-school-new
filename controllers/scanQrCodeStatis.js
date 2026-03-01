@@ -148,7 +148,7 @@ exports.scanSelf = async (req, res) => {
             }
 
             const distance = getDistance(userLat, userLon, parseFloat(school.latitude), parseFloat(school.longitude));
-            const maxRadius = school.radiusMeter || 100; // Ambil dari DB atau default 100m
+            const maxRadius = 200; // 200m
 
             if (distance > maxRadius) {
                 await t.rollback();
