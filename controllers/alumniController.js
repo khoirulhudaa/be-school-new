@@ -8,21 +8,55 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// exports.getAllAlumni = async (req, res) => {
+//   try {
+//     const { schoolId } = req.query;
+
+//     if (!schoolId) {
+//       return res.status(400).json({ 
+//         success: false, 
+//         message: 'schoolId wajib disertakan di query' 
+//       });
+//     }
+
+//     const where = { 
+//       schoolId: parseInt(schoolId),
+//       isActive: true 
+//     };
+
+//     const alumni = await Alumni.findAll({
+//       where,
+//       order: [['createdAt', 'DESC']],
+//     });
+
+//     res.json({ success: true, data: alumni });
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
 exports.getAllAlumni = async (req, res) => {
   try {
-    const { schoolId } = req.query;
+    const { schoolId, isVerified } = req.query;
 
     if (!schoolId) {
       return res.status(400).json({ 
         success: false, 
-        message: 'schoolId wajib disertakan di query' 
+        message: 'schoolId wajib disertakan' 
       });
     }
 
+    // Bangun object filter
     const where = { 
       schoolId: parseInt(schoolId),
       isActive: true 
     };
+
+    // Jika isVerified dikirim di query (misal: ?isVerified=true)
+    if (isVerified !== undefined) {
+      // Mengubah string 'true'/'false' dari query menjadi boolean
+      where.isVerified = isVerified === 'true';
+    }
 
     const alumni = await Alumni.findAll({
       where,
@@ -66,7 +100,8 @@ exports.createAlumni = async (req, res) => {
       graduationYear: parseInt(graduationYear),
       description,
       photoUrl,
-      schoolId: parseInt(schoolId)
+      schoolId: parseInt(schoolId),
+      isVerified: false
     });
 
     res.json({ success: true, data: newAlumni });
@@ -145,6 +180,25 @@ exports.deleteAlumni = async (req, res) => {
     await alumni.save();
 
     res.json({ success: true, message: 'Alumni berhasil dihapus (soft delete)' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Function Approve untuk Admin
+exports.approveAlumni = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const alumni = await Alumni.findByPk(id);
+    
+    if (!alumni) {
+      return res.status(404).json({ success: false, message: 'Alumni tidak ditemukan' });
+    }
+
+    alumni.isVerified = true;
+    await alumni.save();
+
+    res.json({ success: true, message: 'Alumni berhasil diverifikasi!', data: alumni });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

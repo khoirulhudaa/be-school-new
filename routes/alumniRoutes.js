@@ -16,12 +16,7 @@ router.post('/', upload.single('photo'), alumniController.createAlumni);
 router.put('/:id', upload.single('photo'), alumniController.updateAlumni);
 router.delete('/:id', alumniController.deleteAlumni);
 
-
-// Lihat pendaftar yang butuh verifikasi
-router.post('/register', upload.single('photo'), submissionController.submitAlumni);
-router.get('/submissions', submissionController.getPendingSubmissions);
 // Aksi verifikasi
-router.patch('/submissions/:id/approve', submissionController.approveSubmission);
-router.patch('/submissions/:id/reject', submissionController.rejectSubmission);
+router.patch('/:id/approve', alumniController.approveAlumni);
 
 module.exports = router;
