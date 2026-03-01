@@ -18,7 +18,7 @@ router.delete('/:id', alumniController.deleteAlumni);
 
 
 // Lihat pendaftar yang butuh verifikasi
-router.post('/register', submissionController.submitAlumni);
+router.post('/register', upload.single('photo'), submissionController.submitAlumni);
 router.get('/submissions', submissionController.getPendingSubmissions);
 // Aksi verifikasi
 router.patch('/submissions/:id/approve', submissionController.approveSubmission);
