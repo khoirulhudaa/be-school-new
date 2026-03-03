@@ -214,6 +214,43 @@ exports.getAllStudents = async (req, res) => {
   }
 };
 
+exports.getAllStudentsNoPagination = async (req, res) => {
+  try {
+    const { schoolId, class: studentClass, batch, name } = req.query;
+
+    if (!schoolId || isNaN(parseInt(schoolId))) {
+      return res.status(400).json({ success: false, message: "schoolId diperlukan." });
+    }
+
+    // Bangun kondisi filter yang sama agar hasil cetak sesuai dengan filter di UI
+    let condition = {
+      schoolId: parseInt(schoolId),
+      isActive: true
+    };
+
+    if (name) condition.name = { [Op.like]: `%${name}%` };
+    if (studentClass) condition.class = studentClass;
+    if (batch) condition.batch = batch;
+
+    // Ambil semua data tanpa limit & offset
+    const students = await Student.findAll({
+      where: condition,
+      order: [['name', 'ASC']],
+      // Kita hanya ambil kolom yang diperlukan untuk kartu agar hemat memory
+      attributes: ['id', 'name', 'nis', 'nisn', 'class', 'photoUrl', 'qrCodeData']
+    });
+
+    res.json({
+      success: true,
+      count: students.length,
+      data: students
+    });
+  } catch (err) {
+    console.error("Error Get All Students for Card:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 exports.getAttendanceSummary = async (req, res) => {
   try {
     const { schoolId } = req.query;

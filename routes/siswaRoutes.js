@@ -14,6 +14,7 @@ const upload = multer({
 // Endpoint: /api/siswa
 router.get('/search', studentController.getStudentSearch);
 router.get('/', studentController.getAllStudents); // Sesuai fetch di frontend tadi
+router.get('/all-no-pagination', studentController.getAllStudentsNoPagination);
 router.post('/', upload.single('photo'), studentController.createStudent);
 router.post('/login', studentController.checkStudentAuth);
 router.put('/:id', upload.single('photo'), studentController.updateStudent);

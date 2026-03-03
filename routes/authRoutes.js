@@ -14,10 +14,10 @@ const upload = multer({
 
 // Routes
 router.post('/register', upload.single('logo'), authController.registerSchool);
-router.post('/verify-pin', authController.verifyPin);
 router.post('/login', authController.login);
 router.get('/profile', protect, authController.getProfile);
 router.post('/forgot-password', authController.forgotPassword);
+router.post('/verify-pin', authController.verifyPin);
 router.post('/reset-password', authController.resetPassword);
 router.put('/update-profile', protect, authController.updateProfile);
 

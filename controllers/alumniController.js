@@ -8,33 +8,6 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// exports.getAllAlumni = async (req, res) => {
-//   try {
-//     const { schoolId } = req.query;
-
-//     if (!schoolId) {
-//       return res.status(400).json({ 
-//         success: false, 
-//         message: 'schoolId wajib disertakan di query' 
-//       });
-//     }
-
-//     const where = { 
-//       schoolId: parseInt(schoolId),
-//       isActive: true 
-//     };
-
-//     const alumni = await Alumni.findAll({
-//       where,
-//       order: [['createdAt', 'DESC']],
-//     });
-
-//     res.json({ success: true, data: alumni });
-//   } catch (err) {
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
-
 exports.getAllAlumni = async (req, res) => {
   try {
     const { schoolId, isVerified } = req.query;
