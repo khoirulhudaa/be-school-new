@@ -24,6 +24,8 @@ router.delete('/:id', studentController.deleteStudent);
 // Endpoint: /api/siswa/scan
 router.post('/scan', studentController.scanQRCode);
 
+router.get('/validate-qr', studentController.validateUserByQR);
+
 // Mark Absence (Izin, Sakit, Alpha - Satuan atau Bulk)
 router.post('/mark-absence', studentController.markAbsence);
 router.get('/detail/:id', studentController.getUserDetail);

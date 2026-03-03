@@ -36,6 +36,48 @@ const processPhotoUpload = (buffer, schoolId, nis) => {
   });
 };
 
+// Server User - studentController.js
+
+exports.validateUserByQR = async (req, res) => {
+  try {
+    const { qrCodeData, schoolId } = req.query;
+
+    if (!qrCodeData || !schoolId) {
+      return res.status(400).json({ success: false, message: "QR Data dan SchoolId diperlukan." });
+    }
+
+    // 1. Cari di tabel Student
+    let user = await Student.findOne({ 
+      where: { qrCodeData, schoolId: parseInt(schoolId), isActive: true },
+      attributes: ['id', 'name', 'class', 'schoolId', 'nis', 'nisn', 'gender'] // Ambil yang perlu saja
+    });
+    let role = 'student';
+
+    // 2. Jika tidak ada di Student, cari di GuruTendik
+    if (!user) {
+      user = await GuruTendik.findOne({ 
+        where: { qrCodeData, schoolId: parseInt(schoolId), isActive: true },
+        attributes: ['id', ['nama', 'name'], 'role', 'schoolId', 'nip', 'jenisKelamin', 'jurusan', 'email'] // Aliasing 'nama' jadi 'name' agar seragam
+      });
+      role = 'teacher';
+    }
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "Kartu tidak dikenali atau tidak aktif." });
+    }
+
+    // Kirim data user ke Server Perpus
+    res.json({ 
+      success: true, 
+      user, 
+      role 
+    });
+
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 exports.checkStudentAuth = async (req, res) => {
   try {
     const { nis } = req.body;
