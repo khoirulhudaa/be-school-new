@@ -1,4 +1,4 @@
-const { DataTypes } = require('sequelize');
+    const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 
 const News = sequelize.define('News', {
@@ -8,7 +8,7 @@ const News = sequelize.define('News', {
     primaryKey: true,
   },
   schoolId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.INTEGER,    
     allowNull: false,
   },
   title: {
