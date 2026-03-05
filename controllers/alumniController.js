@@ -23,7 +23,7 @@ exports.getAllAlumni = async (req, res) => {
     if (batch) where.batch = batch;
     if (name) where.name = { [Op.like]: `%${name}%` };
 
-    const alumni = await Alumni.findAll({
+    const alumni = await Alumni.findAll({ 
       where,
       order: [['graduationYear', 'DESC'], ['name', 'ASC']],
     });
@@ -33,6 +33,7 @@ exports.getAllAlumni = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
 exports.createAlumni = async (req, res) => {
   try {
     const { name, graduationYear, batch, description, schoolId } = req.body;
