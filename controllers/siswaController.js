@@ -1301,11 +1301,11 @@ exports.processGraduation = async (req, res) => {
     if (!graduationYear || !schoolId) {
       return res.status(400).json({ success: false, message: "Tahun lulus dan School ID wajib diisi." });
     }
+    const idsToFind = studentIds.map(item => (typeof item === 'object' ? item.id : item));
 
-    // 1. AMBIL DATA SISWA (Termasuk kolom NIS)
     const selectedStudents = await Student.findAll({
       where: { 
-        id: { [Op.in]: studentIds },
+        id: { [Op.in]: idsToFind },
         schoolId: parseInt(schoolId)
       }
     });
@@ -1313,6 +1313,7 @@ exports.processGraduation = async (req, res) => {
     if (selectedStudents.length === 0) {
       return res.status(404).json({ success: false, message: "Data siswa tidak ditemukan di database." });
     }
+
 
     // 2. PEMETAAN DATA KE TABEL ALUMNI (Tambahkan NIS di sini)
     const alumniData = selectedStudents.map(student => ({
@@ -1336,7 +1337,7 @@ exports.processGraduation = async (req, res) => {
     await Student.update(
       { isActive: false }, 
       { 
-        where: { id: { [Op.in]: studentIds } },
+        where: { id: { [Op.in]: idsToFind } },
         transaction: t 
       }
     );
