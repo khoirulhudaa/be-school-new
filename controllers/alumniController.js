@@ -1,6 +1,7 @@
 const Alumni = require('../models/alumni');
 const cloudinary = require('cloudinary').v2;
 const streamifier = require('streamifier');
+const SchoolSetting = require('../models/schoolSetting');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -32,18 +33,29 @@ exports.getAllAlumni = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
 exports.createAlumni = async (req, res) => {
   try {
     const { name, graduationYear, batch, description, schoolId } = req.body;
 
-    if (!name || !graduationYear || !schoolId) {
+    // 1. Validasi Kehadiran Field Wajib
+    if (!name || !graduationYear || !schoolId || !batch) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Name, graduationYear, dan schoolId wajib diisi' 
+        message: 'Name, graduationYear, Batch, dan schoolId wajib diisi' 
       });
     }
 
+    // 2. Validasi Batch (Harus Tepat 4 Digit Angka)
+    // Menggunakan regex ^\d{4}$ untuk memastikan hanya angka dan tepat 4 karakter
+    const batchString = String(batch).trim();
+    if (!/^\d{4}$/.test(batchString)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Batch harus berupa 4 digit tahun (contoh: 2020)'
+      });
+    }
+
+    // 3. Logika Upload Foto (Tetap sama)
     let photoUrl = null;
     if (req.file) {
       const result = await new Promise((resolve, reject) => {
@@ -59,10 +71,11 @@ exports.createAlumni = async (req, res) => {
       photoUrl = result.secure_url;
     }
 
+    // 4. Simpan ke Database
     const newAlumni = await Alumni.create({ 
       name, 
       graduationYear: parseInt(graduationYear),
-      batch,
+      batch: batchString, // Simpan sebagai string agar konsisten
       description,
       photoUrl,
       schoolId: parseInt(schoolId),
@@ -165,6 +178,45 @@ exports.approveAlumni = async (req, res) => {
 
     res.json({ success: true, message: 'Alumni berhasil diverifikasi!', data: alumni });
   } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// controllers/setting.controller.js
+exports.updateAlumniDisplay = async (req, res) => {
+  try {
+    const { schoolId, year, batch } = req.body;
+    
+    // Update atau Create jika belum ada (Upsert)
+    await SchoolSetting.upsert({
+      schoolId,
+      displayAlumniYear: year,
+      displayAlumniBatch: batch
+    });
+
+    res.json({ success: true, message: "Pengaturan tampilan data alumni diperbarui." });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// 1. Fungsi untuk Mengambil Setting (GET)
+exports.getAlumniDisplaySetting = async (req, res) => {
+  try {
+    const { schoolId } = req.params;
+
+    if (!schoolId) {
+      return res.status(400).json({ success: false, message: "School ID diperlukan." });
+    }
+
+    const setting = await SchoolSetting.findByPk(schoolId);
+
+    res.json({ 
+      success: true, 
+      data: setting || { displayAlumniYear: null, displayAlumniBatch: null } 
+    });
+  } catch (err) {
+    console.error("Get Setting Error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };

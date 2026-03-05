@@ -1287,10 +1287,14 @@ exports.getPublicHallOfFame = async (req, res) => {
 exports.processGraduation = async (req, res) => {
   const t = await sequelize.transaction();
   try {
-    const { studentIds, graduationYear, description, schoolId } = req.body;
+    const { studentIds, graduationYear, batch, description, schoolId } = req.body;
 
     if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
       return res.status(400).json({ success: false, message: "Pilih minimal satu siswa." });
+    }
+
+    if (!batch) {
+       return res.status(400).json({ success: false, message: "Nama Angkatan (Batch) wajib diisi." });
     }
 
     if (!graduationYear || !schoolId) {
@@ -1312,14 +1316,16 @@ exports.processGraduation = async (req, res) => {
     // 2. Siapkan data untuk tabel Alumni
     // Kita memetakan field dari Student ke Alumni
     const alumniData = selectedStudents.map(student => ({
-      schoolId: student.schoolId,
-      name: student.name,
-      graduationYear: parseInt(graduationYear),
-      description: description || `Alumni angkatan ${student.batch}`,
-      photoUrl: student.photoUrl,
-      isActive: true,
-      isVerified: true // Otomatis verified karena diproses oleh admin
-    }));
+        schoolId: student.schoolId,
+        name: student.name,
+        graduationYear: parseInt(graduationYear),
+        // Menyimpan batch asli siswa ke kolom batch di tabel Alumni
+        batch: batch, 
+        description: description || `Alumni angkatan ${student.batch}`,
+        photoUrl: student.photoUrl,
+        isActive: true,
+        isVerified: true 
+      }));
 
     // 3. Masukkan ke tabel Alumni secara massal
     await Alumni.bulkCreate(alumniData, { transaction: t });
