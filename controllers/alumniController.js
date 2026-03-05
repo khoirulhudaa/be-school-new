@@ -10,30 +10,21 @@ cloudinary.config({
 
 exports.getAllAlumni = async (req, res) => {
   try {
-    const { schoolId, isVerified } = req.query;
+    const { schoolId, isVerified, graduationYear, batch, name } = req.query;
 
-    if (!schoolId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'schoolId wajib disertakan' 
-      });
-    }
-
-    // Bangun object filter
     const where = { 
       schoolId: parseInt(schoolId),
       isActive: true 
     };
 
-    // Jika isVerified dikirim di query (misal: ?isVerified=true)
-    if (isVerified !== undefined) {
-      // Mengubah string 'true'/'false' dari query menjadi boolean
-      where.isVerified = isVerified === 'true';
-    }
+    if (isVerified !== undefined) where.isVerified = isVerified === 'true';
+    if (graduationYear) where.graduationYear = parseInt(graduationYear);
+    if (batch) where.batch = batch;
+    if (name) where.name = { [Op.like]: `%${name}%` };
 
     const alumni = await Alumni.findAll({
       where,
-      order: [['createdAt', 'DESC']],
+      order: [['graduationYear', 'DESC'], ['name', 'ASC']],
     });
 
     res.json({ success: true, data: alumni });
@@ -44,7 +35,7 @@ exports.getAllAlumni = async (req, res) => {
 
 exports.createAlumni = async (req, res) => {
   try {
-    const { name, graduationYear, description, schoolId } = req.body;
+    const { name, graduationYear, batch, description, schoolId } = req.body;
 
     if (!name || !graduationYear || !schoolId) {
       return res.status(400).json({ 
@@ -71,6 +62,7 @@ exports.createAlumni = async (req, res) => {
     const newAlumni = await Alumni.create({ 
       name, 
       graduationYear: parseInt(graduationYear),
+      batch,
       description,
       photoUrl,
       schoolId: parseInt(schoolId),

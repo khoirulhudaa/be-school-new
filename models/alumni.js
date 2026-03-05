@@ -35,6 +35,10 @@ const Alumni = sequelize.define('Alumni', {
     type: DataTypes.BOOLEAN,
     defaultValue: false, // Default false agar tidak langsung muncul
   },
+  batch: { // Tambahkan ini
+    type: DataTypes.STRING,
+    allowNull: true, // Atau false jika wajib
+  },
 }, {
   timestamps: true,
   createdAt: 'createdAt',
@@ -55,7 +59,8 @@ const Alumni = sequelize.define('Alumni', {
       name: 'idx_created_at',
       // Index untuk performa sorting 'DESC' pada tampilan daftar terbaru
       fields: ['createdAt']
-    }
+    },
+    { name: 'idx_batch', fields: ['batch'] },
   ]
 });
 

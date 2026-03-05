@@ -9,6 +9,7 @@ const GuruTendik = require('../models/guruTendik');
 const sequelize = require('../config/database');
 const jwt = require('jsonwebtoken');
 const SchoolProfile = require('../models/profileSekolah');
+const Alumni = require('../models/alumni');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -1280,4 +1281,70 @@ exports.getPublicHallOfFame = async (req, res) => {
         console.error("Error Hall of Fame:", err);
         res.status(500).json({ success: false, message: err.message });
     }
+};
+
+// 1. Cek Kelulusan (Untuk Siswa/Orang Tua)
+exports.processGraduation = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { studentIds, graduationYear, description, schoolId } = req.body;
+
+    if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
+      return res.status(400).json({ success: false, message: "Pilih minimal satu siswa." });
+    }
+
+    if (!graduationYear || !schoolId) {
+      return res.status(400).json({ success: false, message: "Tahun lulus dan School ID wajib diisi." });
+    }
+
+    // 1. Ambil data siswa yang dipilih
+    const selectedStudents = await Student.findAll({
+      where: { 
+        id: { [Op.in]: studentIds },
+        schoolId: parseInt(schoolId)
+      }
+    });
+
+    if (selectedStudents.length === 0) {
+      return res.status(404).json({ success: false, message: "Siswa tidak ditemukan." });
+    }
+
+    // 2. Siapkan data untuk tabel Alumni
+    // Kita memetakan field dari Student ke Alumni
+    const alumniData = selectedStudents.map(student => ({
+      schoolId: student.schoolId,
+      name: student.name,
+      graduationYear: parseInt(graduationYear),
+      description: description || `Alumni angkatan ${student.batch}`,
+      photoUrl: student.photoUrl,
+      isActive: true,
+      isVerified: true // Otomatis verified karena diproses oleh admin
+    }));
+
+    // 3. Masukkan ke tabel Alumni secara massal
+    await Alumni.bulkCreate(alumniData, { transaction: t });
+
+    // 4. Update status di tabel Student menjadi tidak aktif (Lulus)
+    await Student.update(
+      { isActive: false }, 
+      { 
+        where: { id: { [Op.in]: studentIds } },
+        transaction: t 
+      }
+    );
+
+    // Selesaikan transaksi
+    await t.commit();
+
+    res.json({ 
+      success: true, 
+      message: `Berhasil meluluskan ${selectedStudents.length} siswa ke tahun lulus ${graduationYear}.` 
+    });
+
+  } catch (err) {
+    // Batalkan semua perubahan jika terjadi error
+    await t.rollback();
+    console.error("Graduation Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
 };

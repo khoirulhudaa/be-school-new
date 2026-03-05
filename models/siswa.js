@@ -20,7 +20,19 @@ const Student = sequelize.define('Student', {
   batch: { type: DataTypes.STRING, allowNull: false },
   photoUrl: { type: DataTypes.STRING },
   qrCodeData: { type: DataTypes.STRING, unique: true },
-  isActive: { type: DataTypes.BOOLEAN, defaultValue: true }
+  isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
+  isGraduated: { 
+    type: DataTypes.BOOLEAN, 
+    defaultValue: false 
+  },
+  graduationNote: { 
+    type: DataTypes.TEXT, 
+    allowNull: true 
+  },
+  examNumber: { // Nomor Peserta Ujian jika diperlukan
+    type: DataTypes.STRING,
+    allowNull: true
+  }
 }, {
   tableName: 'siswa',
   indexes: [

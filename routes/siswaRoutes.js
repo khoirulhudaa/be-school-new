@@ -41,4 +41,6 @@ router.get('/hall-of-fame', studentController.getPublicHallOfFame);
 router.get('/attendance-report', studentController.getAttendanceReport);
 router.get('/export-attendance', studentController.exportAttendanceExcel);
 
+router.post('/process-graduation', studentController.processGraduation);
+
 module.exports = router;
