@@ -16,7 +16,7 @@ const SchoolSetting = sequelize.define('SchoolSetting', {
     allowNull: true, // Contoh: "2021"
   },
   announcementDate: {
-    type: DataTypes.DATE, // Menyimpan timestamp (tanggal & jam)
+    type: DataTypes.STRING, // Menyimpan timestamp (tanggal & jam)
     allowNull: true,
  }
 });
