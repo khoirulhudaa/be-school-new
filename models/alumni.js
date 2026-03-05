@@ -11,6 +11,10 @@ const Alumni = sequelize.define('Alumni', {
     type: DataTypes.INTEGER,
     allowNull: false,
   },
+  nis: {
+    type: DataTypes.STRING(20),
+    allowNull: false, // Wajib diisi
+  },
   name: {
     type: DataTypes.STRING,
     allowNull: false,
@@ -59,6 +63,11 @@ const Alumni = sequelize.define('Alumni', {
       name: 'idx_created_at',
       // Index untuk performa sorting 'DESC' pada tampilan daftar terbaru
       fields: ['createdAt']
+    },
+    {
+      name: 'idx_school_nis_unique',
+      unique: true,
+      fields: ['schoolId', 'nis'] // Kombinasi school + nis harus unik
     },
     { name: 'idx_batch', fields: ['batch'] },
   ]

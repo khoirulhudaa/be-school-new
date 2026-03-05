@@ -1289,19 +1289,20 @@ exports.processGraduation = async (req, res) => {
   try {
     const { studentIds, graduationYear, batch, description, schoolId } = req.body;
 
+    // --- VALIDASI INPUT ---
     if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
       return res.status(400).json({ success: false, message: "Pilih minimal satu siswa." });
     }
 
     if (!batch) {
-       return res.status(400).json({ success: false, message: "Nama Angkatan (Batch) wajib diisi." });
+      return res.status(400).json({ success: false, message: "Nama Angkatan (Batch) wajib diisi." });
     }
 
     if (!graduationYear || !schoolId) {
       return res.status(400).json({ success: false, message: "Tahun lulus dan School ID wajib diisi." });
     }
 
-    // 1. Ambil data siswa yang dipilih
+    // 1. AMBIL DATA SISWA (Termasuk kolom NIS)
     const selectedStudents = await Student.findAll({
       where: { 
         id: { [Op.in]: studentIds },
@@ -1310,27 +1311,28 @@ exports.processGraduation = async (req, res) => {
     });
 
     if (selectedStudents.length === 0) {
-      return res.status(404).json({ success: false, message: "Siswa tidak ditemukan." });
+      return res.status(404).json({ success: false, message: "Data siswa tidak ditemukan di database." });
     }
 
-    // 2. Siapkan data untuk tabel Alumni
-    // Kita memetakan field dari Student ke Alumni
+    // 2. PEMETAAN DATA KE TABEL ALUMNI (Tambahkan NIS di sini)
     const alumniData = selectedStudents.map(student => ({
-        schoolId: student.schoolId,
-        name: student.name,
-        graduationYear: parseInt(graduationYear),
-        // Menyimpan batch asli siswa ke kolom batch di tabel Alumni
-        batch: batch, 
-        description: description || `Alumni angkatan ${student.batch}`,
-        photoUrl: student.photoUrl,
-        isActive: true,
-        isVerified: true 
-      }));
+      schoolId: student.schoolId,
+      name: student.name,
+      nis: student.nis, // <--- KRUSIAL: Memindahkan NIS dari tabel Student ke Alumni
+      graduationYear: parseInt(graduationYear),
+      batch: batch, 
+      description: description || `Alumni angkatan ${batch}`,
+      photoUrl: student.photoUrl,
+      isActive: true,
+      isVerified: true 
+    }));
 
-    // 3. Masukkan ke tabel Alumni secara massal
+    // 3. MASUKKAN KE TABEL ALUMNI SECARA MASSAL (Bulk Create)
+    // Menggunakan ignoreDuplicates jika ada risiko NIS ganda (tergantung kebijakan DB)
     await Alumni.bulkCreate(alumniData, { transaction: t });
 
-    // 4. Update status di tabel Student menjadi tidak aktif (Lulus)
+    // 4. UPDATE STATUS SISWA (Menjadi Tidak Aktif / Lulus)
+    // Opsional: Anda juga bisa menghapus data siswa (Student.destroy) jika data alumni sudah cukup
     await Student.update(
       { isActive: false }, 
       { 
@@ -1339,18 +1341,28 @@ exports.processGraduation = async (req, res) => {
       }
     );
 
-    // Selesaikan transaksi
+    // SELESAIKAN TRANSAKSI
     await t.commit();
 
     res.json({ 
       success: true, 
-      message: `Berhasil meluluskan ${selectedStudents.length} siswa ke tahun lulus ${graduationYear}.` 
+      message: `Berhasil meluluskan ${selectedStudents.length} siswa ke tahun lulus ${graduationYear} dengan angkatan ${batch}.` 
     });
 
   } catch (err) {
-    // Batalkan semua perubahan jika terjadi error
-    await t.rollback();
-    console.error("Graduation Error:", err);
-    res.status(500).json({ success: false, message: err.message });
+    // BATALKAN SEMUA PERUBAHAN JIKA TERJADI ERROR
+    if (t) await t.rollback();
+    
+    console.error("Graduation Error Detail:", err);
+
+    // Penanganan error khusus jika NIS duplikat di tabel Alumni
+    if (err.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Beberapa siswa dengan NIS tersebut sudah terdaftar sebagai alumni." 
+      });
+    }
+
+    res.status(500).json({ success: false, message: "Internal Server Error: " + err.message });
   }
 };

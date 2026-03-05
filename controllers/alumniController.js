@@ -11,7 +11,7 @@ cloudinary.config({
 
 exports.getAllAlumni = async (req, res) => {
   try {
-    const { schoolId, isVerified, graduationYear, batch, name } = req.query;
+    const { schoolId, isVerified, nis, graduationYear, batch, name } = req.query;
 
     const where = { 
       schoolId: parseInt(schoolId),
@@ -79,6 +79,7 @@ exports.createAlumni = async (req, res) => {
       batch: batchString, // Simpan sebagai string agar konsisten
       description,
       photoUrl,
+      nis,
       schoolId: parseInt(schoolId),
       isVerified: false
     });
@@ -92,7 +93,8 @@ exports.createAlumni = async (req, res) => {
 exports.updateAlumni = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, graduationYear, description } = req.body;
+    // 1. Ambil NIS dan Batch dari req.body
+    const { name, nis, graduationYear, description, batch } = req.body;
 
     const alumni = await Alumni.findByPk(id);
     if (!alumni) {
@@ -101,16 +103,22 @@ exports.updateAlumni = async (req, res) => {
 
     const oldPhotoUrl = alumni.photoUrl;
 
+    // 2. Update field teks (Termasuk NIS)
     if (name) alumni.name = name;
+    if (nis) alumni.nis = nis; // Update NIS
+    if (batch) alumni.batch = batch; // Update Batch
     if (graduationYear) alumni.graduationYear = parseInt(graduationYear);
-    if (description) alumni.description = description;
+    if (description !== undefined) alumni.description = description;
 
+    // 3. Logika Upload Foto ke Cloudinary (Tetap sama)
     if (req.file) {
       if (oldPhotoUrl) {
-        const publicId = oldPhotoUrl.split('/').pop().split('.')[0]; // Extract public_id
+        // Ambil publicId dengan lebih aman (menghindari error jika URL null)
+        const parts = oldPhotoUrl.split('/');
+        const publicId = parts[parts.length - 1].split('.')[0]; 
         try {
           await cloudinary.uploader.destroy(publicId);
-          console.log(`Photo lama dihapus dari Cloudinary: ${publicId}`);
+          console.log(`Photo lama dihapus: ${publicId}`);
         } catch (err) {
           console.log(`Gagal hapus photo lama: ${err.message}`);
         }
@@ -129,10 +137,23 @@ exports.updateAlumni = async (req, res) => {
       alumni.photoUrl = result.secure_url;
     }
 
+    // 4. Simpan ke Database
     await alumni.save();
 
-    res.json({ success: true, data: alumni });
+    res.json({ 
+      success: true, 
+      message: "Data alumni berhasil diperbarui", 
+      data: alumni 
+    });
+    
   } catch (err) {
+    // Tangani error jika NIS ternyata duplikat (jika kolom NIS diset UNIQUE)
+    if (err.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'NIS sudah digunakan oleh alumni lain' 
+      });
+    }
     res.status(500).json({ success: false, message: err.message });
   }
 };
