@@ -14,7 +14,11 @@ const SchoolSetting = sequelize.define('SchoolSetting', {
   displayAlumniBatch: {
     type: DataTypes.STRING,
     allowNull: true, // Contoh: "2021"
-  }
+  },
+  announcementDate: {
+    type: DataTypes.DATE, // Menyimpan timestamp (tanggal & jam)
+    allowNull: true,
+ }
 });
 
 module.exports = SchoolSetting;

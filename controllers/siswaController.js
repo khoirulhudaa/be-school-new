@@ -1347,7 +1347,7 @@ exports.processGraduation = async (req, res) => {
 
     res.json({ 
       success: true, 
-      message: `Berhasil meluluskan ${selectedStudents.length} siswa ke tahun lulus ${graduationYear} dengan angkatan ${batch}.` 
+      message: `Berhasil: ${selectedStudents.length} siswa tahun lulus ${graduationYear} dengan angkatan ${batch}.` 
     });
 
   } catch (err) {

@@ -207,16 +207,16 @@ exports.approveAlumni = async (req, res) => {
 // controllers/setting.controller.js
 exports.updateAlumniDisplay = async (req, res) => {
   try {
-    const { schoolId, year, batch } = req.body;
+    const { schoolId, year, batch, announcementDate } = req.body;
     
-    // Update atau Create jika belum ada (Upsert)
     await SchoolSetting.upsert({
       schoolId,
       displayAlumniYear: year,
-      displayAlumniBatch: batch
+      displayAlumniBatch: batch,
+      announcementDate: announcementDate // Simpan tanggal launching
     });
 
-    res.json({ success: true, message: "Pengaturan tampilan data alumni diperbarui." });
+    res.json({ success: true, message: "Pengaturan diperbarui." });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
