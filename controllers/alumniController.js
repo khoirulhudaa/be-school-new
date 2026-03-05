@@ -2,6 +2,7 @@ const Alumni = require('../models/alumni');
 const cloudinary = require('cloudinary').v2;
 const streamifier = require('streamifier');
 const SchoolSetting = require('../models/schoolSetting');
+const { Op } = require('sequelize');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -9,10 +10,49 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// exports.getAllAlumni = async (req, res) => {
+//   try {
+//     const { schoolId, isVerified, nis, graduationYear, batch, name } = req.query;
+
+//     const where = { 
+//       schoolId: parseInt(schoolId),
+//       isActive: true 
+//     };
+
+//     if (isVerified !== undefined) where.isVerified = isVerified === 'true';
+//     if (graduationYear) where.graduationYear = parseInt(graduationYear);
+//     if (batch) where.batch = batch;
+//     if (name) where.name = { [Op.like]: `%${name}%` };
+
+//     const alumni = await Alumni.findAll({ 
+//       where,
+//       order: [['graduationYear', 'DESC'], ['name', 'ASC']],
+//     });
+
+//     res.json({ success: true, data: alumni });
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
 exports.getAllAlumni = async (req, res) => {
   try {
-    const { schoolId, isVerified, nis, graduationYear, batch, name } = req.query;
+    const { 
+      schoolId, 
+      isVerified, 
+      graduationYear, 
+      batch, 
+      name,
+      page = 1, 
+      limit = 12 
+    } = req.query;
 
+    // Pastikan angka valid
+    const pageNum = Math.max(1, parseInt(page));
+    const limitNum = Math.max(1, parseInt(limit));
+    const offset = (pageNum - 1) * limitNum;
+
+    // Menyiapkan Filter
     const where = { 
       schoolId: parseInt(schoolId),
       isActive: true 
@@ -23,12 +63,31 @@ exports.getAllAlumni = async (req, res) => {
     if (batch) where.batch = batch;
     if (name) where.name = { [Op.like]: `%${name}%` };
 
-    const alumni = await Alumni.findAll({ 
+    // Eksekusi Query
+    const { count, rows } = await Alumni.findAndCountAll({ 
       where,
+      // Sorting: Prioritaskan tahun terbaru, lalu nama alfabetis
       order: [['graduationYear', 'DESC'], ['name', 'ASC']],
+      limit: limitNum,
+      offset: offset,
+      // Gunakan 'distinct' agar count tetap akurat jika nanti ada join table
+      distinct: true 
     });
 
-    res.json({ success: true, data: alumni });
+    const totalPages = Math.ceil(count / limitNum);
+
+    res.json({ 
+      success: true, 
+      data: rows,
+      pagination: {
+        totalItems: count,
+        totalPages: totalPages,
+        currentPage: pageNum,
+        itemsPerPage: limitNum,
+        hasNextPage: pageNum < totalPages,
+        hasPrevPage: pageNum > 1
+      }
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -36,7 +95,7 @@ exports.getAllAlumni = async (req, res) => {
 
 exports.createAlumni = async (req, res) => {
   try {
-    const { name, graduationYear, batch, description, schoolId } = req.body;
+    const { name, graduationYear, batch, nis, description, schoolId } = req.body;
 
     // 1. Validasi Kehadiran Field Wajib
     if (!name || !graduationYear || !schoolId || !batch) {
