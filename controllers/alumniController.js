@@ -10,31 +10,6 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// exports.getAllAlumni = async (req, res) => {
-//   try {
-//     const { schoolId, isVerified, nis, graduationYear, batch, name } = req.query;
-
-//     const where = { 
-//       schoolId: parseInt(schoolId),
-//       isActive: true 
-//     };
-
-//     if (isVerified !== undefined) where.isVerified = isVerified === 'true';
-//     if (graduationYear) where.graduationYear = parseInt(graduationYear);
-//     if (batch) where.batch = batch;
-//     if (name) where.name = { [Op.like]: `%${name}%` };
-
-//     const alumni = await Alumni.findAll({ 
-//       where,
-//       order: [['graduationYear', 'DESC'], ['name', 'ASC']],
-//     });
-
-//     res.json({ success: true, data: alumni });
-//   } catch (err) {
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
-
 exports.getAllAlumni = async (req, res) => {
   try {
     const { 
@@ -87,6 +62,48 @@ exports.getAllAlumni = async (req, res) => {
         hasNextPage: pageNum < totalPages,
         hasPrevPage: pageNum > 1
       }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getAlumniByIds = async (req, res) => {
+  try {
+    const { ids } = req.query;
+
+    if (!ids) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Query parameter "ids" wajib diisi (contoh: ?ids=1 atau ?ids=1,2,3)' 
+      });
+    }
+
+    // Konversi string "1,2,3" menjadi array angka [1, 2, 3]
+    const idArray = ids.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+
+    if (idArray.length === 0) {
+      return res.status(400).json({ success: false, message: 'Format ID tidak valid' });
+    }
+
+    const alumni = await Alumni.findAll({
+      where: {
+        id: { [Op.in]: idArray },
+        isActive: true
+      },
+      order: [['name', 'ASC']]
+    });
+
+    // Jika user hanya minta 1 ID tapi data tidak ada
+    if (idArray.length === 1 && alumni.length === 0) {
+      return res.status(404).json({ success: false, message: 'Alumni tidak ditemukan' });
+    }
+
+    res.json({
+      success: true,
+      count: alumni.length,
+      data: idArray.length === 1 ? (alumni[0] || null) : alumni 
+      // Opsional: Jika hanya 1 ID, kirim object. Jika banyak, kirim array.
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

@@ -16,6 +16,7 @@ router.put('/:id', upload.single('photo'), alumniController.updateAlumni);
 router.delete('/:id', alumniController.deleteAlumni);
 router.post('/alumni-display', alumniController.updateAlumniDisplay);
 router.get('/get-alumni-display/:schoolId', alumniController.getAlumniDisplaySetting);
+router.get('/find', alumniController.getAlumniByIds);
 
 // Aksi verifikasi
 router.patch('/:id/approve', alumniController.approveAlumni);
