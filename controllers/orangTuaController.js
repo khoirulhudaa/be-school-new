@@ -100,7 +100,8 @@ exports.getChildrenAttendance = async (req, res) => {
 
     // 1. Cari semua anak yang terhubung dengan parent ini
     const children = await Student.findAll({
-      where: { parentId: parentId, isActive: true },
+      // where: { parentId: parentId, isActive: true },
+      where: { parentId: parentId },
       attributes: ['id', 'name', 'class', 'nis']
     });
 
