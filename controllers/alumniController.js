@@ -89,7 +89,7 @@ exports.getAlumniByIds = async (req, res) => {
     const alumni = await Alumni.findAll({
       where: {
         id: { [Op.in]: idArray },
-        isActive: true
+        // isActive: true
       },
       order: [['name', 'ASC']]
     });
