@@ -26,7 +26,6 @@ exports.checkGuruAuth = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Data Guru/Tendik tidak ditemukan' });
     }
 
-    // 2. Ambil logo sekolah secara manual berdasarkan schoolId dari data guru
     const dataSekolah = await SchoolProfile.findOne({
       where: { schoolId: guru.schoolId },
       attributes: ["logoUrl"]
@@ -118,9 +117,6 @@ exports.getAllGuruTendik = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Parameter limit tidak valid' });
     }
 
-    // --- 1. LOGIKA IDENTIFIKASI DUPLIKAT ---
-    
-    // Cari NIP duplikat di sekolah yang sama
     const dupNipRows = await GuruTendik.findAll({
       where: { schoolId: sId, isActive: true, nip: { [Op.ne]: null, [Op.ne]: '' } },
       attributes: ['nip'],
@@ -164,7 +160,6 @@ exports.getAllGuruTendik = async (req, res) => {
       ];
     }
 
-    // --- 3. QUERY UTAMA DENGAN PAGINATION ---
     const offset = (currentPage - 1) * itemsPerPage;
 
     const { count, rows: guruTendik } = await GuruTendik.findAndCountAll({
@@ -174,7 +169,6 @@ exports.getAllGuruTendik = async (req, res) => {
       order: [['createdAt', 'DESC']],
     });
 
-    // --- 4. MAPPING FLAG DUPLIKAT KE DATA ---
     const dataWithStatus = guruTendik.map(g => {
       const item = g.toJSON();
       item.isNipDuplicate = duplicateNipList.includes(item.nip) || (item.nip && item.nip.includes('-DUP-'));
@@ -182,7 +176,6 @@ exports.getAllGuruTendik = async (req, res) => {
       return item;
     });
 
-    // --- 5. RESPONSE ---
     res.json({ 
       success: true, 
       summary: {
@@ -320,19 +313,115 @@ exports.createGuruTendik = async (req, res) => {
   }
 };
 
+// exports.updateGuruTendik = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { nama, mapel, email, role, jurusan, jenisKelamin, nip } = req.body;
+
+//     const guru = await GuruTendik.findByPk(id);
+//     if (!guru) {
+//       return res.status(404).json({ success: false, message: 'Guru/Tendik tidak ditemukan' });
+//     }
+
+//     const oldPhotoUrl = guru.photoUrl;
+
+//     // Update fields
+//     if (nama) guru.nama = nama;
+//     if (mapel !== undefined) guru.mapel = mapel;
+//     if (email !== undefined) guru.email = email;
+//     if (nip !== undefined) guru.nip = nip;
+//     if (role) guru.role = role;
+//     if (jurusan !== undefined) guru.jurusan = jurusan;
+//     if (jenisKelamin) guru.jenisKelamin = jenisKelamin;
+
+//     // Handle photo baru
+//     if (req.file) {
+//       // Hapus foto lama jika ada
+//       if (oldPhotoUrl) {
+//         const publicId = oldPhotoUrl.split('/').pop().split('.')[0];
+//         try {
+//           await cloudinary.uploader.destroy(publicId);
+//           console.log(`Foto lama dihapus: ${publicId}`);
+//         } catch (err) {
+//           console.log(`Gagal hapus foto lama: ${err.message}`);
+//         }
+//       }
+
+//       // Upload foto baru
+//       const result = await new Promise((resolve, reject) => {
+//         const uploadStream = cloudinary.uploader.upload_stream(
+//           { resource_type: 'image' },
+//           (error, result) => {
+//             if (error) reject(error);
+//             else resolve(result);
+//           }
+//         );
+//         streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
+//       });
+//       guru.photoUrl = result.secure_url;
+//     }
+
+//     await guru.save();
+
+//     res.json({ success: true, data: guru });
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
 exports.updateGuruTendik = async (req, res) => {
   try {
     const { id } = req.params;
     const { nama, mapel, email, role, jurusan, jenisKelamin, nip } = req.body;
 
+    // 1. Cari record guru yang akan di-update
     const guru = await GuruTendik.findByPk(id);
     if (!guru) {
       return res.status(404).json({ success: false, message: 'Guru/Tendik tidak ditemukan' });
     }
 
+    const schoolId = guru.schoolId; // Ambil schoolId dari record existing (aman)
     const oldPhotoUrl = guru.photoUrl;
 
-    // Update fields
+    // 2. Validasi duplikat NIP (jika nip baru diisi)
+    if (nip !== undefined && nip !== guru.nip) {
+      const existingNip = await GuruTendik.findOne({
+        where: {
+          schoolId,
+          nip,
+          id: { [Op.ne]: id }, // kecuali dirinya sendiri
+          isActive: true,
+        },
+      });
+
+      if (existingNip) {
+        return res.status(409).json({
+          success: false,
+          message: `NIP "${nip}" sudah terdaftar atas nama "${existingNip.nama}" di sekolah ini`,
+        });
+      }
+    }
+
+    // 3. Validasi duplikat Email (jika email baru diisi)
+    if (email !== undefined && email !== guru.email) {
+      const existingEmail = await GuruTendik.findOne({
+        where: {
+          schoolId,
+          email,
+          id: { [Op.ne]: id }, // kecuali dirinya sendiri
+          isActive: true,
+        },
+      });
+
+      if (existingEmail) {
+        return res.status(409).json({
+          success: false,
+          message: `Email "${email}" sudah digunakan oleh "${existingEmail.nama}" di sekolah ini`,
+        });
+      }
+    }
+
+    // 4. Update fields
     if (nama) guru.nama = nama;
     if (mapel !== undefined) guru.mapel = mapel;
     if (email !== undefined) guru.email = email;
@@ -341,7 +430,7 @@ exports.updateGuruTendik = async (req, res) => {
     if (jurusan !== undefined) guru.jurusan = jurusan;
     if (jenisKelamin) guru.jenisKelamin = jenisKelamin;
 
-    // Handle photo baru
+    // 5. Handle photo baru (jika ada upload)
     if (req.file) {
       // Hapus foto lama jika ada
       if (oldPhotoUrl) {
@@ -365,14 +454,17 @@ exports.updateGuruTendik = async (req, res) => {
         );
         streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
       });
+
       guru.photoUrl = result.secure_url;
     }
 
+    // 6. Simpan perubahan
     await guru.save();
 
     res.json({ success: true, data: guru });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    console.error('Error update guru/tendik:', err);
+    res.status(500).json({ success: false, message: err.message || 'Terjadi kesalahan server' });
   }
 };
 
