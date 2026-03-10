@@ -39,6 +39,16 @@ const Student = sequelize.define('Student', {
     {
       name: 'idx_student_school_batch',
       fields: ['schoolId', 'batch'] 
+    },
+    {
+      unique: true,
+      fields: ['nisn'],
+      name: 'unique_nisn_global' 
+    },
+    {
+      unique: true,
+      fields: ['schoolId', 'nis'],
+      name: 'unique_nis_per_school'
     }
   ]
 }); 

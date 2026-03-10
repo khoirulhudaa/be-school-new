@@ -2,7 +2,7 @@ const Student = require('../models/siswa');
 const Attendance = require('../models/kehadiran');
 const cloudinary = require('cloudinary').v2;
 const streamifier = require('streamifier');
-const { fn, col, Op, literal } = require('sequelize');
+const { fn, col, Op, literal, where: sequelizeWhere } = require('sequelize');
 const moment = require('moment');
 const ExcelJS = require('exceljs');
 const GuruTendik = require('../models/guruTendik');
@@ -190,28 +190,117 @@ exports.getStudentSearch = async (req, res) => {
   }
 };
 
+// exports.getAllStudents = async (req, res) => {
+//   try {
+//     const { schoolId, page = 1, limit = 10, class: studentClass, batch, name } = req.query;
+    
+//     if (!schoolId || isNaN(parseInt(schoolId))) {
+//       return res.status(400).json({ success: false, message: "schoolId diperlukan." });
+//     }
+
+//     // 1. Perbaiki Object Condition (Agar filter name, class, batch bekerja)
+//     let condition = { 
+//       schoolId: parseInt(schoolId), 
+//       isActive: true 
+//     };
+    
+//     if (name) condition.name = { [Op.like]: `%${name}%` };
+//     if (studentClass) condition.class = studentClass;
+//     if (batch) condition.batch = batch;
+
+//     const offset = (parseInt(page) - 1) * parseInt(limit);
+
+//     const { count, rows } = await Student.findAndCountAll({
+//       where: condition, // Gunakan variabel condition yang sudah dibangun
+//       limit: parseInt(limit),
+//       offset: offset,
+//       order: [['name', 'ASC']],
+//       include: [{
+//         model: Attendance,
+//         as: 'studentAttendances',
+//         where: {
+//           createdAt: {
+//             [Op.between]: [moment().startOf('day').toDate(), moment().endOf('day').toDate()]
+//           }
+//         },
+//         required: false // Agar siswa tetap muncul meski belum absen
+//       }]
+//     });
+
+//     // 2. Mapping Status Kehadiran (Menghandle 4 Status + Belum Hadir)
+//     const dataWithStatus = rows.map(s => {
+//       const student = s.toJSON();
+//       // Ambil data absen hari ini (jika ada)
+//       const attendanceToday = student.studentAttendances?.[0]; 
+      
+//       // Jika ada data absen, pakai statusnya (Hadir/Izin/Sakit/Alpha)
+//       // Jika tidak ada, statusnya "Belum Hadir"
+//       student.statusKehadiran = attendanceToday ? attendanceToday.status : 'Belum Hadir';
+      
+//       // Hapus array attendances agar JSON lebih ringan dikirim ke client
+//       delete student.studentAttendances; 
+      
+//       return student;
+//     });
+
+//     res.json({
+//       success: true,
+//       data: dataWithStatus,
+//       pagination: {
+//         totalItems: count,
+//         totalPages: Math.ceil(count / parseInt(limit)),
+//         currentPage: parseInt(page)
+//       }
+//     });
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
 exports.getAllStudents = async (req, res) => {
   try {
     const { schoolId, page = 1, limit = 10, class: studentClass, batch, name } = req.query;
-    
+
     if (!schoolId || isNaN(parseInt(schoolId))) {
       return res.status(400).json({ success: false, message: "schoolId diperlukan." });
     }
 
-    // 1. Perbaiki Object Condition (Agar filter name, class, batch bekerja)
-    let condition = { 
-      schoolId: parseInt(schoolId), 
-      isActive: true 
-    };
-    
+    const sId = parseInt(schoolId);
+    let condition = { schoolId: sId, isActive: true };
+
     if (name) condition.name = { [Op.like]: `%${name}%` };
     if (studentClass) condition.class = studentClass;
     if (batch) condition.batch = batch;
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
+    // --- 1. LOGIKA CEK DUPLIKAT (NASIONAL & SEKOLAH) ---
+    
+    // Cari daftar NIS yang duplikat di sekolah ini
+    const dupNisRows = await Student.findAll({
+      where: { schoolId: sId, isActive: true },
+      attributes: ['nis'],
+      group: ['nis'],
+      having: sequelizeWhere(fn('COUNT', col('nis')), '>', 1),
+      raw: true
+    });
+
+    // Cari daftar NISN yang duplikat secara global/nasional (lintas sekolah jika perlu)
+    const dupNisnRows = await Student.findAll({
+      where: { isActive: true, nisn: { [Op.ne]: null } },
+      attributes: ['nisn'],
+      group: ['nisn'],
+      having: sequelizeWhere(fn('COUNT', col('nisn')), '>', 1),
+      raw: true
+    });
+
+    // Ekstrak menjadi array string sederhana agar mudah dicek dengan .includes()
+    const duplicateNisList = dupNisRows.map(d => d.nis);
+    const duplicateNisnList = dupNisnRows.map(d => d.nisn);
+
+    // --- 2. QUERY UTAMA DATA SISWA ---
     const { count, rows } = await Student.findAndCountAll({
-      where: condition, // Gunakan variabel condition yang sudah dibangun
+      where: condition,
       limit: parseInt(limit),
       offset: offset,
       order: [['name', 'ASC']],
@@ -223,28 +312,35 @@ exports.getAllStudents = async (req, res) => {
             [Op.between]: [moment().startOf('day').toDate(), moment().endOf('day').toDate()]
           }
         },
-        required: false // Agar siswa tetap muncul meski belum absen
+        required: false
       }]
     });
 
-    // 2. Mapping Status Kehadiran (Menghandle 4 Status + Belum Hadir)
+    // --- 3. MAPPING DATA & FLAG DUPLIKAT ---
     const dataWithStatus = rows.map(s => {
       const student = s.toJSON();
-      // Ambil data absen hari ini (jika ada)
-      const attendanceToday = student.studentAttendances?.[0]; 
+      const attendanceToday = student.studentAttendances?.[0];
       
-      // Jika ada data absen, pakai statusnya (Hadir/Izin/Sakit/Alpha)
-      // Jika tidak ada, statusnya "Belum Hadir"
       student.statusKehadiran = attendanceToday ? attendanceToday.status : 'Belum Hadir';
       
-      // Hapus array attendances agar JSON lebih ringan dikirim ke client
-      delete student.studentAttendances; 
-      
+      // Tandai baris spesifik ini jika dia duplikat
+      student.isNisDuplicate = duplicateNisList.includes(student.nis);
+      student.isNisnDuplicate = student.nisn ? duplicateNisnList.includes(student.nisn) : false;
+
+      delete student.studentAttendances;
       return student;
     });
 
+    // --- 4. KIRIM RESPONSE ---
     res.json({
       success: true,
+      summary: {
+        // Berapa banyak "nilai" yang duplikat
+        uniqueNisDuplicates: duplicateNisList.length,
+        uniqueNisnDuplicates: duplicateNisnList.length,
+        // Keterangan untuk UI
+        hasIssues: duplicateNisList.length > 0 || duplicateNisnList.length > 0
+      },
       data: dataWithStatus,
       pagination: {
         totalItems: count,
@@ -252,6 +348,7 @@ exports.getAllStudents = async (req, res) => {
         currentPage: parseInt(page)
       }
     });
+
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
