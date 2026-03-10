@@ -129,9 +129,13 @@ exports.getAllGuruTendik = async (req, res) => {
       raw: true
     });
 
-    // Cari Email duplikat secara global
+    // Cari Email duplikat di sekolah yang sama (bukan global)
     const dupEmailRows = await GuruTendik.findAll({
-      where: { isActive: true, email: { [Op.ne]: null, [Op.ne]: '' } },
+      where: { 
+        schoolId: sId,                    // ← TAMBAHKAN INI
+        isActive: true, 
+        email: { [Op.ne]: null, [Op.ne]: '' } 
+      },
       attributes: ['email'],
       group: ['email'],
       having: sequelizeWhere(fn('COUNT', col('email')), '>', 1),
