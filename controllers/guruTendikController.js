@@ -100,7 +100,7 @@ exports.getAllGuruTendik = async (req, res) => {
       name,
       isDuplicateOnly,
       page = 1,
-      limit = 20,          // default 20 item per halaman
+      limit = 20,        
     } = req.query;
 
     if (!schoolId) {
@@ -132,7 +132,7 @@ exports.getAllGuruTendik = async (req, res) => {
     // Cari Email duplikat di sekolah yang sama (bukan global)
     const dupEmailRows = await GuruTendik.findAll({
       where: { 
-        schoolId: sId,                    // ← TAMBAHKAN INI
+        schoolId: sId,                    
         isActive: true, 
         email: { [Op.ne]: null, [Op.ne]: '' } 
       },
@@ -145,7 +145,6 @@ exports.getAllGuruTendik = async (req, res) => {
     const duplicateNipList = dupNipRows.map(d => d.nip);
     const duplicateEmailList = dupEmailRows.map(d => d.email);
 
-    // --- 2. SUSUN KONDISI WHERE ---
     let whereCondition = { 
       schoolId: sId, 
       isActive: true 
