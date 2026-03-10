@@ -870,6 +870,37 @@ exports.scanQRCode = async (req, res) => {
   }
 };
 
+// exports.updateStudent = async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { name, nis, nisn, gender, birthPlace, birthDate, nik, isActive, class: className, batch } = req.body;
+
+//     const student = await Student.findByPk(id);
+//     if (!student) {
+//       return res.status(404).json({ success: false, message: 'Siswa tidak ditemukan' });
+//     }
+
+//    let photoUrl = student.photoUrl;
+
+//     if (req.file) {
+//       // Optimasi saat update (otomatis menimpa file lama karena public_id sama)
+//       photoUrl = await processPhotoUpload(req.file.buffer, student.schoolId, student.nis);
+//     }
+
+//     await student.update({
+//       name, nis, nisn, gender, birthPlace, birthDate, nik, isActive, class: className, batch,
+//       photoUrl
+//     });
+
+//     res.json({ success: true, message: 'Data siswa diperbarui', data: student });
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
+
+const { Op } = require('sequelize');
+
 exports.updateStudent = async (req, res) => {
   try {
     const { id } = req.params;
@@ -880,20 +911,65 @@ exports.updateStudent = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Siswa tidak ditemukan' });
     }
 
-   let photoUrl = student.photoUrl;
-
-    if (req.file) {
-      // Optimasi saat update (otomatis menimpa file lama karena public_id sama)
-      photoUrl = await processPhotoUpload(req.file.buffer, student.schoolId, student.nis);
+    // --- 1. VALIDASI DUPLIKAT SEBELUM UPDATE ---
+    
+    // Cek NIS (Unik per Sekolah)
+    if (nis && nis !== student.nis) {
+      const existingNis = await Student.findOne({
+        where: { 
+          schoolId: student.schoolId, 
+          nis: nis,
+          id: { [Op.ne]: id } // Kecualikan diri sendiri
+        }
+      });
+      if (existingNis) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `NIS ${nis} sudah terdaftar atas nama ${existingNis.name}`,
+          conflictData: existingNis 
+        });
+      }
     }
 
+    // Cek NISN (Unik Nasional/Global)
+    if (nisn && nisn !== student.nisn) {
+      const existingNisn = await Student.findOne({
+        where: { 
+          nisn: nisn,
+          id: { [Op.ne]: id } // Kecualikan diri sendiri
+        }
+      });
+      if (existingNisn) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `NISN ${nisn} sudah terdaftar atas nama ${existingNisn.name}`,
+          conflictData: existingNisn 
+        });
+      }
+    }
+
+    // --- 2. PROSES UPLOAD FOTO ---
+    let photoUrl = student.photoUrl;
+    if (req.file) {
+      photoUrl = await processPhotoUpload(req.file.buffer, student.schoolId, nis || student.nis);
+    }
+
+    // --- 3. EKSEKUSI UPDATE ---
     await student.update({
-      name, nis, nisn, gender, birthPlace, birthDate, nik, isActive, class: className, batch,
-      photoUrl
+      name, nis, nisn, gender, birthPlace, birthDate, nik, isActive, 
+      class: className, batch, photoUrl
     });
 
     res.json({ success: true, message: 'Data siswa diperbarui', data: student });
+
   } catch (err) {
+    // Menangkap error jika lolos dari pengecekan manual di atas (Database Guard)
+    if (err.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Gagal update: NIS atau NISN sudah digunakan oleh siswa lain.' 
+      });
+    }
     res.status(500).json({ success: false, message: err.message });
   }
 };
