@@ -899,8 +899,6 @@ exports.scanQRCode = async (req, res) => {
 // };
 
 
-const { Op } = require('sequelize');
-
 exports.updateStudent = async (req, res) => {
   try {
     const { id } = req.params;
