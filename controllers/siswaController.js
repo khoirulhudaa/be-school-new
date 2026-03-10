@@ -259,7 +259,15 @@ exports.getStudentSearch = async (req, res) => {
 
 exports.getAllStudents = async (req, res) => {
   try {
-    const { schoolId, page = 1, limit = 10, class: studentClass, batch, name } = req.query;
+    const { 
+      schoolId, 
+      page = 1, 
+      limit = 10, 
+      class: studentClass, 
+      batch, 
+      name,
+      isDuplicateOnly // <--- Parameter baru dari frontend
+    } = req.query;
 
     if (!schoolId || isNaN(parseInt(schoolId))) {
       return res.status(400).json({ success: false, message: "schoolId diperlukan." });
@@ -268,13 +276,7 @@ exports.getAllStudents = async (req, res) => {
     const sId = parseInt(schoolId);
     let condition = { schoolId: sId, isActive: true };
 
-    if (name) condition.name = { [Op.like]: `%${name}%` };
-    if (studentClass) condition.class = studentClass;
-    if (batch) condition.batch = batch;
-
-    const offset = (parseInt(page) - 1) * parseInt(limit);
-
-    // --- 1. LOGIKA CEK DUPLIKAT (NASIONAL & SEKOLAH) ---
+    // --- 1. LOGIKA IDENTIFIKASI DUPLIKAT ---
     
     // Cari daftar NIS yang duplikat di sekolah ini
     const dupNisRows = await Student.findAll({
@@ -285,7 +287,7 @@ exports.getAllStudents = async (req, res) => {
       raw: true
     });
 
-    // Cari daftar NISN yang duplikat secara global/nasional (lintas sekolah jika perlu)
+    // Cari daftar NISN yang duplikat secara global
     const dupNisnRows = await Student.findAll({
       where: { isActive: true, nisn: { [Op.ne]: null } },
       attributes: ['nisn'],
@@ -294,11 +296,28 @@ exports.getAllStudents = async (req, res) => {
       raw: true
     });
 
-    // Ekstrak menjadi array string sederhana agar mudah dicek dengan .includes()
     const duplicateNisList = dupNisRows.map(d => d.nis);
     const duplicateNisnList = dupNisnRows.map(d => d.nisn);
 
-    // --- 2. QUERY UTAMA DATA SISWA ---
+    // --- 2. PENYUSUNAN FILTER QUERY ---
+
+    if (name) condition.name = { [Op.like]: `%${name}%` };
+    if (studentClass) condition.class = studentClass;
+    if (batch) condition.batch = batch;
+
+    // Jika isDuplicateOnly bernilai true, filter data agar hanya menampilkan yang bermasalah
+    if (isDuplicateOnly === 'true') {
+      condition[Op.or] = [
+        { nis: { [Op.in]: duplicateNisList } },            // Kembar di sistem
+        { nisn: { [Op.in]: duplicateNisnList } },          // NISN kembar
+        { nis: { [Op.like]: '%-DUP-%' } },                 // Ditandai "-DUP-" oleh SQL sebelumnya
+        { nisn: { [Op.like]: '%-DUP-%' } }                 // (Opsional) jika NISN juga ditandai
+      ];
+    }
+
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+
+    // --- 3. QUERY UTAMA DATA SISWA ---
     const { count, rows } = await Student.findAndCountAll({
       where: condition,
       limit: parseInt(limit),
@@ -316,30 +335,28 @@ exports.getAllStudents = async (req, res) => {
       }]
     });
 
-    // --- 3. MAPPING DATA & FLAG DUPLIKAT ---
+    // --- 4. MAPPING DATA & FLAG DUPLIKAT ---
     const dataWithStatus = rows.map(s => {
       const student = s.toJSON();
       const attendanceToday = student.studentAttendances?.[0];
       
       student.statusKehadiran = attendanceToday ? attendanceToday.status : 'Belum Hadir';
       
-      // Tandai baris spesifik ini jika dia duplikat
-      student.isNisDuplicate = duplicateNisList.includes(student.nis);
-      student.isNisnDuplicate = student.nisn ? duplicateNisnList.includes(student.nisn) : false;
+      // Flag untuk frontend agar bisa memberi warna merah pada baris
+      student.isNisDuplicate = duplicateNisList.includes(student.nis) || student.nis.includes('-DUP-');
+      student.isNisnDuplicate = student.nisn ? (duplicateNisnList.includes(student.nisn) || student.nisn.includes('-DUP-')) : false;
 
       delete student.studentAttendances;
       return student;
     });
 
-    // --- 4. KIRIM RESPONSE ---
+    // --- 5. KIRIM RESPONSE ---
     res.json({
       success: true,
       summary: {
-        // Berapa banyak "nilai" yang duplikat
         uniqueNisDuplicates: duplicateNisList.length,
         uniqueNisnDuplicates: duplicateNisnList.length,
-        // Keterangan untuk UI
-        hasIssues: duplicateNisList.length > 0 || duplicateNisnList.length > 0
+        hasIssues: duplicateNisList.length > 0 || duplicateNisnList.length > 0 || (isDuplicateOnly === 'true' && count > 0)
       },
       data: dataWithStatus,
       pagination: {
