@@ -557,14 +557,17 @@ exports.getUserDetail = async (req, res) => {
       });
     }
 
-    // 1. Ambil data profil + semua attendance di periode (untuk statistik)
     const user = await Model.findOne({
       where: { id, isActive: true },
-      attributes: [
-        'id', 'name', 'nis', 'nisn', 'class', 'batch', 'photoUrl',
-        'gender', 'birthDate', 'qrCodeData',
-        'nip', 'email', 'mapel', 'jurusan',
-      ],
+      attributes: isStudent 
+        ? [  // hanya field siswa
+            'id', 'name', 'nis', 'nisn', 'class', 'batch', 'photoUrl',
+            'gender', 'birthDate', 'qrCodeData', 'qrCodeData'
+          ]
+        : [  // field guru (sesuaikan dengan model GuruTendik)
+            'id', 'name', 'nip', 'email', 'mapel', 'jurusan', 'photoUrl',
+            // tambah field guru lain jika ada
+          ],
       include: includeOptions
     });
 
