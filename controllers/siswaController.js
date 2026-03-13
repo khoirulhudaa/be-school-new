@@ -10,6 +10,7 @@ const sequelize = require('../config/database');
 const jwt = require('jsonwebtoken');
 const SchoolProfile = require('../models/profileSekolah');
 const Alumni = require('../models/alumni');
+const Parent = require('../models/orangTua');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -189,73 +190,6 @@ exports.getStudentSearch = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
-// exports.getAllStudents = async (req, res) => {
-//   try {
-//     const { schoolId, page = 1, limit = 10, class: studentClass, batch, name } = req.query;
-    
-//     if (!schoolId || isNaN(parseInt(schoolId))) {
-//       return res.status(400).json({ success: false, message: "schoolId diperlukan." });
-//     }
-
-//     // 1. Perbaiki Object Condition (Agar filter name, class, batch bekerja)
-//     let condition = { 
-//       schoolId: parseInt(schoolId), 
-//       isActive: true 
-//     };
-    
-//     if (name) condition.name = { [Op.like]: `%${name}%` };
-//     if (studentClass) condition.class = studentClass;
-//     if (batch) condition.batch = batch;
-
-//     const offset = (parseInt(page) - 1) * parseInt(limit);
-
-//     const { count, rows } = await Student.findAndCountAll({
-//       where: condition, // Gunakan variabel condition yang sudah dibangun
-//       limit: parseInt(limit),
-//       offset: offset,
-//       order: [['name', 'ASC']],
-//       include: [{
-//         model: Attendance,
-//         as: 'studentAttendances',
-//         where: {
-//           createdAt: {
-//             [Op.between]: [moment().startOf('day').toDate(), moment().endOf('day').toDate()]
-//           }
-//         },
-//         required: false // Agar siswa tetap muncul meski belum absen
-//       }]
-//     });
-
-//     // 2. Mapping Status Kehadiran (Menghandle 4 Status + Belum Hadir)
-//     const dataWithStatus = rows.map(s => {
-//       const student = s.toJSON();
-//       // Ambil data absen hari ini (jika ada)
-//       const attendanceToday = student.studentAttendances?.[0]; 
-      
-//       // Jika ada data absen, pakai statusnya (Hadir/Izin/Sakit/Alpha)
-//       // Jika tidak ada, statusnya "Belum Hadir"
-//       student.statusKehadiran = attendanceToday ? attendanceToday.status : 'Belum Hadir';
-      
-//       // Hapus array attendances agar JSON lebih ringan dikirim ke client
-//       delete student.studentAttendances; 
-      
-//       return student;
-//     });
-
-//     res.json({
-//       success: true,
-//       data: dataWithStatus,
-//       pagination: {
-//         totalItems: count,
-//         totalPages: Math.ceil(count / parseInt(limit)),
-//         currentPage: parseInt(page)
-//       }
-//     });
-//   } catch (err) {
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
 
 exports.getAllStudents = async (req, res) => {
   try {
@@ -570,82 +504,130 @@ exports.getAllTeachers = async (req, res) => {
 exports.getUserDetail = async (req, res) => {
   try {
     const { id } = req.params;
-    const { role, year, page = 1, limit = 10 } = req.query; // Default page 1, limit 10
+    const { role, year, page = 1, limit = 10 } = req.query;
 
+    // Validasi role
     if (!role || !['student', 'teacher'].includes(role)) {
-      return res.status(400).json({ success: false, message: "Role harus ditentukan." });
+      return res.status(400).json({
+        success: false,
+        message: "Role harus 'student' atau 'teacher'."
+      });
     }
 
     const isStudent = role === 'student';
     const Model = isStudent ? Student : GuruTendik;
     const attendanceAlias = isStudent ? 'studentAttendances' : 'guruAttendances';
 
-    // Konfigurasi Waktu
-    const startDate = year 
-      ? moment(`${year}-01-01`).startOf('year').toDate() 
-      : moment().subtract(1, 'years').toDate();
-    const endDate = year 
-      ? moment(`${year}-12-31`).endOf('year').toDate() 
-      : moment().endOf('day').toDate();
-
-    // 1. Ambil Profil & Statistik (Tanpa limit untuk hitung total stats)
-    const userWithAllAttendance = await Model.findOne({
-      where: { id, isActive: true },
-      include: [{
-        model: Attendance,
-        as: attendanceAlias,
-        where: { createdAt: { [Op.between]: [startDate, endDate] } },
-        required: false
-      }]
-    });
-
-    if (!userWithAllAttendance) {
-      return res.status(404).json({ success: false, message: 'Data tidak ditemukan' });
+    // Validasi & set tahun
+    if (year && !/^\d{4}$/.test(year)) {
+      return res.status(400).json({
+        success: false,
+        message: "Format tahun tidak valid, gunakan YYYY (contoh: 2025)"
+      });
     }
 
-    // 2. Hitung Statistik (Logic tetap sama)
-    const stats = { Hadir: 0, Izin: 0, Sakit: 0, Alpha: 0, Terlambat: 0 };
-    const deadline = "07:00:00";
-    const allRecords = userWithAllAttendance[attendanceAlias] || [];
-    
-    allRecords.forEach(record => {
-      const scanTime = moment(record.createdAt).format("HH:mm:ss");
-      if (record.status === 'Hadir' && scanTime > deadline) stats.Terlambat++;
-      if (stats.hasOwnProperty(record.status)) stats[record.status]++;
+    // Tentukan rentang tanggal
+    const startDate = year
+      ? moment(`${year}-01-01`).startOf('year').toDate()
+      : moment().subtract(1, 'years').startOf('day').toDate();
+
+    const endDate = year
+      ? moment(`${year}-12-31`).endOf('day').toDate()
+      : moment().endOf('day').toDate();
+
+    // Opsi include
+    let includeOptions = [
+      {
+        model: Attendance,
+        as: attendanceAlias,
+        where: {
+          createdAt: { [Op.between]: [startDate, endDate] }
+        },
+        required: false,
+        attributes: ['id', 'status', 'createdAt'] // hanya yang dibutuhkan
+      }
+    ];
+
+    // Tambahkan relasi orang tua hanya untuk siswa
+    if (isStudent) {
+      includeOptions.push({
+        model: Parent,
+        as: 'parent',
+        attributes: ['id', 'name', 'gender', 'relationStatus', 'phoneNumber', 'type'],
+        required: false
+      });
+    }
+
+    // 1. Ambil data profil + semua attendance di periode (untuk statistik)
+    const user = await Model.findOne({
+      where: { id, isActive: true },
+      attributes: [
+        'id', 'name', 'nis', 'nisn', 'class', 'batch', 'photoUrl',
+        'gender', 'birthDate', 'qrCodeData',
+        'nip', 'email', 'mapel', 'jurusan',
+      ],
+      include: includeOptions
     });
 
-    // 3. Query Terpisah untuk Riwayat (Dengan Pagination)
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: `Data ${role} dengan ID ${id} tidak ditemukan atau tidak aktif`
+      });
+    }
+
+    // 2. Hitung statistik kehadiran
+    const stats = { Hadir: 0, Izin: 0, Sakit: 0, Alpha: 0, Terlambat: 0 };
+    const deadline = "07:00:00";
+    const attendances = user[attendanceAlias] || [];
+
+    attendances.forEach(record => {
+      if (!record.status) return;
+
+      const scanTime = moment(record.createdAt).format('HH:mm:ss');
+
+      // Hitung status biasa
+      if (stats.hasOwnProperty(record.status)) {
+        stats[record.status]++;
+      }
+
+      // Hitung terlambat (khusus Hadir)
+      if (record.status === 'Hadir' && scanTime > deadline) {
+        stats.Terlambat++;
+      }
+    });
+
+    // 3. Riwayat absen dengan pagination (query terpisah biar akurat)
     const offset = (parseInt(page) - 1) * parseInt(limit);
-    
-    // Kita ambil datanya langsung dari model Attendance agar pagination lebih akurat
+
     const { count, rows } = await Attendance.findAndCountAll({
       where: {
-        // Sesuaikan foreign key berdasarkan role
-        [isStudent ? 'studentId' : 'guruId']: id, 
+        [isStudent ? 'studentId' : 'guruId']: id,
         createdAt: { [Op.between]: [startDate, endDate] }
       },
+      attributes: ['id', 'status', 'createdAt'],
       order: [['createdAt', 'DESC']],
       limit: parseInt(limit),
-      offset: offset
+      offset
     });
 
     const history = rows.map(record => {
-      const scanTime = moment(record.createdAt).format("HH:mm:ss");
+      const scanTime = moment(record.createdAt).format('HH:mm:ss');
       return {
         id: record.id,
         date: moment(record.createdAt).format('YYYY-MM-DD'),
         time: scanTime,
         status: record.status,
         isLate: record.status === 'Hadir' && scanTime > deadline,
-        info: isStudent ? record.currentClass : 'GURU/STAFF'
+        info: isStudent ? user.class || '-' : 'GURU/STAFF'
       };
     });
 
-    // 4. Response
-    const profile = userWithAllAttendance.toJSON();
-    delete profile[attendanceAlias];
+    // 4. Siapkan response
+    const profile = user.toJSON();
+    delete profile[attendanceAlias]; // hapus array attendance dari profil
 
-    res.json({
+    return res.json({
       success: true,
       data: {
         role,
@@ -662,8 +644,12 @@ exports.getUserDetail = async (req, res) => {
     });
 
   } catch (err) {
-    console.error("Error Detail User:", err);
-    res.status(500).json({ success: false, message: err.message });
+    console.error('[getUserDetail] Error:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Terjadi kesalahan server',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 };
 

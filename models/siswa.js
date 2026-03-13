@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
+const Parent = require('./orangTua');
 
 const Student = sequelize.define('Student', {
   id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
@@ -52,6 +53,11 @@ const Student = sequelize.define('Student', {
     }
   ]
 }); 
+
+Student.belongsTo(Parent, {
+  foreignKey: 'parentId',
+  as: 'parent'           
+});
 
 
 module.exports = Student;
