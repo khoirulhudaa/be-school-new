@@ -54,10 +54,4 @@ const Student = sequelize.define('Student', {
   ]
 }); 
 
-Student.belongsTo(Parent, {
-  foreignKey: 'parentId',
-  as: 'parent'           
-});
-
-
 module.exports = Student;
