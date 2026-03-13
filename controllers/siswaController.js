@@ -527,12 +527,11 @@ exports.getUserDetail = async (req, res) => {
     }
 
     // Tentukan rentang tanggal
-    const startDate = year
-      ? moment(`${year}-01-01`).startOf('year').toDate()
-      : moment().subtract(1, 'years').startOf('day').toDate();
-
-    const endDate = year
-      ? moment(`${year}-12-31`).endOf('day').toDate()
+   const startDate = year 
+      ? moment(`${year}-01-01`).startOf('year').toDate() 
+      : moment().subtract(1, 'years').toDate();
+    const endDate = year 
+      ? moment(`${year}-12-31`).endOf('year').toDate() 
       : moment().endOf('day').toDate();
 
     // Opsi include
@@ -576,50 +575,56 @@ exports.getUserDetail = async (req, res) => {
       });
     }
 
-    // 2. Hitung statistik kehadiran
-    const stats = { Hadir: 0, Izin: 0, Sakit: 0, Alpha: 0, Terlambat: 0 };
-    const deadline = "07:00:00";
-    const attendances = user[attendanceAlias] || [];
-
-    attendances.forEach(record => {
-      if (!record.status) return;
-
-      const scanTime = moment(record.createdAt).format('HH:mm:ss');
-
-      // Hitung status biasa
-      if (stats.hasOwnProperty(record.status)) {
-        stats[record.status]++;
-      }
-
-      // Hitung terlambat (khusus Hadir)
-      if (record.status === 'Hadir' && scanTime > deadline) {
-        stats.Terlambat++;
-      }
+  // 1. Ambil Profil & Statistik (Tanpa limit untuk hitung total stats)
+    const userWithAllAttendance = await Model.findOne({
+      where: { id, isActive: true },
+      include: [{
+        model: Attendance,
+        as: attendanceAlias,
+        where: { createdAt: { [Op.between]: [startDate, endDate] } },
+        required: false
+      }]
     });
 
-    // 3. Riwayat absen dengan pagination (query terpisah biar akurat)
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+    if (!userWithAllAttendance) {
+      return res.status(404).json({ success: false, message: 'Data tidak ditemukan' });
+    }
 
+    // 2. Hitung Statistik (Logic tetap sama)
+    const stats = { Hadir: 0, Izin: 0, Sakit: 0, Alpha: 0, Terlambat: 0 };
+    const deadline = "07:00:00";
+    const allRecords = userWithAllAttendance[attendanceAlias] || [];
+    
+    allRecords.forEach(record => {
+      const scanTime = moment(record.createdAt).format("HH:mm:ss");
+      if (record.status === 'Hadir' && scanTime > deadline) stats.Terlambat++;
+      if (stats.hasOwnProperty(record.status)) stats[record.status]++;
+    });
+
+    // 3. Query Terpisah untuk Riwayat (Dengan Pagination)
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Kita ambil datanya langsung dari model Attendance agar pagination lebih akurat
     const { count, rows } = await Attendance.findAndCountAll({
       where: {
-        [isStudent ? 'studentId' : 'guruId']: id,
+        // Sesuaikan foreign key berdasarkan role
+        [isStudent ? 'studentId' : 'guruId']: id, 
         createdAt: { [Op.between]: [startDate, endDate] }
       },
-      attributes: ['id', 'status', 'createdAt'],
       order: [['createdAt', 'DESC']],
       limit: parseInt(limit),
-      offset
+      offset: offset
     });
 
     const history = rows.map(record => {
-      const scanTime = moment(record.createdAt).format('HH:mm:ss');
+      const scanTime = moment(record.createdAt).format("HH:mm:ss");
       return {
         id: record.id,
         date: moment(record.createdAt).format('YYYY-MM-DD'),
         time: scanTime,
         status: record.status,
         isLate: record.status === 'Hadir' && scanTime > deadline,
-        info: isStudent ? user.class || '-' : 'GURU/STAFF'
+        info: isStudent ? record.currentClass : 'GURU/STAFF'
       };
     });
 
@@ -647,7 +652,7 @@ exports.getUserDetail = async (req, res) => {
     console.error('[getUserDetail] Error:', err);
     return res.status(500).json({
       success: false,
-      message: 'Terjadi kesalahan server',
+      message: `Terjadi kesalahan server: ${err.message}`,
       error: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
   }
