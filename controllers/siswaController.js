@@ -180,7 +180,7 @@ exports.checkStudentAuth = async (req, res) => {
     profile.schoolLocation = {
       lat: school ? school.latitude : null,
       lng: school ? school.longitude : null,
-      radiusMeter: 100
+      radiusMeter: 200
     };
 
     // 6. Generate JWT
