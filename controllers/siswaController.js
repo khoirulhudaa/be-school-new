@@ -12,6 +12,7 @@ const jwt = require('jsonwebtoken');
 const Alumni = require('../models/alumni');
 const Parent = require('../models/orangTua');
 const bcrypt = require('bcrypt');
+const SchoolProfile = require('../models/profileSekolah');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
