@@ -4,6 +4,7 @@ const cloudinary = require('cloudinary').v2;
 const streamifier = require('streamifier');
 const jwt = require('jsonwebtoken');
 const SchoolProfile = require('../models/profileSekolah');
+const bcrypt = require('bcrypt');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -11,38 +12,108 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// exports.checkGuruAuth = async (req, res) => {
+//   try {
+//     const { email, nip } = req.body;
+    
+//     const guru = await GuruTendik.findOne({
+//       where: {  
+//         isActive: true,
+//         [Op.or]: [{ email: email }, { nip: nip }]
+//       }
+//     });
+
+//     if (!guru) {
+//       return res.status(404).json({ success: false, message: 'Data Guru/Tendik tidak ditemukan' });
+//     }
+
+//     const dataSekolah = await SchoolProfile.findOne({
+//       where: { schoolId: guru.schoolId },
+//       attributes: ["logoUrl"]
+//     });
+
+//     // Mengubah instance database menjadi objek plain JSON
+//     const profile = guru.toJSON();
+//     profile.schoolLogo = dataSekolah ? dataSekolah.logoUrl : null;
+
+//     // Hapus field sensitif atau yang tidak perlu agar token ringan
+//     delete profile.password; 
+//     delete profile.createdAt;
+//     delete profile.updatedAt;
+
+//     // Generate Token JWT dengan Profile Lengkap
+//     const token = jwt.sign(
+//       { profile }, // Payload berisi seluruh profil
+//       process.env.JWT_SECRET || 'secret_key_anda',
+//       { expiresIn: '1d' }
+//     );
+
+//     res.json({ 
+//       success: true, 
+//       token, 
+//       data: profile // Kirim data yang sudah dibersihkan
+//     });
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
 exports.checkGuruAuth = async (req, res) => {
   try {
-    const { email, nip } = req.body;
+    const { email, password } = req.body;
     
+    // 1. Cari Guru berdasarkan email
     const guru = await GuruTendik.findOne({
-      where: {  
-        isActive: true,
-        [Op.or]: [{ email: email }, { nip: nip }]
-      }
+      where: { email, isActive: true }
     });
 
     if (!guru) {
-      return res.status(404).json({ success: false, message: 'Data Guru/Tendik tidak ditemukan' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Email Guru/Tendik tidak ditemukan.' 
+      });
     }
 
+    // 2. Verifikasi Password
+    if (!guru.password) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Password belum diatur. Silakan hubungi operator.' 
+      });
+    }
+
+    const isBcrypt = guru.password.startsWith('$2b$');
+
+    let isMatch = false;
+    if (isBcrypt) {
+        // Jika hash, bandingkan pakai bcrypt
+        isMatch = await bcrypt.compare(password, guru.password);
+    } else {
+        // Jika belum hash (hasil SQL plain text), bandingkan teks langsung
+        isMatch = (password === guru.password);
+    }
+
+    if (!isMatch) {
+        return res.status(401).json({ success: false, message: 'Password salah.' });
+    }
+
+    // 3. Ambil Logo Sekolah
     const dataSekolah = await SchoolProfile.findOne({
       where: { schoolId: guru.schoolId },
       attributes: ["logoUrl"]
     });
 
-    // Mengubah instance database menjadi objek plain JSON
+    // 4. Susun Profile
     const profile = guru.toJSON();
     profile.schoolLogo = dataSekolah ? dataSekolah.logoUrl : null;
 
-    // Hapus field sensitif atau yang tidak perlu agar token ringan
     delete profile.password; 
     delete profile.createdAt;
     delete profile.updatedAt;
 
-    // Generate Token JWT dengan Profile Lengkap
+    // 5. Generate JWT
     const token = jwt.sign(
-      { profile }, // Payload berisi seluruh profil
+      { profile },
       process.env.JWT_SECRET || 'secret_key_anda',
       { expiresIn: '1d' }
     );
@@ -50,8 +121,9 @@ exports.checkGuruAuth = async (req, res) => {
     res.json({ 
       success: true, 
       token, 
-      data: profile // Kirim data yang sudah dibersihkan
+      data: profile 
     });
+
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

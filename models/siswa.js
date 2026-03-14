@@ -33,7 +33,17 @@ const Student = sequelize.define('Student', {
   examNumber: { // Nomor Peserta Ujian jika diperlukan
     type: DataTypes.STRING,
     allowNull: true
-  }
+  },
+  email: { 
+    type: DataTypes.STRING, 
+    allowNull: true, // Awalnya true agar tidak error saat migrasi data lama
+    unique: true,
+    validate: { isEmail: true } 
+  },
+  password: { 
+    type: DataTypes.STRING, 
+    allowNull: true 
+  },
 }, {
   tableName: 'siswa',
   indexes: [

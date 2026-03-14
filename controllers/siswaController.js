@@ -8,9 +8,10 @@ const ExcelJS = require('exceljs');
 const GuruTendik = require('../models/guruTendik');
 const sequelize = require('../config/database');
 const jwt = require('jsonwebtoken');
-const SchoolProfile = require('../models/profileSekolah');
+// const SchoolProfile = require('../models/profileSekolah');
 const Alumni = require('../models/alumni');
 const Parent = require('../models/orangTua');
+const bcrypt = require('bcrypt');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -80,41 +81,117 @@ exports.validateUserByQR = async (req, res) => {
   }
 };
 
+// exports.checkStudentAuth = async (req, res) => {
+//   try {
+//     const { nis } = req.body;
+//     const student = await Student.findOne({ 
+//       where: { nis, isActive: true } 
+//     });
+
+//     if (!student) {
+//       return res.status(404).json({ success: false, message: 'Data siswa tidak ditemukan' });
+//     }
+
+//     const school = await SchoolProfile.findOne({
+//       where: { schoolId: student.schoolId }
+//     });
+    
+//     // Mengubah instance database menjadi objek plain JSON
+//     const profile = student.toJSON();
+
+//     // Pastikan role siswa ada di dalam profile jika tidak ada di DB
+//     profile.role = 'siswa';
+
+//     // Bersihkan data yang tidak diperlukan dalam token
+//     delete profile.createdAt;
+//     delete profile.updatedAt;
+
+//     // Tambahkan info lokasi sekolah untuk Geofencing di HP
+//     profile.schoolLocation = {
+//       lat: school ? school.latitude : null,
+//       lng: school ? school.longitude : null,
+//       radiusMeter: 100 // Jarak toleransi absen dalam meter
+//     };
+
+//     // Generate Token JWT dengan Profile Lengkap
+//     const token = jwt.sign(
+//       { profile }, // Payload berisi seluruh profil
+//       process.env.JWT_SECRET || 'secret_key_anda',
+//       { expiresIn: '1d' }
+//     );
+
+//     res.json({ 
+//       success: true, 
+//       token, 
+//       data: profile 
+//     });
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
 exports.checkStudentAuth = async (req, res) => {
   try {
-    const { nis } = req.body;
+    const { email, password } = req.body;
+
+    // 1. Cari siswa berdasarkan email
     const student = await Student.findOne({ 
-      where: { nis, isActive: true } 
+      where: { email, isActive: true } 
     });
 
+    // 2. Jika email tidak ketemu
     if (!student) {
-      return res.status(404).json({ success: false, message: 'Data siswa tidak ditemukan' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Email siswa tidak terdaftar atau akun tidak aktif.' 
+      });
     }
 
+    // 3. Verifikasi Password (Bcrypt)
+    // Jika data lama belum ada password, kita berikan pesan khusus
+    if (!student.password) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Akun belum diaktivasi password. Hubungi Admin.' 
+      });
+    }
+
+    const isBcrypt = student.password.startsWith('$2b$');
+
+    let isMatch = false;
+    if (isBcrypt) {
+        // Jika hash, bandingkan pakai bcrypt
+        isMatch = await bcrypt.compare(password, student.password);
+    } else {
+        // Jika belum hash (hasil SQL plain text), bandingkan teks langsung
+        isMatch = (password === student.password);
+    }
+
+    if (!isMatch) {
+        return res.status(401).json({ success: false, message: 'Password salah.' });
+    }
+
+    // 4. Ambil data sekolah untuk lokasi/geofencing
     const school = await SchoolProfile.findOne({
       where: { schoolId: student.schoolId }
     });
     
-    // Mengubah instance database menjadi objek plain JSON
+    // 5. Susun Profile (Hapus data sensitif)
     const profile = student.toJSON();
-
-    // Pastikan role siswa ada di dalam profile jika tidak ada di DB
     profile.role = 'siswa';
-
-    // Bersihkan data yang tidak diperlukan dalam token
+    delete profile.password;
     delete profile.createdAt;
     delete profile.updatedAt;
 
-    // Tambahkan info lokasi sekolah untuk Geofencing di HP
     profile.schoolLocation = {
       lat: school ? school.latitude : null,
       lng: school ? school.longitude : null,
-      radiusMeter: 100 // Jarak toleransi absen dalam meter
+      radiusMeter: 100
     };
 
-    // Generate Token JWT dengan Profile Lengkap
+    // 6. Generate JWT
     const token = jwt.sign(
-      { profile }, // Payload berisi seluruh profil
+      { profile },
       process.env.JWT_SECRET || 'secret_key_anda',
       { expiresIn: '1d' }
     );
@@ -124,6 +201,7 @@ exports.checkStudentAuth = async (req, res) => {
       token, 
       data: profile 
     });
+
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

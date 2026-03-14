@@ -22,6 +22,10 @@ const GuruTendik = sequelize.define('GuruTendik', {
   jenisKelamin: { type: DataTypes.STRING(10), allowNull: false },
   photoUrl: { type: DataTypes.STRING(255), allowNull: true },
   isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
+  password: { 
+    type: DataTypes.STRING, 
+    allowNull: true 
+  },
 }, {
   timestamps: true,
   tableName: 'guruTendik'
