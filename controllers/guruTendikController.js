@@ -82,19 +82,12 @@ exports.checkGuruAuth = async (req, res) => {
       });
     }
 
-    const isBcrypt = guru.password.startsWith('$2b$');
-
-    let isMatch = false;
-    if (isBcrypt) {
-        // Jika hash, bandingkan pakai bcrypt
-        isMatch = await bcrypt.compare(password, guru.password);
-    } else {
-        // Jika belum hash (hasil SQL plain text), bandingkan teks langsung
-        isMatch = (password === guru.password);
-    }
-
+    const isMatch = await bcrypt.compare(password, guru.password);
     if (!isMatch) {
-        return res.status(401).json({ success: false, message: 'Password salah.' });
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Password salah.' 
+      });
     }
 
     // 3. Ambil Logo Sekolah

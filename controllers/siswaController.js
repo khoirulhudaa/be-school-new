@@ -156,19 +156,12 @@ exports.checkStudentAuth = async (req, res) => {
       });
     }
 
-    const isBcrypt = student.password.startsWith('$2b$');
-
-    let isMatch = false;
-    if (isBcrypt) {
-        // Jika hash, bandingkan pakai bcrypt
-        isMatch = await bcrypt.compare(password, student.password);
-    } else {
-        // Jika belum hash (hasil SQL plain text), bandingkan teks langsung
-        isMatch = (password === student.password);
-    }
-
+    const isMatch = await bcrypt.compare(password, student.password);
     if (!isMatch) {
-        return res.status(401).json({ success: false, message: 'Password salah.' });
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Password yang Anda masukkan salah.' 
+      });
     }
 
     // 4. Ambil data sekolah untuk lokasi/geofencing
