@@ -13,6 +13,7 @@ router.get('/', adminController.getAdminsBySchool);
 
 // Membuat admin tambahan baru
 router.post('/', adminController.createAdmin);
+router.post('/import', adminController.bulkCreateAdnin); // Ini yang handle File
 
 // Update data admin (Nama, Email, Status)
 router.put('/:id', adminController.updateAdmin);

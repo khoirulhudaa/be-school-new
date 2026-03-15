@@ -3,7 +3,7 @@ const SchoolAccount = require('../models/auth');
 // 1. CREATE ADMIN BARU
 exports.createAdmin = async (req, res) => {
   try {
-    const { adminName, email, password, role } = req.body;
+    const { adminName, email, password } = req.body;
     
     // Ambil data sekolah dari admin yang sedang login (req.user)
     const creator = await SchoolAccount.findByPk(req.user.id);
@@ -25,7 +25,7 @@ exports.createAdmin = async (req, res) => {
       email,
       password, // Akan ter-hash otomatis oleh hook beforeCreate
       adminName,
-      role: role || 'admin_staff', // Role pembeda
+      role: 'admin_staff', // Role pembeda
       isVerified: true, // Langsung aktif karena dibuat oleh admin utama
       isActive: true
     });
@@ -45,6 +45,44 @@ exports.createAdmin = async (req, res) => {
     }
     res.status(500).json({ success: false, message: err.message });
     }
+};
+
+exports.bulkCreateAdmin = async (req, res) => {
+  try {
+    const { admins } = req.body; // 'admins' adalah array dari frontend
+    
+    if (!Array.isArray(admins)) {
+      return res.status(400).json({ success: false, message: "Data harus berupa array" });
+    }
+
+    const creator = await SchoolAccount.findByPk(req.user.id);
+
+    // Persiapkan data untuk dimasukkan secara masal
+    const preparedData = admins.map(adm => ({
+      npsn: creator.npsn,
+      schoolName: creator.schoolName,
+      address: creator.address,
+      latitude: creator.latitude,
+      longitude: creator.longitude,
+      logoUrl: creator.logoUrl,
+      email: adm.email,
+      password: adm.password, // Pastikan model menghash ini otomatis
+      adminName: adm.adminName,
+      role: 'admin_staff',
+      isVerified: true,
+      isActive: true
+    }));
+
+    // Gunakan bulkCreate untuk performa lebih cepat
+    await SchoolAccount.bulkCreate(preparedData, { validate: true });
+
+    res.status(201).json({
+      success: true,
+      message: `${preparedData.length} Admin berhasil diimport`
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 };
 
 // 2. GET SEMUA ADMIN DI SEKOLAH TERSEBUT
