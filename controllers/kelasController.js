@@ -24,8 +24,6 @@ exports.getAllClasses = async (req, res) => {
 // };
 
 
-const { Op } = require('sequelize');
-const Class = require('../models/kelas');
 
 exports.getAllClasses = async (req, res) => {
   try {
