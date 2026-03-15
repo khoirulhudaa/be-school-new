@@ -106,21 +106,32 @@ exports.getAdminsBySchool = async (req, res) => {
 exports.updateAdmin = async (req, res) => {
   try {
     const { id } = req.params;
-    const { adminName, email, isActive } = req.body;
+    const { adminName, email, isActive, password } = req.body; // Tambahkan password di sini
     const currentUser = await SchoolAccount.findByPk(req.user.id);
 
     const adminToUpdate = await SchoolAccount.findOne({ 
       where: { id, npsn: currentUser.npsn } 
     });
 
-    if (!adminToUpdate) return res.status(404).json({ success: false, message: 'Admin tidak ditemukan' });
+    if (!adminToUpdate) {
+      return res.status(404).json({ success: false, message: 'Admin tidak ditemukan' });
+    }
 
+    // Update field jika dikirim dari frontend
     if (adminName) adminToUpdate.adminName = adminName;
     if (email) adminToUpdate.email = email;
     if (isActive !== undefined) adminToUpdate.isActive = isActive;
+    
+    // Jika ada password baru, masukkan ke instance. 
+    // Hook beforeUpdate akan otomatis mendeteksi perubahan dan melakukan hashing.
+    if (password) adminToUpdate.password = password;
 
     await adminToUpdate.save();
-    res.json({ success: true, message: 'Data admin berhasil diperbarui' });
+
+    res.json({ 
+      success: true, 
+      message: password ? 'Password berhasil diperbarui' : 'Data admin berhasil diperbarui' 
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
