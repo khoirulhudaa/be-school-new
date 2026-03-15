@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController'); // Sesuaikan path-nya
-const { protect } = require('../middlewares/auth'); // Pastikan middleware ini ada
+const { protect } = require('../middlewares/protect'); // Pastikan middleware ini ada
 
 // Gunakan middleware protect agar semua route di bawah ini wajib login
 router.use(protect);
