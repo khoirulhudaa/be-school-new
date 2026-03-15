@@ -13,12 +13,86 @@ exports.getAllClasses = async (req, res) => {
   }
 };
 
+// exports.createClass = async (req, res) => {
+//   try {
+//     const { schoolId, className } = req.body;
+//     const newClass = await Class.create({ schoolId, className });
+//     res.json({ success: true, data: newClass });
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
+
+const { Op } = require('sequelize');
+const Class = require('../models/kelas');
+
+exports.getAllClasses = async (req, res) => {
+  try {
+    const { schoolId } = req.query;
+    if (!schoolId) {
+      return res.status(400).json({ success: false, message: 'schoolId diperlukan' });
+    }
+
+    const classes = await Class.findAll({ 
+      where: { schoolId },
+      order: [['className', 'ASC']] 
+    });
+    
+    res.json({ success: true, data: classes });
+  } catch (err) {
+    console.error('Error getAllClasses:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 exports.createClass = async (req, res) => {
   try {
     const { schoolId, className } = req.body;
-    const newClass = await Class.create({ schoolId, className });
-    res.json({ success: true, data: newClass });
+
+    // 1. Validasi input wajib
+    if (!schoolId || !className?.trim()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'schoolId dan className wajib diisi' 
+      });
+    }
+
+    const normalizedName = className.trim();
+
+    // 2. Cek duplikat (MySQL default case-insensitive)
+    const existing = await Class.findOne({
+      where: {
+        schoolId,
+        className: normalizedName   // ← ini sudah cukup di MySQL (case-insensitive)
+      }
+    });
+
+    if (existing) {
+      return res.status(409).json({ 
+        success: false, 
+        message: `Kelas dengan nama "${normalizedName}" sudah ada untuk sekolah ini` 
+      });
+    }
+
+    // 3. Buat data baru
+    const newClass = await Class.create({ 
+      schoolId, 
+      className: normalizedName 
+    });
+
+    res.status(201).json({ success: true, data: newClass });
   } catch (err) {
+    console.error('Error createClass:', err);
+    
+    // Tangani error unique constraint jika Anda sudah tambahkan index di DB
+    if (err.name === 'SequelizeUniqueConstraintError') {
+      return res.status(409).json({ 
+        success: false, 
+        message: 'Nama kelas sudah digunakan untuk sekolah ini (duplikat)' 
+      });
+    }
+
     res.status(500).json({ success: false, message: err.message });
   }
 };

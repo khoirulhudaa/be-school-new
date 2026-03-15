@@ -8,7 +8,6 @@ const ExcelJS = require('exceljs');
 const GuruTendik = require('../models/guruTendik');
 const sequelize = require('../config/database');
 const jwt = require('jsonwebtoken');
-// const SchoolProfile = require('../models/profileSekolah');
 const Alumni = require('../models/alumni');
 const Parent = require('../models/orangTua');
 const bcrypt = require('bcrypt');
@@ -82,55 +81,6 @@ exports.validateUserByQR = async (req, res) => {
   }
 };
 
-// exports.checkStudentAuth = async (req, res) => {
-//   try {
-//     const { nis } = req.body;
-//     const student = await Student.findOne({ 
-//       where: { nis, isActive: true } 
-//     });
-
-//     if (!student) {
-//       return res.status(404).json({ success: false, message: 'Data siswa tidak ditemukan' });
-//     }
-
-//     const school = await SchoolProfile.findOne({
-//       where: { schoolId: student.schoolId }
-//     });
-    
-//     // Mengubah instance database menjadi objek plain JSON
-//     const profile = student.toJSON();
-
-//     // Pastikan role siswa ada di dalam profile jika tidak ada di DB
-//     profile.role = 'siswa';
-
-//     // Bersihkan data yang tidak diperlukan dalam token
-//     delete profile.createdAt;
-//     delete profile.updatedAt;
-
-//     // Tambahkan info lokasi sekolah untuk Geofencing di HP
-//     profile.schoolLocation = {
-//       lat: school ? school.latitude : null,
-//       lng: school ? school.longitude : null,
-//       radiusMeter: 100 // Jarak toleransi absen dalam meter
-//     };
-
-//     // Generate Token JWT dengan Profile Lengkap
-//     const token = jwt.sign(
-//       { profile }, // Payload berisi seluruh profil
-//       process.env.JWT_SECRET || 'secret_key_anda',
-//       { expiresIn: '1d' }
-//     );
-
-//     res.json({ 
-//       success: true, 
-//       token, 
-//       data: profile 
-//     });
-//   } catch (err) {
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
-
 exports.checkStudentAuth = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -201,20 +151,27 @@ exports.checkStudentAuth = async (req, res) => {
   }
 };
 
-// --- CRUD SISWA ---
 exports.createStudent = async (req, res) => {
   try {
-    const { name, nis, nisn, gender, birthPlace, birthDate, nik, schoolId, class: className, batch } = req.body;
+    const { 
+      name, nis, nisn, gender, birthPlace, birthDate, nik, 
+      schoolId, class: className, batch, 
+      email, password // Ambil email & password dari req.body
+    } = req.body;
+
     if (!name || !nis || !schoolId) {
-      return res.status(400).json({ success: false, message: 'Name, NIS, dan SchoolId wajib diisi' });
+      return res.status(400).json({ success: false, message: 'Name, NIS, dan SchoolId wajib diisi!' });
     }
 
-    // Di dalam try block sebelum Student.create
     const existing = await Student.findOne({ where: { nis, schoolId } });
     if (existing) {
-    // Lewati atau berikan peringatan agar tidak duplikat
-        return res.status(400).json({ success: false, message: `NIS ${nis} sudah terdaftar` });
+      return res.status(400).json({ success: false, message: `NIS ${nis} sudah terdaftar` });
     }
+
+    // --- Logika Default Email & Password ---
+    const finalEmail = email || `${nis}@gmail.com`;
+    const finalPassword = password || 'sekolah123';
+    // ---------------------------------------
 
     let photoUrl = null;
     if (req.file) {
@@ -222,11 +179,20 @@ exports.createStudent = async (req, res) => {
     }
 
     const newStudent = await Student.create({
-      name, nis, nisn, gender, birthPlace, birthDate, nik, schoolId: parseInt(schoolId),
+      name, 
+      nis, 
+      nisn, 
+      gender, 
+      birthPlace, 
+      birthDate, 
+      nik, 
+      schoolId: parseInt(schoolId),
+      email: finalEmail,      
+      password: finalPassword, 
       photoUrl,
       class: className, 
       batch,
-      qrCodeData: `QR-${nis}-${Date.now()}` // Unique identifier untuk QR
+      qrCodeData: `QR-${nis}-${Date.now()}`
     });
 
     res.json({ success: true, data: newStudent });
@@ -238,7 +204,7 @@ exports.createStudent = async (req, res) => {
 exports.getStudentSearch = async (req, res) => {
   try {
     const { schoolId, name } = req.query;
-    console.log("Searching for:", name, "in schoolId:", schoolId); // Log ini sangat penting
+    console.log("Searching for:", name, "in schoolId:", schoolId);
 
     let condition = { 
       schoolId: parseInt(schoolId),
