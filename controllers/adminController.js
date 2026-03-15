@@ -36,8 +36,15 @@ exports.createAdmin = async (req, res) => {
       data: { id: newAdmin.id, email: newAdmin.email, adminName: newAdmin.adminName }
     });
   } catch (err) {
+    // Jika ini error validasi Sequelize, ambil pesan detailnya
+    if (err.name === 'SequelizeValidationError' || err.name === 'SequelizeUniqueConstraintError') {
+        return res.status(400).json({ 
+        success: false, 
+        message: err.errors.map(e => e.message).join(', ') 
+        });
+    }
     res.status(500).json({ success: false, message: err.message });
-  }
+    }
 };
 
 // 2. GET SEMUA ADMIN DI SEKOLAH TERSEBUT
