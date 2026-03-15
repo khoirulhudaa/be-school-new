@@ -42,7 +42,7 @@
   const assignSudinSekolah = require('./assignSchoolSudinRoutes');
   const pengumumanSudin = require('./announcementSudinRoutes');
   const authUserSudin = require('./authSudinRoutes');
-  const provinsi = require('./provinsiRoutes');
+  const admin = require('./adminRoutes');
 
   router.use('/auth', require('./authRoutes'));
 
@@ -58,6 +58,7 @@
   router.use('/layanan', layananRouter);
   router.use('/program', programRouter);
   router.use('/sejarah', sejarahSekolahRouter); 
+  router.use('/admin', admin); 
   router.use('/guruTendik', guruTendikRouter); 
   router.use('/ppdb', ppdbRouter); 
   router.use('/osis', osisRouter); 
