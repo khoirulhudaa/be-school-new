@@ -11,7 +11,7 @@ const SchoolAccount = sequelize.define('SchoolAccount', {
   npsn: {
     type: DataTypes.STRING(16),
     allowNull: false,
-    unique: true,
+    // unique: true,
     validate: {
       isNumeric: true,
       len: [8, 16],

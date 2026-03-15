@@ -167,26 +167,57 @@ exports.getProfile = async (req, res) => {
   }
 };
 
-// 2. VERIFIKASI PIN
-exports.verifyPin = async (req, res) => {
+
+// --- LOGIN ---
+exports.login = async (req, res) => {
   try {
-    const { email, pin } = req.body;
+    const { email, password } = req.body;
 
-    const user = await SchoolAccount.findOne({ where: { email, verificationPin: pin } });
-
-    if (!user) {
-      return res.status(400).json({ success: false, message: 'PIN salah atau email tidak ditemukan' });
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Email dan password wajib diisi' });
     }
 
-    user.isVerified = true;
-    user.verificationPin = null; // Hapus PIN setelah verifikasi
+    const user = await SchoolAccount.findOne({ where: { email } });
+    
+    // Gunakan method validPassword dari model
+    if (!user || !(await user.validPassword(password))) {
+      return res.status(401).json({ success: false, message: 'Email atau password salah' });
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({ success: false, message: 'Akun dinonaktifkan' });
+    }
+
+    // Update lastLogin
+    user.lastLogin = new Date();
     await user.save();
 
-    res.json({ success: true, message: 'Akun berhasil diverifikasi. Silakan login.' });
+    const token = jwt.sign(
+      { id: user.id, schoolId: user.id },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
+    );
+
+    res.json({
+      success: true,
+      message: 'Login berhasil',
+      token,
+      user: {
+        id: user.id,
+        username: user.adminName,
+        email: user.email,
+        schoolName: user.schoolName,
+        logoUrl: user.logoUrl,
+        lat: user.latitude,
+        long: user.longitude,
+        role: user.role
+      },
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
 
 // --- FORGOT PASSWORD ---
 exports.forgotPassword = async (req, res) => {
@@ -279,56 +310,6 @@ exports.resetPassword = async (req, res) => {
   }
 };
 
-// --- LOGIN ---
-exports.login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ success: false, message: 'Email dan password wajib diisi' });
-    }
-
-    const user = await SchoolAccount.findOne({ where: { email } });
-    
-    // Gunakan method validPassword dari model
-    if (!user || !(await user.validPassword(password))) {
-      return res.status(401).json({ success: false, message: 'Email atau password salah' });
-    }
-
-    if (!user.isActive) {
-      return res.status(403).json({ success: false, message: 'Akun dinonaktifkan' });
-    }
-
-    // Update lastLogin
-    user.lastLogin = new Date();
-    await user.save();
-
-    const token = jwt.sign(
-      { id: user.id, schoolId: user.id },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
-    );
-
-    res.json({
-      success: true,
-      message: 'Login berhasil',
-      token,
-      user: {
-        id: user.id,
-        username: user.adminName,
-        email: user.email,
-        schoolName: user.schoolName,
-        logoUrl: user.logoUrl,
-        lat: user.latitude,
-        long: user.longitude,
-        role: user.role
-      },
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
 // --- UPDATE PROFILE (HANYA NAMA & EMAIL) ---
 exports.updateProfile = async (req, res) => {
   try {
@@ -368,6 +349,27 @@ exports.updateProfile = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Gagal memperbarui profil: ' + err.message });
+  }
+};
+
+// 2. VERIFIKASI PIN
+exports.verifyPin = async (req, res) => {
+  try {
+    const { email, pin } = req.body;
+
+    const user = await SchoolAccount.findOne({ where: { email, verificationPin: pin } });
+
+    if (!user) {
+      return res.status(400).json({ success: false, message: 'PIN salah atau email tidak ditemukan' });
+    }
+
+    user.isVerified = true;
+    user.verificationPin = null; // Hapus PIN setelah verifikasi
+    await user.save();
+
+    res.json({ success: true, message: 'Akun berhasil diverifikasi. Silakan login.' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 

@@ -69,7 +69,7 @@ exports.createClass = async (req, res) => {
     if (existing) {
       return res.status(409).json({ 
         success: false, 
-        message: `Kelas dengan nama "${normalizedName}" sudah ada untuk sekolah ini` 
+        message: `Kelas sudah pernah dibuat!` 
       });
     }
 
