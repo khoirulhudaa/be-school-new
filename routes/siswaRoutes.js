@@ -1,6 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const studentController = require('../controllers/siswaController');
+const { protect } = require('../middlewares/protect');
 
 const router = express.Router();
 
@@ -23,7 +24,7 @@ router.delete('/:id', studentController.deleteStudent);
 // --- API ABSENSI ---
 // Endpoint: /api/siswa/scan
 router.post('/scan', studentController.scanQRCode);
-router.get('/get-attendances', studentController.getStudentAttendance);
+router.get('/get-attendances', protect, studentController.getStudentAttendance);
 
 router.get('/validate-qr', studentController.validateUserByQR);
 
