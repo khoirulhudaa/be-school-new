@@ -23,7 +23,7 @@ router.delete('/:id', studentController.deleteStudent);
 // --- API ABSENSI ---
 // Endpoint: /api/siswa/scan
 router.post('/scan', studentController.scanQRCode);
-router.post('/get-attendances', studentController.getStudentAttendance);
+router.get('/get-attendances', studentController.getStudentAttendance);
 
 router.get('/validate-qr', studentController.validateUserByQR);
 
