@@ -20,5 +20,7 @@ router.post('/forgot-password', authController.forgotPassword);
 router.post('/verify-pin', authController.verifyPin);
 router.post('/reset-password', authController.resetPassword);
 router.put('/update-profile', protect, authController.updateProfile);
+router.post('/maintenance/deactivate', authController.deactivateAllSchools);
+router.post('/maintenance/activate', authController.activateAllSchools);
 
 module.exports = router;

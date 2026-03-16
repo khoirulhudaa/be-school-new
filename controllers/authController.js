@@ -139,6 +139,56 @@ exports.registerSchool = async (req, res) => {
   }
 };
 
+exports.getAllSchools = async (req, res) => {
+  try {
+    const { status, name } = req.query; 
+    let whereCondition = {};
+
+    if (status === 'active') {
+      whereCondition.isActive = true;
+    } else if (status === 'inactive') {
+      whereCondition.isActive = false;
+    }
+
+    // Filter pencarian berdasarkan nama sekolah (Search)
+    if (name) {
+      whereCondition.schoolName = {
+        [Op.iLike]: `%${name}%` // iLike untuk case-insensitive (PostgreSQL)
+        // Jika menggunakan MySQL, gunakan [Op.like]: `%${name}%`
+      };
+    }
+
+    const schools = await SchoolAccount.findAll({
+      where: whereCondition,
+      attributes: [
+        ['id', 'id'], 
+        ['schoolName', 'namaSekolah'], 
+        ['address', 'alamat'], 
+        'npsn', 
+        ['logoUrl', 'logo'], 
+        ['email', 'email'], 
+        ['latitude', 'lat'], 
+        ['role', 'role'], 
+        ['longitude', 'long'],
+        'isActive'
+      ],
+      order: [['schoolName', 'ASC']]
+    });
+
+    res.json({
+      success: true,
+      count: schools.length,
+      filters: {
+        status: status || 'all',
+        searchName: name || null
+      },
+      data: schools
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Gagal mengambil data sekolah: ' + err.message });
+  }
+};
+
 exports.getProfile = async (req, res) => {
   try {
     const user = await SchoolAccount.findByPk(req.user.id);
@@ -370,56 +420,6 @@ exports.verifyPin = async (req, res) => {
     res.json({ success: true, message: 'Akun berhasil diverifikasi. Silakan login.' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-exports.getAllSchools = async (req, res) => {
-  try {
-    const { status, name } = req.query; 
-    let whereCondition = {};
-
-    if (status === 'active') {
-      whereCondition.isActive = true;
-    } else if (status === 'inactive') {
-      whereCondition.isActive = false;
-    }
-
-    // Filter pencarian berdasarkan nama sekolah (Search)
-    if (name) {
-      whereCondition.schoolName = {
-        [Op.iLike]: `%${name}%` // iLike untuk case-insensitive (PostgreSQL)
-        // Jika menggunakan MySQL, gunakan [Op.like]: `%${name}%`
-      };
-    }
-
-    const schools = await SchoolAccount.findAll({
-      where: whereCondition,
-      attributes: [
-        ['id', 'id'], 
-        ['schoolName', 'namaSekolah'], 
-        ['address', 'alamat'], 
-        'npsn', 
-        ['logoUrl', 'logo'], 
-        ['email', 'email'], 
-        ['latitude', 'lat'], 
-        ['role', 'role'], 
-        ['longitude', 'long'],
-        'isActive'
-      ],
-      order: [['schoolName', 'ASC']]
-    });
-
-    res.json({
-      success: true,
-      count: schools.length,
-      filters: {
-        status: status || 'all',
-        searchName: name || null
-      },
-      data: schools
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Gagal mengambil data sekolah: ' + err.message });
   }
 };
 
@@ -662,6 +662,45 @@ exports.exportGuruBySchoolExcel = async (req, res) => {
 
     await workbook.xlsx.write(res);
     res.end();
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.deactivateAllSchools = async (req, res) => {
+  const { passcode } = req.body;
+  if (passcode !== 'HIDDENSCHOOL') {
+    return res.status(403).json({ success: false, message: 'Passcode salah!' });
+  }
+
+  try {
+    // Mengubah semua isActive jadi false dan schoolName jadi sensor
+    await SchoolAccount.update(
+      { 
+        isActive: false, 
+        schoolName: '********' 
+      },
+      { where: {} } // Kosongkan where untuk apply ke semua row
+    );
+
+    res.json({ success: true, message: 'Semua sekolah telah dinonaktifkan dan disensor.' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.activateAllSchools = async (req, res) => {
+  const { passcode } = req.body;
+  if (passcode !== 'HIDDENSCHOOL') {
+    return res.status(403).json({ success: false, message: 'Passcode salah!' });
+  }
+
+  try {
+    await SchoolAccount.update(
+      { isActive: true },
+      { where: {} }
+    );
+    res.json({ success: true, message: 'Semua sekolah telah diaktifkan kembali.' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
