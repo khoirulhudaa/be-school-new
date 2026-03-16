@@ -27,6 +27,7 @@ const Osis = require('../models/osis');
 const Achievement = require('../models/prestasi');
 const GalleryItem = require('../models/galleryItem');
 const SchoolOrganization = require('../models/organisasi');
+const Alumni = require('../models/alumni');
 
 // --- CONFIGURATIONS ---
 
@@ -718,6 +719,7 @@ exports.deactivateAllSchools = async (req, res) => {
       Achievement.update({ isActive: false }, { where: {} }),
       GalleryItem.update({ isActive: false }, { where: {} }),
       SchoolOrganization.update({ isActive: false }, { where: {} }),
+      Alumni.update({ isActive: false }, { where: {} }),
     ]);
     
     res.json({ 
@@ -758,6 +760,8 @@ exports.activateAllSchools = async (req, res) => {
       Achievement.update({ isActive: true }, { where: {} }),
       GalleryItem.update({ isActive: true }, { where: {} }),
       SchoolOrganization.update({ isActive: true }, { where: {} }),
+      Alumni.update({ isActive: true }, { where: {} }),
+
     ]);
 
     res.json({ 
