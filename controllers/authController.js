@@ -25,6 +25,8 @@ const Facility = require('../models/fasilitas');
 const CalendarEvent = require('../models/kalender');
 const Osis = require('../models/osis');
 const Achievement = require('../models/prestasi');
+const GalleryItem = require('../models/galleryItem');
+const SchoolOrganization = require('../models/organisasi');
 
 // --- CONFIGURATIONS ---
 
@@ -714,6 +716,8 @@ exports.deactivateAllSchools = async (req, res) => {
       CalendarEvent.update({ isActive: false }, { where: {} }),
       Osis.update({ isActive: false }, { where: {} }),
       Achievement.update({ isActive: false }, { where: {} }),
+      GalleryItem.update({ isActive: false }, { where: {} }),
+      SchoolOrganization.update({ isActive: false }, { where: {} }),
     ]);
     
     res.json({ 
@@ -750,8 +754,10 @@ exports.activateAllSchools = async (req, res) => {
       Parent.update({ isActive: true }, { where: {} }),
       Facility.update({ isActive: true }, { where: {} }),
       CalendarEvent.update({ isActive: true }, { where: {} }),
-      Osis.update({ isActive: false }, { where: {} }),
-      Achievement.update({ isActive: false }, { where: {} }),
+      Osis.update({ isActive: true }, { where: {} }),
+      Achievement.update({ isActive: true }, { where: {} }),
+      GalleryItem.update({ isActive: true }, { where: {} }),
+      SchoolOrganization.update({ isActive: true }, { where: {} }),
     ]);
 
     res.json({ 
