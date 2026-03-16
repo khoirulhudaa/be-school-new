@@ -1587,3 +1587,47 @@ exports.processGraduation = async (req, res) => {
     res.status(500).json({ success: false, message: "Internal Server Error: " + err.message });
   }
 };
+
+
+
+exports.getStudentAttendance = async (req, res) => {
+  try {
+    // Ambil studentId dari token (req.user diisi oleh middleware auth)
+    const studentId = req.user.id; 
+    const { year } = req.query;
+
+    // 1. Konfigurasi Rentang Waktu
+    const startDate = year 
+      ? moment(`${year}-01-01`).startOf('year').toDate() 
+      : moment().startOf('month').toDate(); // Default bulan ini saja biar ringan
+    const endDate = moment().endOf('day').toDate();
+
+    // 2. Ambil data kehadiran
+    const attendanceRecords = await Attendance.findAll({
+      where: {
+        studentId: studentId,
+        createdAt: { [Op.between]: [startDate, endDate] }
+      },
+      order: [['createdAt', 'DESC']]
+    });
+
+    const deadline = "07:00:00";
+    const history = attendanceRecords.map(record => {
+      const scanTime = moment(record.createdAt).format("HH:mm:ss");
+      return {
+        date: moment(record.createdAt).format('DD MMM YYYY'),
+        time: scanTime,
+        status: record.status,
+        isLate: record.status === 'Hadir' && scanTime > deadline
+      };
+    });
+
+    res.json({
+      success: true,
+      data: history
+    });
+
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
