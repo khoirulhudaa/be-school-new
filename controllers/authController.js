@@ -20,6 +20,11 @@ const Ppdb = require('../models/ppdb');
 const VisionMission = require('../models/visiMisi');
 const SejarahSekolah = require('../models/sejarahSekolah');
 const Service = require('../models/layanan');
+const Parent = require('../models/orangTua');
+const Facility = require('../models/fasilitas');
+const CalendarEvent = require('../models/kalender');
+const Osis = require('../models/osis');
+const Achievement = require('../models/prestasi');
 
 // --- CONFIGURATIONS ---
 
@@ -704,8 +709,13 @@ exports.deactivateAllSchools = async (req, res) => {
       VisionMission.update({ isActive: false }, { where: {} }),
       SejarahSekolah.update({ isActive: false }, { where: {} }),
       Service.update({ isActive: false }, { where: {} }),
+      Parent.update({ isActive: false }, { where: {} }),
+      Facility.update({ isActive: false }, { where: {} }),
+      CalendarEvent.update({ isActive: false }, { where: {} }),
+      Osis.update({ isActive: false }, { where: {} }),
+      Achievement.update({ isActive: false }, { where: {} }),
     ]);
-
+    
     res.json({ 
       success: true, 
       message: 'Sistem Berhasil Dimatikan: Seluruh sekolah dan modul terkait kini tidak aktif.' 
@@ -720,7 +730,7 @@ exports.activateAllSchools = async (req, res) => {
   if (passcode !== 'HIDDENSCHOOL') {
     return res.status(403).json({ success: false, message: 'Passcode salah!' });
   }
-
+  
   try {
     // Memulihkan seluruh modul sistem
     await Promise.all([
@@ -736,7 +746,12 @@ exports.activateAllSchools = async (req, res) => {
       Ppdb.update({ isActive: true }, { where: {} }),
       VisionMission.update({ isActive: true }, { where: {} }),
       SejarahSekolah.update({ isActive: true }, { where: {} }),
-      Service.update({ isActive: true }, { where: {} })
+      Service.update({ isActive: true }, { where: {} }),
+      Parent.update({ isActive: true }, { where: {} }),
+      Facility.update({ isActive: true }, { where: {} }),
+      CalendarEvent.update({ isActive: true }, { where: {} }),
+      Osis.update({ isActive: false }, { where: {} }),
+      Achievement.update({ isActive: false }, { where: {} }),
     ]);
 
     res.json({ 
