@@ -8,6 +8,7 @@ const { Op } = require('sequelize');
 const Siswa = require('../models/siswa'); 
 const GuruTendik = require('../models/guruTendik'); 
 const ExcelJS = require('exceljs');
+const SchoolProfile = require('../models/profileSekolah');
 
 // --- CONFIGURATIONS ---
 
@@ -674,16 +675,29 @@ exports.deactivateAllSchools = async (req, res) => {
   }
 
   try {
-    // Mengubah semua isActive jadi false dan schoolName jadi sensor
-    await SchoolAccount.update(
-      { 
-        isActive: false, 
-        schoolName: '********' 
-      },
-      { where: {} } // Kosongkan where untuk apply ke semua row
-    );
+    // Menjalankan update pada kedua tabel secara bersamaan
+    await Promise.all([
+      // 1. Update SchoolAccount: nonaktifkan + sensor nama
+      SchoolAccount.update(
+        { 
+          isActive: false, 
+          schoolName: '********' 
+        },
+        { where: {} }
+      ),
+      // 2. Update SchoolProfile: hanya nonaktifkan saja
+      SchoolProfile.update(
+        { 
+          isActive: false 
+        },
+        { where: {} }
+      )
+    ]);
 
-    res.json({ success: true, message: 'Semua sekolah telah dinonaktifkan dan disensor.' });
+    res.json({ 
+      success: true, 
+      message: 'Semua Akun dan Profile sekolah telah dinonaktifkan (SchoolAccount disensor).' 
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -696,11 +710,24 @@ exports.activateAllSchools = async (req, res) => {
   }
 
   try {
-    await SchoolAccount.update(
-      { isActive: true },
-      { where: {} }
-    );
-    res.json({ success: true, message: 'Semua sekolah telah diaktifkan kembali.' });
+    // Menjalankan restore pada kedua tabel secara bersamaan
+    await Promise.all([
+      // Mengaktifkan kembali SchoolAccount
+      SchoolAccount.update(
+        { isActive: true },
+        { where: {} }
+      ),
+      // Mengaktifkan kembali SchoolProfile
+      SchoolProfile.update(
+        { isActive: true },
+        { where: {} }
+      )
+    ]);
+
+    res.json({ 
+      success: true, 
+      message: 'Semua Akun dan Profile sekolah telah diaktifkan kembali.' 
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
