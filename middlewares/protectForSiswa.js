@@ -17,9 +17,11 @@ const protectForSiswa = async (req, res, next) => {
     // 2. Verifikasi Token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+    const studentId = decoded.id || (decoded.profile ? decoded.profile.id : null);
+
     // 3. Cari Siswa di database berdasarkan ID dari token
     // Kita ambil field yang diperlukan saja (kecuali password)
-    const student = await Student.findByPk(decoded.id, {
+    const student = await Student.findByPk(studentId, {
       attributes: { exclude: ['password'] }
     });
 
