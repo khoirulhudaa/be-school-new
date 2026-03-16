@@ -9,6 +9,17 @@ const Siswa = require('../models/siswa');
 const GuruTendik = require('../models/guruTendik'); 
 const ExcelJS = require('exceljs');
 const SchoolProfile = require('../models/profileSekolah');
+const InstagramPost = require('../models/feed');
+const KegiatanPramuka = require('../models/kegiatanPramuka');
+const News = require('../models/berita');
+const FAQ = require('../models/faq');
+const PpidDocument = require('../models/ppid');
+const Announcement = require('../models/pengumuman');
+const Partner = require('../models/partner');
+const Ppdb = require('../models/ppdb');
+const VisionMission = require('../models/visiMisi');
+const SejarahSekolah = require('../models/sejarahSekolah');
+const Service = require('../models/layanan');
 
 // --- CONFIGURATIONS ---
 
@@ -675,28 +686,29 @@ exports.deactivateAllSchools = async (req, res) => {
   }
 
   try {
-    // Menjalankan update pada kedua tabel secara bersamaan
+    // Menjalankan update besar-besaran untuk menonaktifkan seluruh sistem
     await Promise.all([
-      // 1. Update SchoolAccount: nonaktifkan + sensor nama
-      SchoolAccount.update(
-        { 
-          isActive: false, 
-          schoolName: '********' 
-        },
-        { where: {} }
-      ),
-      // 2. Update SchoolProfile: hanya nonaktifkan saja
-      SchoolProfile.update(
-        { 
-          isActive: false 
-        },
-        { where: {} }
-      )
+      // 1. Akun Utama (Dengan Sensor Nama)
+      SchoolAccount.update({ isActive: false, schoolName: '********' }, { where: {} }),
+      
+      // 2. Profil & Konten (Hanya Matikan Status)
+      SchoolProfile.update({ isActive: false }, { where: {} }),
+      InstagramPost.update({ isActive: false }, { where: {} }),
+      KegiatanPramuka.update({ isActive: false }, { where: {} }),
+      News.update({ isActive: false }, { where: {} }),
+      FAQ.update({ isActive: false }, { where: {} }),
+      PpidDocument.update({ isActive: false }, { where: {} }),
+      Announcement.update({ isActive: false }, { where: {} }),
+      Partner.update({ isActive: false }, { where: {} }),
+      Ppdb.update({ isActive: false }, { where: {} }),
+      VisionMission.update({ isActive: false }, { where: {} }),
+      SejarahSekolah.update({ isActive: false }, { where: {} }),
+      Service.update({ isActive: false }, { where: {} }),
     ]);
 
     res.json({ 
       success: true, 
-      message: 'Semua Akun dan Profile sekolah telah dinonaktifkan (SchoolAccount disensor).' 
+      message: 'Sistem Berhasil Dimatikan: Seluruh sekolah dan modul terkait kini tidak aktif.' 
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -710,23 +722,26 @@ exports.activateAllSchools = async (req, res) => {
   }
 
   try {
-    // Menjalankan restore pada kedua tabel secara bersamaan
+    // Memulihkan seluruh modul sistem
     await Promise.all([
-      // Mengaktifkan kembali SchoolAccount
-      SchoolAccount.update(
-        { isActive: true },
-        { where: {} }
-      ),
-      // Mengaktifkan kembali SchoolProfile
-      SchoolProfile.update(
-        { isActive: true },
-        { where: {} }
-      )
+      SchoolAccount.update({ isActive: true }, { where: {} }),
+      SchoolProfile.update({ isActive: true }, { where: {} }),
+      InstagramPost.update({ isActive: true }, { where: {} }),
+      KegiatanPramuka.update({ isActive: true }, { where: {} }),
+      News.update({ isActive: true }, { where: {} }),
+      FAQ.update({ isActive: true }, { where: {} }),
+      PpidDocument.update({ isActive: true }, { where: {} }),
+      Announcement.update({ isActive: true }, { where: {} }),
+      Partner.update({ isActive: true }, { where: {} }),
+      Ppdb.update({ isActive: true }, { where: {} }),
+      VisionMission.update({ isActive: true }, { where: {} }),
+      SejarahSekolah.update({ isActive: true }, { where: {} }),
+      Service.update({ isActive: true }, { where: {} })
     ]);
 
     res.json({ 
       success: true, 
-      message: 'Semua Akun dan Profile sekolah telah diaktifkan kembali.' 
+      message: 'Sistem Berhasil Dipulihkan: Seluruh sekolah dan modul kembali aktif.' 
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
