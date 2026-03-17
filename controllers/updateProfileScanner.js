@@ -199,7 +199,8 @@ exports.updateMyProfile = async (req, res) => {
         success: true,
         message: "Profile berhasil diupdate",
         data: updatedUser,// <-- INI PENTING,
-        password: newPassword
+        passwordBARU: newPassword,
+        passwordLama: oldPassword,
     });
 
   } catch (err) {
