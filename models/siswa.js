@@ -6,7 +6,7 @@ const Student = sequelize.define('Student', {
   id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
   schoolId: { type: DataTypes.INTEGER, allowNull: false },
   name: { type: DataTypes.STRING, allowNull: false },
-  parentId: { 
+  parentId: {   
     type: DataTypes.INTEGER, 
     allowNull: true,
     references: { model: 'orangTua', key: 'id' }

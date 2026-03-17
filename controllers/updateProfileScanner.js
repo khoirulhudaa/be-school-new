@@ -36,9 +36,17 @@ const processPhotoUpload = (buffer, schoolId, identifier, role) => {
 exports.updateMyProfile = async (req, res) => {
   try {
     const user = req.user; // dari JWT
-    const { email, nis, nisn, nip } = req.body;
+    const { name, email, nis, nisn, nip } = req.body;
 
     let dataToUpdate = {};
+
+    if (name) {
+        if (user.role === 'siswa') {
+            dataToUpdate.name = name; 
+        } else {
+            dataToUpdate.nama = name; 
+        }
+    }
 
     // ========================
     // VALIDASI EMAIL
