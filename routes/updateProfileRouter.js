@@ -11,3 +11,5 @@ const upload = multer({
 
 router.put('/me/biodata', protectMultiRole, profileController.updateMyProfile);
 router.post('/me/photo', protectMultiRole, upload.single('photo'), profileController.updateMyPhoto);
+
+module.exports = router;
