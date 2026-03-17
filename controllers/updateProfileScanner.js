@@ -3,6 +3,7 @@ const Student = require("../models/siswa");
 const cloudinary = require('cloudinary').v2;
 const streamifier = require('streamifier');
 const { Op } = require('sequelize');
+const bcrypt = require('bcryptjs');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -36,7 +37,7 @@ const processPhotoUpload = (buffer, schoolId, identifier, role) => {
 exports.updateMyProfile = async (req, res) => {
   try {
     const user = req.user; // dari JWT
-    const { name, email, nis, nisn, nip } = req.body;
+    const { name, email, nis, nisn, nip, oldPassword, newPassword } = req.body;
 
     let dataToUpdate = {};
 
@@ -81,6 +82,32 @@ exports.updateMyProfile = async (req, res) => {
       }
 
       dataToUpdate.email = email;
+    }
+
+    // ========================
+    // UPDATE PASSWORD
+    // ========================
+    if (oldPassword && newPassword) {
+        let currentUser;
+
+        if (user.role === 'siswa') {
+            currentUser = await Student.findByPk(user.id);
+        } else {
+            currentUser = await GuruTendik.findByPk(user.id);
+        }
+
+        // cek password lama
+        const isMatch = await bcrypt.compare(oldPassword, currentUser.password || '');
+        if (!isMatch) {
+            return res.status(400).json({
+            success: false,
+            message: "Password lama tidak sesuai"
+            });
+        }
+
+        // hash password baru
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        dataToUpdate.password = hashedPassword;
     }
 
     // ========================
