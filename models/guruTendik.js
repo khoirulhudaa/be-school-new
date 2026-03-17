@@ -14,7 +14,7 @@ const GuruTendik = sequelize.define('GuruTendik', {
   },
   nip: {
     type: DataTypes.STRING(18),
-    allowNull: true,          // boleh kosong untuk tendik non-PNS
+    allowNull: true,         
     unique: true,
   },
   role: { type: DataTypes.STRING, allowNull: false },

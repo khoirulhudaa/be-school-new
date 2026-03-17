@@ -45,6 +45,7 @@
   const admin = require('./adminRoutes');
 
   router.use('/auth', require('./authRoutes'));
+  router.use('/profile', require('./updateProfileRouter'));
 
   // ── Mount routes dengan limiter khusus ────────────────────────────────
 
