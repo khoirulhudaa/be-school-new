@@ -148,9 +148,22 @@ exports.updateMyProfile = async (req, res) => {
       });
     }
 
+    let updatedUser;
+
+    if (user.role === 'siswa') {
+    updatedUser = await Student.findByPk(user.id, {
+        attributes: { exclude: ['password'] }
+    });
+    } else {
+    updatedUser = await GuruTendik.findByPk(user.id, {
+        attributes: { exclude: ['password'] }
+    });
+    }
+
     res.json({
-      success: true,
-      message: "Profile berhasil diupdate"
+        success: true,
+        message: "Profile berhasil diupdate",
+        data: updatedUser // <-- INI PENTING
     });
 
   } catch (err) {
