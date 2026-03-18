@@ -947,74 +947,84 @@ exports.scanQRCode = async (req, res) => {
 //   }
 // };
 
-
 exports.updateStudent = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, nis, nisn, gender, birthPlace, birthDate, nik, isActive, class: className, batch } = req.body;
+    const { 
+      name, nis, nisn, gender, birthPlace, birthDate, nik, 
+      isActive, class: className, batch, 
+      email, password // Tambahkan ini
+    } = req.body;
 
     const student = await Student.findByPk(id);
     if (!student) {
       return res.status(404).json({ success: false, message: 'Siswa tidak ditemukan' });
     }
 
-    // --- 1. VALIDASI DUPLIKAT SEBELUM UPDATE ---
+    // --- 1. VALIDASI DUPLIKAT ---
     
     // Cek NIS (Unik per Sekolah)
     if (nis && nis !== student.nis) {
       const existingNis = await Student.findOne({
-        where: { 
-          schoolId: student.schoolId, 
-          nis: nis,
-          id: { [Op.ne]: id } // Kecualikan diri sendiri
-        }
+        where: { schoolId: student.schoolId, nis: nis, id: { [Op.ne]: id } }
       });
-      if (existingNis) {
-        return res.status(400).json({ 
-          success: false, 
-          message: `NIS ${nis} sudah terdaftar atas nama ${existingNis.name}`,
-          conflictData: existingNis 
-        });
-      }
+      if (existingNis) return res.status(400).json({ success: false, message: `NIS ${nis} sudah terdaftar.` });
     }
 
-    // Cek NISN (Unik Nasional/Global)
+    // Cek NISN (Unik Global)
     if (nisn && nisn !== student.nisn) {
       const existingNisn = await Student.findOne({
-        where: { 
-          nisn: nisn,
-          id: { [Op.ne]: id } // Kecualikan diri sendiri
-        }
+        where: { nisn: nisn, id: { [Op.ne]: id } }
       });
-      if (existingNisn) {
+      if (existingNisn) return res.status(400).json({ success: false, message: `NISN ${nisn} sudah terdaftar.` });
+    }
+
+    // Cek Email (Unik Global) - TAMBAHAN
+    if (email && email !== student.email) {
+      const existingEmail = await Student.findOne({
+        where: { email: email, id: { [Op.ne]: id } }
+      });
+      if (existingEmail) {
         return res.status(400).json({ 
           success: false, 
-          message: `NISN ${nisn} sudah terdaftar atas nama ${existingNisn.name}`,
-          conflictData: existingNisn 
+          message: `Email ${email} sudah digunakan oleh pengguna lain.` 
         });
       }
     }
 
-    // --- 2. PROSES UPLOAD FOTO ---
+    // --- 2. PROSES DATA TAMBAHAN ---
+    
+    // Foto
     let photoUrl = student.photoUrl;
     if (req.file) {
       photoUrl = await processPhotoUpload(req.file.buffer, student.schoolId, nis || student.nis);
     }
 
-    // --- 3. EKSEKUSI UPDATE ---
-    await student.update({
+    // Hash Password jika ada perubahan - TAMBAHAN
+    let updatedData = {
       name, nis, nisn, gender, birthPlace, birthDate, nik, isActive, 
-      class: className, batch, photoUrl
-    });
+      class: className, batch, photoUrl, email
+    };
 
-    res.json({ success: true, message: 'Data siswa diperbarui', data: student });
+    if (password && password.trim() !== "") {
+      const salt = await bcrypt.genSalt(10);
+      updatedData.password = await bcrypt.hash(password, salt);
+    }
+
+    // --- 3. EKSEKUSI UPDATE ---
+    await student.update(updatedData);
+
+    // Hilangkan password dari response agar aman
+    const responseData = student.toJSON();
+    delete responseData.password;
+
+    res.json({ success: true, message: 'Data siswa diperbarui', data: responseData });
 
   } catch (err) {
-    // Menangkap error jika lolos dari pengecekan manual di atas (Database Guard)
     if (err.name === 'SequelizeUniqueConstraintError') {
       return res.status(400).json({ 
         success: false, 
-        message: 'Gagal update: NIS atau NISN sudah digunakan oleh siswa lain.' 
+        message: 'Gagal update: Email, NIS, atau NISN sudah digunakan.' 
       });
     }
     res.status(500).json({ success: false, message: err.message });
