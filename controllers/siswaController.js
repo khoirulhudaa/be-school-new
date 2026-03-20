@@ -94,7 +94,7 @@ exports.checkStudentAuth = async (req, res) => {
     if (!student) {
       return res.status(404).json({ 
         success: false, 
-        message: 'Email siswa tidak terdaftar atau akun tidak aktif.' 
+        message: 'Email siswa tidak ditemukan.' 
       });
     }
 
@@ -103,7 +103,7 @@ exports.checkStudentAuth = async (req, res) => {
     if (!student.password) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Akun belum diaktivasi password. Hubungi Admin.' 
+        message: 'Akun belum diaktivasi. Hubungi Admin.' 
       });
     }
 
