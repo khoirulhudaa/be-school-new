@@ -106,7 +106,101 @@ exports.scanSelf = async (req, res) => {
     }
 };
 
+exports.loginWithQR = async (req, res) => {
+  try {
+    const { qrCodeData, role: requestedRole } = req.body; // role opsional: 'siswa' atau 'guru'
 
+    if (!qrCodeData) {
+      return res.status(400).json({ success: false, message: 'QR Code data diperlukan' });
+    }
+
+    let user = null;
+    let finalRole = null;
+    let profile = null;
+
+    // 1. Coba cari di tabel Siswa dulu
+    user = await Student.findOne({
+      where: { 
+        qrCodeData, 
+        isActive: true 
+      }
+    });
+
+    if (user) {
+      finalRole = 'siswa';
+      profile = user.toJSON();
+      profile.role = 'siswa';
+      
+      // Ambil info sekolah (sama seperti login biasa)
+      const school = await SchoolProfile.findOne({
+        where: { schoolId: user.schoolId },
+        attributes: ['logoUrl', 'latitude', 'longitude']
+      });
+      
+      if (school) {
+        profile.schoolLogo = school.logoUrl;
+        profile.schoolLocation = {
+          lat: school.latitude,
+          lng: school.longitude,
+          radiusMeter: 200
+        };
+      }
+    } 
+    // 2. Jika bukan siswa, coba cari di GuruTendik
+    else {
+      user = await GuruTendik.findOne({
+        where: { 
+          qrCodeData, 
+          isActive: true 
+        }
+      });
+
+      if (user) {
+        finalRole = 'guru';
+        profile = user.toJSON();
+        profile.role = 'guru';
+        profile.name = user.nama; // alias supaya seragam
+        
+        // Ambil logo sekolah
+        const school = await SchoolProfile.findOne({
+          where: { schoolId: user.schoolId },
+          attributes: ['logoUrl']
+        });
+        if (school) profile.schoolLogo = school.logoUrl;
+      }
+    }
+
+    if (!user) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'QR Code tidak valid atau akun tidak aktif.' 
+      });
+    }
+
+    // Hapus field sensitif
+    delete profile.password;
+    delete profile.createdAt;
+    delete profile.updatedAt;
+
+    // Generate JWT (sama seperti login biasa)
+    const token = jwt.sign(
+      { profile },
+      process.env.JWT_SECRET || 'secret_key_anda',
+      { expiresIn: '1d' }
+    );
+
+    res.json({ 
+      success: true, 
+      token, 
+      data: profile,
+      role: finalRole 
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
 
 // KHUSUS UNTUK TESTING (TANPA GEOFICIING LOKASI)
 

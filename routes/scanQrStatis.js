@@ -4,5 +4,6 @@ const scanQrController = require('../controllers/scanQrCodeStatis');
 const scanQrMiddleware = require('../middlewares/scanQrStatis');
 
 router.post('/', scanQrMiddleware, scanQrController.scanSelf);
+router.post('/login-qr', scanQrController.loginWithQR);   // atau siswaController.loginWithQR
 
 module.exports = router;
