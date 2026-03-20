@@ -11,13 +11,23 @@ const sequelize = new Sequelize(
     isolationLevel: Transaction.ISOLATION_LEVELS.REPEATABLE_READ,
     logging: false, 
     pool: {
-      max: 20,           
-      min: 5,            
-      acquire: 60000,    
-      idle: 10000        
+      max: 30,          // naikkan kalau traffic lumayan
+      min: 5,
+      acquire: 120000,  // 2 menit
+      idle: 30000,      // tutup koneksi idle setelah 30 detik
+      evict: 1000,      // cek koneksi mati setiap 1 detik  
     },
     dialectOptions: {
       connectTimeout: 60000 
+    },
+    hooks: {
+      beforeConnect: (config) => {
+        config.dialectOptions = {
+          ...config.dialectOptions,
+          wait_timeout: 3600,
+          interactive_timeout: 3600,
+        };
+      },
     }
   }
 );

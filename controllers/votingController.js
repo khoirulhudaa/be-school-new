@@ -34,6 +34,7 @@ exports.getCandidates = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
 // createCandidate
 exports.createCandidate = async (req, res) => {
   try {
