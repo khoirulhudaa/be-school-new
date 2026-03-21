@@ -2,6 +2,7 @@ const Student = require('../models/siswa');
 const Attendance = require('../models/kehadiran');
 const { Op } = require('sequelize');
 const moment = require('moment');
+const jwt = require('jsonwebtoken');
 const GuruTendik = require('../models/guruTendik');
 const sequelize = require('../config/database');
 const SchoolProfile = require('../models/profileSekolah'); // Pastikan ini di-import

@@ -19,6 +19,23 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// === REDIS + INVALIDATE CACHE ===
+const redisClient = require('../config/redis');
+
+const invalidateStudentCache = async (schoolId) => {
+  if (!schoolId) return;
+  try {
+    const pattern = `cache:/api/siswa*schoolId=${schoolId}*`;
+    const keys = await redisClient.keys(pattern);
+    if (keys.length > 0) {
+      await redisClient.del(keys);
+      console.log(`✅ Cache invalidated: ${keys.length} keys for schoolId ${schoolId}`);
+    }
+  } catch (err) {
+    console.error('❌ Invalidate cache error:', err.message);
+  }
+};
+
 // Helper: Optimasi Gambar Jangka Panjang
 const processPhotoUpload = (buffer, schoolId, nis) => {
   return new Promise((resolve, reject) => {
@@ -195,6 +212,7 @@ exports.createStudent = async (req, res) => {
       qrCodeData: `QR-${nis}-${Date.now()}`
     });
 
+    await invalidateStudentCache(parseInt(req.body.schoolId));   // ← TAMBAHAN
     res.json({ success: true, data: newStudent });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -904,6 +922,8 @@ exports.scanQRCode = async (req, res) => {
 
     await t.commit();
 
+    await invalidateStudentCache(updateFields.schoolId);
+
      res.json({ 
       success: true, 
       message: `Absen berhasil: ${updateFields.name}`,
@@ -1018,6 +1038,8 @@ exports.updateStudent = async (req, res) => {
     const responseData = student.toJSON();
     delete responseData.password;
 
+    await invalidateStudentCache(student.schoolId);
+
     res.json({ success: true, message: 'Data siswa diperbarui', data: responseData });
 
   } catch (err) {
@@ -1048,6 +1070,7 @@ exports.deleteStudent = async (req, res) => {
     student.isActive = false;
     await student.save();
 
+    await invalidateStudentCache(student.schoolId);
     res.json({ success: true, message: 'Siswa berhasil dinonaktifkan' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -1353,6 +1376,7 @@ exports.markAbsence = async (req, res) => {
     });
 
     const records = await Promise.all(operations);
+    await invalidateStudentCache(schoolId);
 
     res.json({
       success: true,
@@ -1544,7 +1568,6 @@ exports.processGraduation = async (req, res) => {
       return res.status(404).json({ success: false, message: "Data siswa tidak ditemukan di database." });
     }
 
-
     // 2. PEMETAAN DATA KE TABEL ALUMNI (Tambahkan NIS di sini)
     const alumniData = selectedStudents.map(student => ({
       schoolId: student.schoolId,
@@ -1574,6 +1597,8 @@ exports.processGraduation = async (req, res) => {
 
     // SELESAIKAN TRANSAKSI
     await t.commit();
+
+    await invalidateStudentCache(parseInt(req.body.schoolId));
 
     res.json({ 
       success: true, 
