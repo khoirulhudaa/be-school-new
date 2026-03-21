@@ -3,6 +3,7 @@ const multer = require('multer');
 const studentController = require('../controllers/siswaController');
 const { protectForSiswa } = require('../middlewares/protectForSiswa');
 const cache = require('../middlewares/cache');
+const redisClient = require('../config/redis');
 
 const router = express.Router();
 
@@ -45,5 +46,31 @@ router.get('/attendance-report', studentController.getAttendanceReport);
 router.get('/export-attendance', studentController.exportAttendanceExcel);
 
 router.post('/process-graduation', studentController.processGraduation);
+// Tambahkan di atas, setelah const router = express.Router();
+router.get('/test-redis', async (req, res) => {
+  try {
+    // Test koneksi & operasi sederhana
+    await redisClient.set('test_key', 'Redis works! 🚀', { EX: 60 }); // expire 60 detik
+    const value = await redisClient.get('test_key');
+
+    if (value === 'Redis works! 🚀') {
+      return res.json({
+        status: 'success',
+        message: 'Redis connected & working perfectly!',
+        value_from_redis: value,
+        redis_ready: redisClient.isReady,     // true kalau ready
+        redis_open: redisClient.isOpen,       // true kalau socket open
+      });
+    } else {
+      return res.status(500).json({ status: 'error', message: 'Redis set/get gagal' });
+    }
+  } catch (err) {
+    console.error('Test Redis error:', err);
+    return res.status(500).json({
+      status: 'error',
+      message: 'Redis error: ' + err.message,
+    });
+  }
+});
 
 module.exports = router;
