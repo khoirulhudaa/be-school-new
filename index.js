@@ -4,6 +4,7 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const sequelize = require('./config/database');
+const compression = require('compression');
 
 const Student = require('./models/siswa');
 const Parent = require('./models/orangTua');
@@ -36,6 +37,17 @@ app.use(cors({
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(compression({
+  // balance speed vs compression ratio
+  level: 6,              
+  // > 1KB (hindari overhead kecil)
+  threshold: 1024,       
+  filter: (req, res) => {
+    // Compress hanya kalau client support (default sudah bagus)
+    if (req.headers['x-no-compression']) return false;
+    return compression.filter(req, res); // default: text, json, dll
+  }
+}));
 
 // Global limiter untuk SEMUA request (tetap di app level)
 app.use(globalLimiter);
