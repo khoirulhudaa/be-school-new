@@ -20,15 +20,15 @@ const sequelize = new Sequelize(
     dialectOptions: {
       connectTimeout: 60000 
     },
-    hooks: {
-      beforeConnect: (config) => {
-        config.dialectOptions = {
-          ...config.dialectOptions,
-          wait_timeout: 3600,
-          interactive_timeout: 3600,
-        };
-      },
-    }
+    // hooks: {
+    //   beforeConnect: (config) => {
+    //     config.dialectOptions = {
+    //       ...config.dialectOptions,
+    //       wait_timeout: 3600,
+    //       interactive_timeout: 3600,
+    //     };
+    //   },
+    // }
   }
 );
 
