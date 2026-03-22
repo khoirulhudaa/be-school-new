@@ -28,6 +28,7 @@ const Achievement = require('../models/prestasi');
 const GalleryItem = require('../models/galleryItem');
 const SchoolOrganization = require('../models/organisasi');
 const Alumni = require('../models/alumni');
+const Student = require('../models/siswa');
 
 // --- CONFIGURATIONS ---
 
@@ -222,17 +223,17 @@ exports.getProfile = async (req, res) => {
         user = await SchoolAccount.findByPk(req.user.id);
     }
     if (!user) return res.status(404).json({ success: false, message: 'User tidak ditemukan' });
-    
+    console.log('user get profile;', user)
     // Format data agar sama dengan struktur yang diharapkan Frontend (Vokadash)
     res.json({
       success: true,
       data: {
-        id: user.id,
-        name: user.adminName,
+        id: user.schoolId,
+        name: user.adminName || user.nama,
         email: user.email,
         role: user.role, // Hardcoded sesuai kebutuhan frontend
         sekolah: {
-          id: user.id,
+          id: user.schoolId,
           namaSekolah: user.schoolName,
           npsn: user.npsn,
           address: user.address,
