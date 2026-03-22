@@ -229,12 +229,12 @@ exports.getProfile = async (req, res) => {
     res.json({
       success: true,
       data: {
-        id: user.role === 'admim' ? user.dataValues.id : user.schoolId,
-        name: user.role === 'admim' ? user.dataValues.adminName : user.nama,
+        id: user.dataValues ? user.dataValues.id : user.schoolId,
+        name: user.dataValues ? user.dataValues.adminName : user.nama,
         email: user.email,
         role: user.role, // Hardcoded sesuai kebutuhan frontend
         sekolah: {
-          id: user.role === 'admim' ? user.dataValues.id : user.schoolId,
+          id: user.dataValues ? user.dataValues.id : user.schoolId,
           namaSekolah: user.schoolName,
           npsn: user.npsn,
           address: user.address,
