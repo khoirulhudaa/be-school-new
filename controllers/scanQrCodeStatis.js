@@ -210,6 +210,13 @@ exports.loginWithQRNew = async (req, res) => {
     // req.user biasanya diisi oleh middleware verifyToken Anda
     // Pastikan strukturnya sama dengan format login manual (data: profile)
     const userProfile = req.user.profile || req.user;
+    
+    if (userProfile.role === 'Siswa' || userProfile.role === 'siswa') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Akses Ditolak: siswa tidak diizinkan!' 
+      });
+    }
 
     if (!qrCodeData) {
       return res.status(400).json({ success: false, message: 'Session ID diperlukan' });
