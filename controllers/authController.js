@@ -223,8 +223,9 @@ exports.getProfile = async (req, res) => {
         user = await SchoolAccount.findByPk(req.user.id);
     }
     if (!user) return res.status(404).json({ success: false, message: 'User tidak ditemukan' });
-    console.log('user get value;', user.dataValues)
-    console.log('user get profile;', user)
+    console.log('[REQ USER]', req.user)
+    console.log('[VALUE]', user.dataValues)
+    console.log('[PROFILE]', user)
     // Format data agar sama dengan struktur yang diharapkan Frontend (Vokadash)
     res.json({
       success: true,
