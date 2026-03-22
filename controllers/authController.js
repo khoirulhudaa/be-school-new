@@ -223,17 +223,18 @@ exports.getProfile = async (req, res) => {
         user = await SchoolAccount.findByPk(req.user.id);
     }
     if (!user) return res.status(404).json({ success: false, message: 'User tidak ditemukan' });
+    console.log('user get value;', user.dataValues)
     console.log('user get profile;', user)
     // Format data agar sama dengan struktur yang diharapkan Frontend (Vokadash)
     res.json({
       success: true,
       data: {
-        id: user.role === 'admim' ? user.id : user.schoolId,
-        name: user.adminName || user.nama,
+        id: user.role === 'admim' ? user.dataValues.id : user.schoolId,
+        name: user.role === 'admim' ? user.dataValues.adminName : user.nama,
         email: user.email,
         role: user.role, // Hardcoded sesuai kebutuhan frontend
         sekolah: {
-          id: user.role === 'admim' ? user.id : user.schoolId,
+          id: user.role === 'admim' ? user.dataValues.id : user.schoolId,
           namaSekolah: user.schoolName,
           npsn: user.npsn,
           address: user.address,
