@@ -211,9 +211,18 @@ exports.getAllSchools = async (req, res) => {
 
 exports.getProfile = async (req, res) => {
   try {
-    const user = await SchoolAccount.findByPk(req.user.id);
-    if (!user) return res.status(404).json({ success: false, message: 'User tidak ditemukan' });
+    // const user = await SchoolAccount.findByPk(req.user.id);
 
+    let user;
+    if (req.user.role === 'Kepala Sekolah' || req.user.role === 'Guru') {
+        user = await GuruTendik.findByPk(req.user.id);
+    } else if (req.user.role === 'Siswa') {
+        user = await Student.findByPk(req.user.id);
+    } else {
+        user = await SchoolAccount.findByPk(req.user.id);
+    }
+    if (!user) return res.status(404).json({ success: false, message: 'User tidak ditemukan' });
+    
     // Format data agar sama dengan struktur yang diharapkan Frontend (Vokadash)
     res.json({
       success: true,
