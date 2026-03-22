@@ -209,7 +209,7 @@ exports.loginWithQRNew = async (req, res) => {
     
     // req.user biasanya diisi oleh middleware verifyToken Anda
     // Pastikan strukturnya sama dengan format login manual (data: profile)
-    const userProfile = req.user.profile; 
+    const userProfile = req.user.profile || req.user;
 
     if (!qrCodeData) {
       return res.status(400).json({ success: false, message: 'Session ID diperlukan' });

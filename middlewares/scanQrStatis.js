@@ -16,7 +16,7 @@ const scanQrMiddleware = (req, res, next) => {
   try {
     // 2. Verifikasi token
     // Pastikan JWT_SECRET sama dengan yang digunakan saat login/sign-up
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_secret_key');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // 3. Masukkan data hasil decode ke req.user
     // Jika di token ada { id, role, schoolId }, maka req.user akan berisi itu.
