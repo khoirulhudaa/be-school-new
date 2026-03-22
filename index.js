@@ -6,6 +6,10 @@ const fs = require('fs');
 const sequelize = require('./config/database');
 const compression = require('compression');
 
+// --- 1. IMPORT HTTP & SOCKET.IO ---
+const http = require('http');
+const { Server } = require('socket.io');
+
 const Student = require('./models/siswa');
 const Parent = require('./models/orangTua');
 
@@ -21,6 +25,35 @@ const apiRoutes = require('./routes');  // → routes/index.js
 
 const app = express();
 const port = process.env.PORT || 5005;
+
+// --- 2. BUAT HTTP SERVER ---
+const server = http.createServer(app);
+
+// --- 3. INISIALISASI SOCKET.IO ---
+const io = new Server(server, {
+  cors: {
+    origin: '*', // Sesuaikan jika ingin lebih secure di production
+    methods: ['GET', 'POST']
+  }
+});
+
+// --- 4. SIMPAN IO KE APP AGAR BISA DIAKSES DI CONTROLLER ---
+app.set('socketio', io);
+
+// --- 5. LOGIKA SOCKET CONNECTION ---
+io.on('connection', (socket) => {
+  console.log('A client connected:', socket.id);
+
+  // Web Perpus join room berdasarkan UUID sessionId
+  socket.on('join-login-room', (sessionId) => {
+    socket.join(sessionId);
+    console.log(`Client joined room: ${sessionId}`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Client disconnected');
+  });
+});
 
 app.set('trust proxy', 1);
 
@@ -79,20 +112,17 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Database connection & start server
+// --- 6. DATABASE CONNECTION & START SERVER (GANTI app.listen MENJADI server.listen) ---
 sequelize.authenticate()
   .then(() => {
     console.log('MySQL connected!');
-    
-    // JIKA ADA PERUBAH MODELS SAJA (LOCAL SAJA)
-    // return sequelize.sync({ alter: true, force: false });
-
     return sequelize.sync({ alter: false, force: false });
   })
   .then(() => {
     console.log('Tables synced');
-    app.listen(port, '0.0.0.0', () => {
-      console.log(`Server running on port ${port}`);
+    // PENTING: Gunakan server.listen, bukan app.listen
+    server.listen(port, '0.0.0.0', () => {
+      console.log(`Server with Socket.io running on port ${port}`);
     });
   })
   .catch(err => {

@@ -203,6 +203,39 @@ exports.loginWithQR = async (req, res) => {
   }
 };
 
+exports.loginWithQRNew = async (req, res) => {
+  try {
+    const { qrCodeData } = req.body; // Ini adalah sessionId (UUID) dari layar Perpus
+    
+    // req.user biasanya diisi oleh middleware verifyToken Anda
+    // Pastikan strukturnya sama dengan format login manual (data: profile)
+    const userProfile = req.user.profile; 
+
+    if (!qrCodeData) {
+      return res.status(400).json({ success: false, message: 'Session ID diperlukan' });
+    }
+
+    // 1. Ambil instance io yang tadi kita simpan di app.set
+    const io = req.app.get('socketio');
+
+    // 2. Kirim data login ke Web Perpus yang sedang menunggu di room 'qrCodeData'
+    // Format payload disesuaikan dengan kebutuhan Vokadash (token & user)
+    io.to(qrCodeData).emit('login-success', {
+      token: req.headers.authorization.split(' ')[1], // Meneruskan token aktif HP
+      user: userProfile // Data profile lengkap siswa/guru
+    });
+
+    return res.json({ 
+      success: true, 
+      message: 'Autentikasi berhasil dikirim ke perangkat tujuan.' 
+    });
+
+  } catch (err) {
+    console.error("Socket Emit Error:", err);
+    res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+};
+
 // KHUSUS UNTUK TESTING (TANPA GEOFICIING LOKASI)
 
 // const Student = require('../models/siswa');
