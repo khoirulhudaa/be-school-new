@@ -225,6 +225,8 @@ exports.loginWithQRNew = async (req, res) => {
       user: userProfile // Data profile lengkap siswa/guru
     });
 
+    console.log('[profile user]', userProfile)
+
     return res.json({ 
       success: true, 
       message: 'Autentikasi berhasil dikirim ke perangkat tujuan.' 
