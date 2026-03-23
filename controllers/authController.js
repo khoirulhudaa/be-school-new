@@ -255,13 +255,12 @@ exports.getProfile = async (req, res) => {
     res.json({
       success: true,
       data: {
-        // Jika userData.id tidak ada, pakai userData.schoolId
-        id: userData.id || userData.schoolId, 
+        id: userData.schoolId || userData.id, 
         name: userData.adminName || userData.nama,
         email: userData.email,
         role: role, 
         sekolah: {
-          id: userData.id || userData.schoolId,
+          id: userData.schoolId || userData.id,
           namaSekolah: userData.schoolName || userData.namaSekolah,
           npsn: userData.npsn,
           address: userData.address,
