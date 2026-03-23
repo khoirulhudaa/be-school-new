@@ -210,70 +210,105 @@ exports.getAllSchools = async (req, res) => {
   }
 };
 
+// exports.getProfile = async (req, res) => {
+//   try {
+//     // const user = await SchoolAccount.findByPk(req.user.id);
+//     const { role, id: userId } = req.user;
+
+//     let user;
+//     if (role === 'Kepala Sekolah' || role === 'Guru') {
+//         console.log('AKUN GURU')
+//         user = await GuruTendik.findByPk(req.user.id);
+//     } else if (role === 'Siswa') {
+//         console.log('AKUN SISWA')
+//         user = await Student.findByPk(req.user.id);
+//     } else {
+//         console.log('AKUN SEKOLAH')
+//         user = await SchoolAccount.findByPk(req.user.id);
+//     }
+//     if (!user) return res.status(404).json({ success: false, message: 'User tidak ditemukan' });
+
+//     const userData = user.get({ plain: true });
+//     console.log('[USERDATA]', userData)
+
+//     res.json({
+//       success: true,
+//       data: {
+//         id: userData.schoolId || userData.id, 
+//         name: userData.adminName || userData.nama,
+//         email: userData.email,
+//         role: role, 
+//         sekolah: {
+//           id: userData.schoolId || userData.id,
+//           namaSekolah: userData.schoolName || userData.namaSekolah,
+//           npsn: userData.npsn,
+//           address: userData.address,
+//           nameProvince: 'DKI Jakarta', // Hardcoded sesuai kebutuhanmu
+//           file: userData.logoUrl
+//         }
+//       }
+//     });
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
+
 exports.getProfile = async (req, res) => {
   try {
-    // const user = await SchoolAccount.findByPk(req.user.id);
     const { role, id: userId } = req.user;
 
     let user;
+    let schoolData = null;
+
+    // 1. Ambil data user berdasarkan role
     if (role === 'Kepala Sekolah' || role === 'Guru') {
-        console.log('AKUN GURU')
-        user = await GuruTendik.findByPk(req.user.id);
+      user = await GuruTendik.findByPk(userId);
     } else if (role === 'Siswa') {
-        console.log('AKUN SISWA')
-        user = await Student.findByPk(req.user.id);
+      user = await Student.findByPk(userId);
     } else {
-        console.log('AKUN SEKOLAH')
-        user = await SchoolAccount.findByPk(req.user.id);
+      // Jika rolenya admin sekolah, user itu sendiri adalah SchoolAccount
+      user = await SchoolAccount.findByPk(userId);
     }
+
     if (!user) return res.status(404).json({ success: false, message: 'User tidak ditemukan' });
 
-    console.log('user get value;', user.dataValues)
-    console.log('user get profile;', user)
     const userData = user.get({ plain: true });
-    console.log('[USERDATA]', userData)
 
-    // Format data agar sama dengan struktur yang diharapkan Frontend (Vokadash)
-    // res.json({
-    //   success: true,
-    //   data: {
-    //     id: user.dataValues ? user.dataValues.id : user.schoolId,
-    //     name: user.dataValues ? user.dataValues.adminName : user.nama,
-    //     email: user.email,
-    //     role: user.role, // Hardcoded sesuai kebutuhan frontend
-    //     sekolah: {
-    //       id: user.dataValues ? user.dataValues.id : user.schoolId,
-    //       namaSekolah: user.schoolName,
-    //       npsn: user.npsn,
-    //       address: user.address,
-    //       nameProvince: 'DKI Jakarta',
-    //       file: user.logoUrl // Logo dari Cloudinary
-    //     }
-    //   }
-    // });
+    // 2. Ambil data sekolah secara dinamis
+    if (role === 'Kepala Sekolah' || role === 'Guru' || role === 'Siswa') {
+      // Cari di tabel SchoolAccount berdasarkan schoolId yang ada di profile guru/siswa
+      schoolData = await SchoolAccount.findByPk(userData.schoolId);
+    } else {
+      // Jika rolenya admin sekolah, datanya ya dari userData itu sendiri
+      schoolData = user;
+    }
 
+    // 3. Susun Response
     res.json({
       success: true,
       data: {
-        id: userData.schoolId || userData.id, 
-        name: userData.adminName || userData.nama,
+        id: userData.id, // ID asli user (Guru/Siswa/Sekolah)
+        name: userData.nama || userData.adminName,
         email: userData.email,
-        role: role, 
-        sekolah: {
-          id: userData.schoolId || userData.id,
-          namaSekolah: userData.schoolName || userData.namaSekolah,
-          npsn: userData.npsn,
-          address: userData.address,
-          nameProvince: 'DKI Jakarta', // Hardcoded sesuai kebutuhanmu
-          file: userData.logoUrl
-        }
+        role: role,
+        // Data Sekolah diambil dari instance schoolData
+        sekolah: schoolData ? {
+          id: schoolData.id,
+          namaSekolah: schoolData.schoolName,
+          npsn: schoolData.npsn,
+          address: schoolData.address,
+          nameProvince: 'DKI Jakarta', // Bisa kamu tambahkan kolom province di model jika perlu
+          file: schoolData.logoUrl // Logo konsisten dari tabel akunSekolah
+        } : null
       }
     });
+
   } catch (err) {
+    console.error("Error Get Profile:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
 
 // --- LOGIN ---
 exports.login = async (req, res) => {
