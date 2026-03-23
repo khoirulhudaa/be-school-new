@@ -231,6 +231,7 @@ exports.getProfile = async (req, res) => {
     console.log('user get value;', user.dataValues)
     console.log('user get profile;', user)
     const userData = user.get({ plain: true });
+    console.log('[USERDATA]', userData)
 
     // Format data agar sama dengan struktur yang diharapkan Frontend (Vokadash)
     // res.json({
