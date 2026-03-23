@@ -213,12 +213,13 @@ exports.getAllSchools = async (req, res) => {
 exports.getProfile = async (req, res) => {
   try {
     // const user = await SchoolAccount.findByPk(req.user.id);
+    const { role, id: userId } = req.user;
 
     let user;
-    if (req.user.role === 'Kepala Sekolah' || req.user.role === 'Guru') {
+    if (role === 'Kepala Sekolah' || role === 'Guru') {
         console.log('AKUN GURU')
         user = await GuruTendik.findByPk(req.user.id);
-    } else if (req.user.role === 'Siswa') {
+    } else if (role === 'Siswa') {
         console.log('AKUN SISWA')
         user = await Student.findByPk(req.user.id);
     } else {
