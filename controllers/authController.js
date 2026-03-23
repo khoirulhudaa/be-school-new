@@ -216,30 +216,55 @@ exports.getProfile = async (req, res) => {
 
     let user;
     if (req.user.role === 'Kepala Sekolah' || req.user.role === 'Guru') {
+        console.log('AKUN GURU')
         user = await GuruTendik.findByPk(req.user.id);
     } else if (req.user.role === 'Siswa') {
+        console.log('AKUN SISWA')
         user = await Student.findByPk(req.user.id);
     } else {
+        console.log('AKUN SEKOLAH')
         user = await SchoolAccount.findByPk(req.user.id);
     }
     if (!user) return res.status(404).json({ success: false, message: 'User tidak ditemukan' });
+
     console.log('user get value;', user.dataValues)
     console.log('user get profile;', user)
+    const userData = user.get({ plain: true });
+
     // Format data agar sama dengan struktur yang diharapkan Frontend (Vokadash)
+    // res.json({
+    //   success: true,
+    //   data: {
+    //     id: user.dataValues ? user.dataValues.id : user.schoolId,
+    //     name: user.dataValues ? user.dataValues.adminName : user.nama,
+    //     email: user.email,
+    //     role: user.role, // Hardcoded sesuai kebutuhan frontend
+    //     sekolah: {
+    //       id: user.dataValues ? user.dataValues.id : user.schoolId,
+    //       namaSekolah: user.schoolName,
+    //       npsn: user.npsn,
+    //       address: user.address,
+    //       nameProvince: 'DKI Jakarta',
+    //       file: user.logoUrl // Logo dari Cloudinary
+    //     }
+    //   }
+    // });
+
     res.json({
       success: true,
       data: {
-        id: user.dataValues ? user.dataValues.id : user.schoolId,
-        name: user.dataValues ? user.dataValues.adminName : user.nama,
-        email: user.email,
-        role: user.role, // Hardcoded sesuai kebutuhan frontend
+        // Jika userData.id tidak ada, pakai userData.schoolId
+        id: userData.id || userData.schoolId, 
+        name: userData.adminName || userData.nama,
+        email: userData.email,
+        role: role, 
         sekolah: {
-          id: user.dataValues ? user.dataValues.id : user.schoolId,
-          namaSekolah: user.schoolName,
-          npsn: user.npsn,
-          address: user.address,
-          nameProvince: 'DKI Jakarta',
-          file: user.logoUrl // Logo dari Cloudinary
+          id: userData.id || userData.schoolId,
+          namaSekolah: userData.schoolName || userData.namaSekolah,
+          npsn: userData.npsn,
+          address: userData.address,
+          nameProvince: 'DKI Jakarta', // Hardcoded sesuai kebutuhanmu
+          file: userData.logoUrl
         }
       }
     });
