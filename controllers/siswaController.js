@@ -1037,6 +1037,7 @@ exports.updateStudent = async (req, res) => {
 
     // Hilangkan password dari response agar aman
     const responseData = student.toJSON();
+    responseData.role = 'siswa';
     delete responseData.password;
 
     await invalidateStudentCache(student.schoolId);
