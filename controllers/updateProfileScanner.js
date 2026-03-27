@@ -37,7 +37,7 @@ const processPhotoUpload = (buffer, schoolId, identifier, role) => {
 exports.updateMyProfile = async (req, res) => {
   try {
     const user = req.user; // dari JWT
-    const { name, email, nis, nisn, nip, oldPassword, newPassword } = req.body;
+    const { name, email, nis, nisn, nip, oldPassword, newPassword, class: kelas } = req.body;
 
     let dataToUpdate = {};
 
@@ -47,6 +47,10 @@ exports.updateMyProfile = async (req, res) => {
         } else {
             dataToUpdate.nama = name; 
         }
+    }
+
+    if (kelas && user.role === 'siswa') {
+      dataToUpdate.class = kelas;
     }
 
     // ========================
