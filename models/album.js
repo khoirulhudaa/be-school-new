@@ -10,8 +10,6 @@ const Album = sequelize.define('Album', {
   schoolId: {
     type: DataTypes.INTEGER,
     allowNull: false,
-    // bisa tambah index kalau sering query berdasarkan school
-    // index: true,
   },
   title: {
     type: DataTypes.STRING,

@@ -5,12 +5,34 @@ const streamifier = require('streamifier');
 const jwt = require('jsonwebtoken');
 const SchoolProfile = require('../models/profileSekolah');
 const bcrypt = require('bcrypt');
+const redisClient = require('../config/redis');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
+
+const invalidateGuruTendikCache = async (schoolId) => {
+  if (!schoolId) return;
+
+  try {
+    const pattern = `cache:/guruTendik*schoolId=${schoolId}*`;
+    // Gunakan SCAN untuk aman jika key banyak
+    let cursor = 0;
+    do {
+      const reply = await redisClient.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+      cursor = parseInt(reply[0]);
+      const keys = reply[1];
+      if (keys.length > 0) {
+        await redisClient.del(keys);
+        console.log(`✅ Cache GuruTendik invalidated: ${keys.length} keys for schoolId ${schoolId}`);
+      }
+    } while (cursor !== 0);
+  } catch (err) {
+    console.error('❌ Invalidate GuruTendik cache error:', err.message);
+  }
+};
 
 exports.checkGuruAuth = async (req, res) => {
   try {
@@ -240,6 +262,8 @@ exports.createGuruTendik = async (req, res) => {
       nip
     });
 
+    await invalidateGuruTendikCache(sId)
+
     res.json({ success: true, message: 'Berhasil menambahkan Staff', data: newGuruTendik });
   } catch (err) {
     if (err.name === 'SequelizeUniqueConstraintError') {
@@ -341,6 +365,8 @@ exports.updateGuruTendik = async (req, res) => {
     // 6. Simpan perubahan
     await guru.save();
 
+    await invalidateGuruTendikCache(guru.schoolId);
+
     res.json({ success: true, data: guru });
   } catch (err) {
     console.error('Error update guru/tendik:', err);
@@ -371,6 +397,8 @@ exports.deleteGuruTendik = async (req, res) => {
     // Soft delete
     guru.isActive = false;
     await guru.save();
+
+    await invalidateGuruTendikCache(guru.schoolId);
 
     res.json({ success: true, message: 'Guru/Tendik berhasil dihapus (soft delete)' });
   } catch (err) {

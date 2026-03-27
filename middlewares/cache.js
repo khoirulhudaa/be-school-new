@@ -3,7 +3,8 @@ const redisClient = require('../config/redis');
 const cacheMiddleware = (durationSeconds = 60) => {
   return async (req, res, next) => {
     const key = `cache:${req.originalUrl || req.url}`;
-
+    console.log('originalURL REDIS 1:', req.originalUrl)
+    console.log('originalURL REDIS 2:', req.url)
     try {
 
       if (!redisClient.isReady) {

@@ -25,7 +25,7 @@ const redisClient = require('../config/redis');
 const invalidateStudentCache = async (schoolId) => {
   if (!schoolId) return;
   try {
-    const pattern = `cache:/api/siswa*schoolId=${schoolId}*`;
+    const pattern = `cache:/siswa*schoolId=${schoolId}*`;
     const keys = await redisClient.keys(pattern);
     if (keys.length > 0) {
       await redisClient.del(keys);
@@ -358,6 +358,35 @@ exports.getAllStudents = async (req, res) => {
 
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getStudentById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const student = await Student.findByPk(id);
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: 'Siswa tidak ditemukan'
+      });
+    }
+
+    const data = student.toJSON();
+    delete data.password; // keamanan
+
+    res.json({
+      success: true,
+      data
+    });
+
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
   }
 };
 
@@ -938,34 +967,6 @@ exports.scanQRCode = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
-// exports.updateStudent = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const { name, nis, nisn, gender, birthPlace, birthDate, nik, isActive, class: className, batch } = req.body;
-
-//     const student = await Student.findByPk(id);
-//     if (!student) {
-//       return res.status(404).json({ success: false, message: 'Siswa tidak ditemukan' });
-//     }
-
-//    let photoUrl = student.photoUrl;
-
-//     if (req.file) {
-//       // Optimasi saat update (otomatis menimpa file lama karena public_id sama)
-//       photoUrl = await processPhotoUpload(req.file.buffer, student.schoolId, student.nis);
-//     }
-
-//     await student.update({
-//       name, nis, nisn, gender, birthPlace, birthDate, nik, isActive, class: className, batch,
-//       photoUrl
-//     });
-
-//     res.json({ success: true, message: 'Data siswa diperbarui', data: student });
-//   } catch (err) {
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
 
 exports.updateStudent = async (req, res) => {
   try {

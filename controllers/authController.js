@@ -210,50 +210,6 @@ exports.getAllSchools = async (req, res) => {
   }
 };
 
-// exports.getProfile = async (req, res) => {
-//   try {
-//     // const user = await SchoolAccount.findByPk(req.user.id);
-//     const { role, id: userId } = req.user;
-
-//     let user;
-//     if (role === 'Kepala Sekolah' || role === 'Guru') {
-//         console.log('AKUN GURU')
-//         user = await GuruTendik.findByPk(req.user.id);
-//     } else if (role === 'Siswa') {
-//         console.log('AKUN SISWA')
-//         user = await Student.findByPk(req.user.id);
-//     } else {
-//         console.log('AKUN SEKOLAH')
-//         user = await SchoolAccount.findByPk(req.user.id);
-//     }
-//     if (!user) return res.status(404).json({ success: false, message: 'User tidak ditemukan' });
-
-//     const userData = user.get({ plain: true });
-//     console.log('[USERDATA]', userData)
-
-//     res.json({
-//       success: true,
-//       data: {
-//         id: userData.schoolId || userData.id, 
-//         name: userData.adminName || userData.nama,
-//         email: userData.email,
-//         role: role, 
-//         sekolah: {
-//           id: userData.schoolId || userData.id,
-//           namaSekolah: userData.schoolName || userData.namaSekolah,
-//           npsn: userData.npsn,
-//           address: userData.address,
-//           nameProvince: 'DKI Jakarta', // Hardcoded sesuai kebutuhanmu
-//           file: userData.logoUrl
-//         }
-//       }
-//     });
-//   } catch (err) {
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
-
-
 exports.getProfile = async (req, res) => {
   try {
     const { role, id: userId } = req.user;
