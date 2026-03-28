@@ -15,22 +15,15 @@ cloudinary.config({
 
 const invalidateGuruTendikCache = async (schoolId) => {
   if (!schoolId) return;
-
   try {
     const pattern = `cache:/guruTendik*schoolId=${schoolId}*`;
-    // Gunakan SCAN untuk aman jika key banyak
-    let cursor = 0;
-    do {
-      const reply = await redisClient.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
-      cursor = parseInt(reply[0]);
-      const keys = reply[1];
-      if (keys.length > 0) {
-        await redisClient.del(keys);
-        console.log(`✅ Cache GuruTendik invalidated: ${keys.length} keys for schoolId ${schoolId}`);
-      }
-    } while (cursor !== 0);
+    const keys = await redisClient.keys(pattern);
+    if (keys.length > 0) {
+      await redisClient.del(keys);
+      console.log(`✅ Cache invalidated: ${keys.length} keys for schoolId ${schoolId}`);
+    }
   } catch (err) {
-    console.error('❌ Invalidate GuruTendik cache error:', err.message);
+    console.error('❌ Invalidate cache error:', err.message);
   }
 };
 
