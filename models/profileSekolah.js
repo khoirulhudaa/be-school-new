@@ -66,8 +66,8 @@ const SchoolProfile = sequelize.define('SchoolProfile', {
   teacherCount: { type: DataTypes.INTEGER, defaultValue: 0 },
   roomCount: { type: DataTypes.INTEGER, defaultValue: 0 },
   achievementCount: { type: DataTypes.INTEGER, defaultValue: 0 },
-  latitude: { type: DataTypes.FLOAT, allowNull: true },
-  longitude: { type: DataTypes.FLOAT, allowNull: true },
+  latitude: { type: DataTypes.DECIMAL(10, 8), allowNull: true },
+  longitude: { type: DataTypes.DECIMAL(11, 8), allowNull: true },
   isActive: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
