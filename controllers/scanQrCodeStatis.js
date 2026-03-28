@@ -69,7 +69,8 @@ exports.scanSelf = async (req, res) => {
                 [idKey]: id, 
                 createdAt: { [Op.between]: [todayStart, todayEnd] } 
             },
-            transaction: t
+            transaction: t,
+            lock: t.LOCK.UPDATE
         });
 
         if (alreadyExists) {

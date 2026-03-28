@@ -13,6 +13,10 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+const defaultPassword = 'sekolah123';
+const saltRounds = 10;
+const hashedPassword = await bcrypt.hash(defaultPassword, saltRounds);
+
 const invalidateGuruTendikCache = async (schoolId) => {
   if (!schoolId) return;
   try {
@@ -252,6 +256,7 @@ exports.createGuruTendik = async (req, res) => {
       nama, mapel, email, role, jurusan, jenisKelamin, photoUrl,
       schoolId: sId,
       qrCodeData: generatedQR,
+      password: hashedPassword,
       nip
     });
 
