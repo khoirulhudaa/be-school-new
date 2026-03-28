@@ -262,7 +262,7 @@ exports.createGuruTendik = async (req, res) => {
       nip
     });
 
-    await invalidateGuruTendikCache(sId)
+    await invalidateGuruTendikCache(schoolId)
 
     res.json({ success: true, message: 'Berhasil menambahkan Staff', data: newGuruTendik });
   } catch (err) {
