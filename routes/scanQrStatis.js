@@ -2,8 +2,9 @@ const express = require('express');
 const router = express.Router();
 const scanQrController = require('../controllers/scanQrCodeStatis');
 const scanQrMiddleware = require('../middlewares/scanQrStatis');
+const { strictLimiter } = require('../middlewares/rateLimiter');
 
-router.post('/', scanQrMiddleware, scanQrController.scanSelf);
+router.post('/', strictLimiter, scanQrMiddleware, scanQrController.scanSelf);
 router.post('/login-qr', scanQrController.loginWithQR);   // atau siswaController.loginWithQR
 router.post('/login-qr-new', scanQrMiddleware, scanQrController.loginWithQRNew);   // atau siswaController.loginWithQR
 

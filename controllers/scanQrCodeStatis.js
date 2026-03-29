@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const GuruTendik = require('../models/guruTendik');
 const sequelize = require('../config/database');
 const SchoolProfile = require('../models/profileSekolah'); // Pastikan ini di-import
+const redis = require('../config/redis'); // Pastikan path benar
 
 // Fungsi Helper Haversine
 function getDistance(lat1, lon1, lat2, lon2) {
@@ -19,7 +20,6 @@ function getDistance(lat1, lon1, lat2, lon2) {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
 }
-
 exports.scanSelf = async (req, res) => {
     // 1. Ambil qrScanned DAN koordinat dari body
     const { qrCodeData, userLat, userLon } = req.body; // Ganti qrScanned jadi qrCodeData
@@ -36,11 +36,43 @@ exports.scanSelf = async (req, res) => {
         return res.status(403).json({ success: false, message: `QR Code tidak valid untuk sekolah ini.` });
     }
 
+    const redisKey = `absensi_check:${schoolId}:${id}:${moment().format('YYYY-MM-DD')}`;
+    
+    try {
+        const isAlreadyScanned = await redis.get(redisKey);
+        if (isAlreadyScanned) {
+            return res.status(400).json({ success: false, message: 'Anda sudah absen hari ini.' });
+        }
+    } catch (redisError) {
+        console.error("Redis Error:", redisError);
+        // Lanjut saja ke DB jika Redis mati (failover)
+    }
+
     const t = await sequelize.transaction();
 
     try {
-        // 3. VALIDASI GEOFENCING
-        const school = await SchoolProfile.findOne({ where: { schoolId } });
+        // --- 3. VALIDASI GEOFENCING (REVISED) ---
+        let school = await redis.get(`school_profile:${schoolId}`);
+        
+        if (school) {
+            try {
+                school = JSON.parse(school);
+            } catch (e) {
+                console.error("Redis Parse Error:", e);
+                school = null; // Paksa null agar di-fetch ulang dari DB di bawah
+            }
+        }
+
+        // Ini memastikan jika Redis kosong ATAU JSON error, kita ambil dari DB.
+        if (!school) {
+            school = await SchoolProfile.findOne({ where: { schoolId } });
+            if (school) {
+                await redis.set(`school_profile:${schoolId}`, JSON.stringify(school), {
+                    EX: 60 * 60 * 24 
+                });
+            }
+        }
+
         if (school && school.latitude && school.longitude) {
             if (!userLat || !userLon) {
                 await t.rollback();
@@ -95,6 +127,13 @@ exports.scanSelf = async (req, res) => {
         }, { transaction: t });
 
         await t.commit();
+
+        // SIMPAN KE REDIS SETELAH COMMIT BERHASIL
+        // Beri TTL (Time to Live) misal 20 jam agar besok key ini otomatis hilang
+        await redis.set(redisKey, 'true', {
+            EX: 12 * 60 * 60 // 12 jam dalam detik
+        });
+
         res.json({ success: true, message: `Absensi Berhasil!`, time: moment(newAttendance.createdAt).format("HH:mm:ss") });
 
     } catch (err) {
