@@ -34,187 +34,260 @@ const processPhotoUpload = (buffer, schoolId, identifier, role) => {
   });
 };
 
+// exports.updateMyProfile = async (req, res) => {
+//   try {
+//     const user = req.user; // dari JWT
+//     const { name, email, nis, nisn, nip, oldPassword, newPassword, class: kelas } = req.body;
+
+//     let dataToUpdate = {};
+
+//     if (name) {
+//         if (user.role === 'siswa') {
+//             dataToUpdate.name = name; 
+//         } else {
+//             dataToUpdate.nama = name; 
+//         }
+//     }
+
+//     if (kelas && user.role === 'siswa') {
+//       dataToUpdate.class = kelas;
+//     }
+
+//     // ========================
+//     // VALIDASI EMAIL
+//     // ========================
+//     if (email) {
+//       if (user.role === 'siswa') {
+//         const exist = await Student.findOne({
+//           where: {
+//             email,
+//             id: { [Op.ne]: user.id }
+//           }
+//         });
+//         if (exist) {
+//           return res.status(400).json({
+//             success: false,
+//             message: "Email sudah digunakan siswa lain"
+//           });
+//         }
+//       } else {
+//         const exist = await GuruTendik.findOne({
+//           where: {
+//             email,
+//             id: { [Op.ne]: user.id }
+//           }
+//         });
+//         if (exist) {
+//           return res.status(400).json({
+//             success: false,
+//             message: "Email sudah digunakan"
+//           });
+//         }
+//       }
+
+//       dataToUpdate.email = email;
+//     }
+
+//     // ========================
+//     // UPDATE PASSWORD
+//     // ========================
+//     if (oldPassword && newPassword) {
+//         let currentUser;
+
+//         if (user.role === 'siswa') {
+//             currentUser = await Student.findByPk(user.id);
+//         } else {
+//             currentUser = await GuruTendik.findByPk(user.id);
+//         }
+
+//         // cek password lama
+//         const isMatch = await bcrypt.compare(oldPassword, currentUser.password || '');
+//         if (!isMatch) {
+//             return res.status(400).json({
+//             success: false,
+//             message: "Password lama tidak sesuai"
+//             });
+//         }
+
+//         // hash password baru
+//         const hashedPassword = await bcrypt.hash(newPassword, 10);
+//         dataToUpdate.password = hashedPassword;
+//     }
+
+//     // ========================
+//     // ROLE: SISWA
+//     // ========================
+//     if (user.role === 'siswa') {
+
+//       if (nis && nis !== user.nis) {
+//         const existNis = await Student.findOne({
+//           where: {
+//             schoolId: user.schoolId,
+//             nis,
+//             id: { [Op.ne]: user.id }
+//           }
+//         });
+
+//         if (existNis) {
+//           return res.status(400).json({
+//             success: false,
+//             message: `NIS ${nis} sudah digunakan`
+//           });
+//         }
+
+//         dataToUpdate.nis = nis;
+//       }
+
+//       if (nisn && nisn !== user.nisn) {
+//         const existNisn = await Student.findOne({
+//           where: {
+//             nisn,
+//             id: { [Op.ne]: user.id }
+//           }
+//         });
+
+//         if (existNisn) {
+//           return res.status(400).json({
+//             success: false,
+//             message: `NISN ${nisn} sudah digunakan`
+//           });
+//         }
+
+//         dataToUpdate.nisn = nisn;
+//       }
+
+//       await Student.update(dataToUpdate, {
+//         where: { id: user.id }
+//       });
+
+//     } else {
+//       // ========================
+//       // ROLE: GURU
+//       // ========================
+//       if (nip && nip !== user.nip) {
+//         const existNip = await GuruTendik.findOne({
+//           where: {
+//             nip,
+//             id: { [Op.ne]: user.id }
+//           }
+//         });
+
+//         if (existNip) {
+//           return res.status(400).json({
+//             success: false,
+//             message: `NIP ${nip} sudah digunakan`
+//           });
+//         }
+
+//         dataToUpdate.nip = nip;
+//       }
+
+//       await GuruTendik.update(dataToUpdate, {
+//         where: { id: user.id }
+//       });
+//     }
+
+//     let updatedUser;
+
+//     if (user.role === 'siswa') {
+//     updatedUser = await Student.findByPk(user.id, {
+//         attributes: { exclude: ['password'] }
+//     });
+//     } else {
+//     updatedUser = await GuruTendik.findByPk(user.id, {
+//         attributes: { exclude: ['password'] }
+//     });
+//     }
+
+//     res.json({
+//         success: true,
+//         message: "Profile berhasil diupdate",
+//         data: updatedUser,// <-- INI PENTING,
+//         passwordBARU: newPassword,
+//         passwordLama: oldPassword,
+//     });
+
+//   } catch (err) {
+//     res.status(500).json({
+//       success: false,
+//       message: err.message
+//     });
+//   }
+// };
+
 exports.updateMyProfile = async (req, res) => {
   try {
-    const user = req.user; // dari JWT
+    const user = req.user; 
     const { name, email, nis, nisn, nip, oldPassword, newPassword, class: kelas } = req.body;
 
     let dataToUpdate = {};
+    const Model = user.role === 'siswa' ? Student : GuruTendik;
 
+    // 1. Mapping Nama berdasarkan Role
     if (name) {
-        if (user.role === 'siswa') {
-            dataToUpdate.name = name; 
-        } else {
-            dataToUpdate.nama = name; 
-        }
+        user.role === 'siswa' ? dataToUpdate.name = name : dataToUpdate.nama = name;
+    }
+    if (kelas && user.role === 'siswa') dataToUpdate.class = kelas;
+
+    // 2. Optimasi Validasi Unik (Email, NIS, NISN)
+    // Kita cek semuanya sekaligus dalam satu query OR
+    const orConditions = [];
+    if (email) orConditions.push({ email });
+    if (user.role === 'siswa') {
+        if (nis) orConditions.push({ nis });
+        if (nisn) orConditions.push({ nisn });
+    } else {
+        if (nip) orConditions.push({ nip });
     }
 
-    if (kelas && user.role === 'siswa') {
-      dataToUpdate.class = kelas;
-    }
-
-    // ========================
-    // VALIDASI EMAIL
-    // ========================
-    if (email) {
-      if (user.role === 'siswa') {
-        const exist = await Student.findOne({
-          where: {
-            email,
-            id: { [Op.ne]: user.id }
-          }
+    if (orConditions.length > 0) {
+        const duplicate = await Model.findOne({
+            where: {
+                [Op.or]: orConditions,
+                id: { [Op.ne]: user.id }
+            }
         });
-        if (exist) {
-          return res.status(400).json({
-            success: false,
-            message: "Email sudah digunakan siswa lain"
-          });
-        }
-      } else {
-        const exist = await GuruTendik.findOne({
-          where: {
-            email,
-            id: { [Op.ne]: user.id }
-          }
-        });
-        if (exist) {
-          return res.status(400).json({
-            success: false,
-            message: "Email sudah digunakan"
-          });
-        }
-      }
 
-      dataToUpdate.email = email;
+        if (duplicate) {
+            if (email && duplicate.email === email) return res.status(400).json({ success: false, message: "Email sudah digunakan" });
+            if (nis && duplicate.nis === nis) return res.status(400).json({ success: false, message: "NIS sudah digunakan" });
+            if (nisn && duplicate.nisn === nisn) return res.status(400).json({ success: false, message: "NISN sudah digunakan" });
+            if (nip && duplicate.nip === nip) return res.status(400).json({ success: false, message: "NIP sudah digunakan" });
+        }
+        if (email) dataToUpdate.email = email;
+        if (nis) dataToUpdate.nis = nis;
+        if (nisn) dataToUpdate.nisn = nisn;
+        if (nip) dataToUpdate.nip = nip;
     }
 
-    // ========================
-    // UPDATE PASSWORD
-    // ========================
+    // 3. Update Password (Hanya jika diminta)
     if (oldPassword && newPassword) {
-        let currentUser;
-
-        if (user.role === 'siswa') {
-            currentUser = await Student.findByPk(user.id);
-        } else {
-            currentUser = await GuruTendik.findByPk(user.id);
-        }
-
-        // cek password lama
+        const currentUser = await Model.findByPk(user.id);
         const isMatch = await bcrypt.compare(oldPassword, currentUser.password || '');
-        if (!isMatch) {
-            return res.status(400).json({
-            success: false,
-            message: "Password lama tidak sesuai"
-            });
-        }
-
-        // hash password baru
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
-        dataToUpdate.password = hashedPassword;
+        if (!isMatch) return res.status(400).json({ success: false, message: "Password lama salah" });
+        
+        dataToUpdate.password = await bcrypt.hash(newPassword, 10);
     }
 
-    // ========================
-    // ROLE: SISWA
-    // ========================
-    if (user.role === 'siswa') {
+    // 4. Eksekusi Update
+    await Model.update(dataToUpdate, { where: { id: user.id } });
 
-      if (nis && nis !== user.nis) {
-        const existNis = await Student.findOne({
-          where: {
-            schoolId: user.schoolId,
-            nis,
-            id: { [Op.ne]: user.id }
-          }
-        });
+    // 5. Response (Tanpa query findByPk lagi untuk performa)
+    // Kita buat objek user baru dari data yang ada
+    const finalData = { ...user, ...dataToUpdate };
+    delete finalData.password; // Pastikan password tidak ikut dikirim
 
-        if (existNis) {
-          return res.status(400).json({
-            success: false,
-            message: `NIS ${nis} sudah digunakan`
-          });
-        }
-
-        dataToUpdate.nis = nis;
-      }
-
-      if (nisn && nisn !== user.nisn) {
-        const existNisn = await Student.findOne({
-          where: {
-            nisn,
-            id: { [Op.ne]: user.id }
-          }
-        });
-
-        if (existNisn) {
-          return res.status(400).json({
-            success: false,
-            message: `NISN ${nisn} sudah digunakan`
-          });
-        }
-
-        dataToUpdate.nisn = nisn;
-      }
-
-      await Student.update(dataToUpdate, {
-        where: { id: user.id }
-      });
-
-    } else {
-      // ========================
-      // ROLE: GURU
-      // ========================
-      if (nip && nip !== user.nip) {
-        const existNip = await GuruTendik.findOne({
-          where: {
-            nip,
-            id: { [Op.ne]: user.id }
-          }
-        });
-
-        if (existNip) {
-          return res.status(400).json({
-            success: false,
-            message: `NIP ${nip} sudah digunakan`
-          });
-        }
-
-        dataToUpdate.nip = nip;
-      }
-
-      await GuruTendik.update(dataToUpdate, {
-        where: { id: user.id }
-      });
-    }
-
-    let updatedUser;
-
-    if (user.role === 'siswa') {
-    updatedUser = await Student.findByPk(user.id, {
-        attributes: { exclude: ['password'] }
-    });
-    } else {
-    updatedUser = await GuruTendik.findByPk(user.id, {
-        attributes: { exclude: ['password'] }
-    });
-    }
-
+    console.log('KODE BARU UPDATE PROFILE ME')
     res.json({
         success: true,
         message: "Profile berhasil diupdate",
-        data: updatedUser,// <-- INI PENTING,
-        passwordBARU: newPassword,
-        passwordLama: oldPassword,
+        data: finalData 
     });
 
   } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: err.message
-    });
+    res.status(500).json({ success: false, message: err.message });
   }
 };
-
 
 exports.updateMyPhoto = async (req, res) => {
   try {
