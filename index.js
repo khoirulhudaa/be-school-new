@@ -44,6 +44,10 @@ app.set('socketio', io);
 io.on('connection', (socket) => {
   console.log('A client connected:', socket.id);
 
+  socket.on('join-school', (schoolId) => {
+    socket.join(`school-${schoolId}`);
+  });
+
   // Web Perpus join room berdasarkan UUID sessionId
   socket.on('join-login-room', (sessionId) => {
     socket.join(sessionId);
