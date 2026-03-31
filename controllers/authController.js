@@ -232,7 +232,7 @@ exports.getProfile = async (req, res) => {
     const userData = user.get({ plain: true });
 
     // 2. Ambil data sekolah secara dinamis
-    if (role === 'Kepala Sekolah' || role === 'Guru' || role === 'Siswa') {
+    if (role === 'Kepala Sekolah' || role === 'guru' || role === 'Guru' || role === 'Siswa') {
       // Cari di tabel SchoolAccount berdasarkan schoolId yang ada di profile guru/siswa
       schoolData = await SchoolAccount.findByPk(userData.schoolId);
     } else {
