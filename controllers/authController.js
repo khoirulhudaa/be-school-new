@@ -218,7 +218,7 @@ exports.getProfile = async (req, res) => {
     let schoolData = null;
 
     // 1. Ambil data user berdasarkan role
-    if (role !== 'Siswa' || role !== 'siswa') {
+    if (role === 'Kepala Sekolah' || role === 'guru' || role === 'Guru') {
       user = await GuruTendik.findByPk(userId);
     } else if (role === 'Siswa') {
       user = await Student.findByPk(userId);
