@@ -212,15 +212,16 @@ exports.getAllSchools = async (req, res) => {
 
 exports.getProfile = async (req, res) => {
   try {
-    const { role, id: userId } = req.user;
+    const { role: rawRole, id: userId } = req.user;
+    const role = rawRole.toLowerCase();
 
     let user;
     let schoolData = null;
 
     // 1. Ambil data user berdasarkan role
-    if (role === 'Kepala Sekolah' || role === 'Guru') {
+    if (role === 'kepala sekolah' || role === 'guru') {
       user = await GuruTendik.findByPk(userId);
-    } else if (role === 'Siswa') {
+    } else if (role === 'siswa') {
       user = await Student.findByPk(userId);
     } else {
       // Jika rolenya admin sekolah, user itu sendiri adalah SchoolAccount
@@ -232,8 +233,7 @@ exports.getProfile = async (req, res) => {
     const userData = user.get({ plain: true });
 
     // 2. Ambil data sekolah secara dinamis
-    if (role === 'Kepala Sekolah' || role === 'Guru' || role === 'Siswa') {
-      // Cari di tabel SchoolAccount berdasarkan schoolId yang ada di profile guru/siswa
+    if (role === 'kepala sekolah' || role === 'guru' || role === 'siswa') {      
       schoolData = await SchoolAccount.findByPk(userData.schoolId);
     } else {
       // Jika rolenya admin sekolah, datanya ya dari userData itu sendiri
@@ -247,7 +247,7 @@ exports.getProfile = async (req, res) => {
         id: userData.id, // ID asli user (Guru/Siswa/Sekolah)
         name: userData.nama || userData.adminName,
         email: userData.email,
-        role: role,
+        role: rawRole,
         // Data Sekolah diambil dari instance schoolData
         sekolah: schoolData ? {
           id: schoolData.id,
