@@ -99,7 +99,7 @@
     router.get('/testing', (req, res) => {
       res.json({
         success: true,
-        message: 'API SEKOLAH (1.0.1)',
+        message: 'API SEKOLAH (1.0.1) WITH PM2',
         timestamp: new Date().toISOString()
       });
     });
