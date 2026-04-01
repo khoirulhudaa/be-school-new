@@ -14,12 +14,14 @@ const globalLimiter = rateLimit({
 
 // 2. Stricter limiter untuk route sensitif (misal login, create berita, upload)
 const strictLimiter = rateLimit({
-  windowMs: 60 * 1000,           // 1 menit
-  limit: 5,                       // max 100 request per menit
-  // standardHeaders: 'draft-8',
-  // legacyHeaders: false,
+  windowMs: 60 * 1000,
+  limit: 5,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
   message: { success: false, message: 'Terlalu banyak percobaan, tunggu 1 menit.' },
   statusCode: 429,
+  // TAMBAHKAN INI:
+  validate: { xForwardedForHeader: false },
 });
 
 // 3. Limiter khusus untuk route berat (misal upload gambar/fasilitas)
