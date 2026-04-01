@@ -382,9 +382,16 @@ exports.scanSelfDoubleQr = async (req, res) => {
             userProfile = JSON.parse(userProfile);
         } else {
             userProfile = isStudent
-                ? await Student.findByPk(id, { attributes: ['id', 'name', 'nama', 'class', 'kelas', 'photoUrl'], raw: true })
-                : await GuruTendik.findByPk(id, { attributes: ['id', 'name', 'nama', 'photoUrl'], raw: true });
-
+            ? await Student.findByPk(id, { 
+                // Model Student menggunakan 'name' dan 'class'
+                attributes: ['id', 'name', 'class', 'photoUrl', 'nis'], 
+                raw: true 
+              })
+            : await GuruTendik.findByPk(id, { 
+                // Model GuruTendik menggunakan 'nama' (bukan name)
+                attributes: ['id', 'nama', 'photoUrl', 'nip', 'role'], 
+                raw: true 
+              });
             if (!userProfile) {
                 await redis.del(redisKey);
                 return res.status(404).json({ success: false, message: "Profil tidak ditemukan" });
