@@ -11,9 +11,9 @@ const sequelize = new Sequelize(
     isolationLevel: Transaction.ISOLATION_LEVELS.REPEATABLE_READ,
     logging: false, 
     pool: {
-      max: 60,            // Dinaikkan untuk menangani lonjakan absen
+      max: 50,            // Dinaikkan untuk menangani lonjakan absen
       min: 10,           // Standby koneksi lebih banyak
-      acquire: 60000,     // 1 menit cukup untuk timeout
+      acquire: 10000,     // 1 menit cukup untuk timeout
       idle: 10000,        // Tutup koneksi idle lebih cepat (10 detik)
       evict: 1000,
     },

@@ -14,8 +14,12 @@ const globalLimiter = rateLimit({
 
 // 2. Stricter limiter untuk route sensitif (misal login, create berita, upload)
 const strictLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,             // 1 menit
-  limit: 100,                       // max 100 request per menit
+  windowMs: 60 * 1000,           // 1 menit
+  limit: 5,                  
+  keyGenerator: (req) => {
+    const profile = req.user?.profile || req.user;
+    return `scan:${profile?.id || req.ip}`;
+  }, 
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: { success: false, message: 'Terlalu banyak percobaan, tunggu 1 menit.' },

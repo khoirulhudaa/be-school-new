@@ -331,78 +331,81 @@ exports.scanSelfDoubleQr = async (req, res) => {
 
     const { id, role, schoolId } = profile;
 
-    // --- 1. Validasi Awal (Tanpa DB) ---
-    if (!qrCodeData || !schoolId) return res.status(400).json({ success: false, message: "Data tidak lengkap" });
+    // --- 1. Validasi Awal ---
+    if (!qrCodeData || !schoolId) 
+        return res.status(400).json({ success: false, message: "Data tidak lengkap" });
+    
     const regex = new RegExp(`^SCHOOL_QR_${schoolId}_(LEFT|RIGHT)$`);
     const match = qrCodeData.match(regex);
-    if (!match) return res.status(403).json({ success: false, message: "QR Code tidak valid" });
+    if (!match) 
+        return res.status(403).json({ success: false, message: "QR Code tidak valid" });
     const qrPosition = match[1].toLowerCase();
 
-    // --- 2. Redis Guard (Cepat) ---
-    const redisKey = `absensi_check:${schoolId}:${id}:${moment().format('YYYY-MM-DD')}`;
+    // --- 2. Geofencing DULU (Zero DB, Pure CPU) ---
+    // Ambil school dari Redis cache dulu
+    let school = await redis.get(`school_profile:${schoolId}`);
+    if (school) {
+        school = JSON.parse(school);
+    } else {
+        school = await SchoolProfile.findOne({ where: { schoolId }, raw: true });
+        if (school) await redis.set(`school_profile:${schoolId}`, JSON.stringify(school), { EX: 86400 });
+    }
+
+    if (school?.latitude && school?.longitude) {
+        const distance = getDistance(userLat, userLon, parseFloat(school.latitude), parseFloat(school.longitude));
+        if (distance > 200) {
+            return res.status(403).json({ success: false, message: `Luar jangkauan (${Math.round(distance)}m)` });
+        }
+    }
+
+    // --- 3. Redis Atomic Guard (SETELAH geofencing lolos) ---
+    const today = moment().format('YYYY-MM-DD');
+    const redisKey = `absensi_check:${schoolId}:${id}:${today}`;
     const secondsUntilEndOfDay = moment().endOf('day').diff(moment(), 'seconds');
+    
     const lock = await redis.set(redisKey, 'true', { NX: true, EX: secondsUntilEndOfDay });
-    if (!lock) return res.status(400).json({ success: false, message: 'Anda sudah absen hari ini.' });
+    if (!lock) 
+        return res.status(400).json({ success: false, message: 'Anda sudah absen hari ini.' });
 
     try {
-        // --- 3. Geofencing (DI LUAR TRANSAKSI) ---
-        let school = await redis.get(`school_profile:${schoolId}`);
-        if (school) school = JSON.parse(school);
-        if (!school) {
-            school = await SchoolProfile.findOne({ where: { schoolId }, raw: true }); // raw: true lebih cepat
-            if (school) await redis.set(`school_profile:${schoolId}`, JSON.stringify(school), { EX: 86400 });
-        }
-
-        if (school?.latitude && school?.longitude) {
-            const distance = getDistance(userLat, userLon, parseFloat(school.latitude), parseFloat(school.longitude));
-            if (distance > 200) {
-                await redis.del(redisKey); // Hapus lock karena gagal
-                return res.status(403).json({ success: false, message: `Luar jangkauan (${Math.round(distance)}m)` });
-            }
-        }
-
         const isStudent = role?.toLowerCase?.() === 'siswa' || role === 'student';
         const idKey = isStudent ? 'studentId' : 'guruId';
 
-        // --- 4. Ambil Profil (DI LUAR TRANSAKSI) ---
-        // Kita hanya ambil kolom yang butuh saja (attributes)
-        const userProfile = isStudent 
-            ? await Student.findByPk(id, { attributes: ['id', 'name', 'nama', 'class', 'kelas', 'photoUrl'], raw: true })
-            : await GuruTendik.findByPk(id, { attributes: ['id', 'name', 'nama', 'photoUrl'], raw: true });
+        // --- 4. Ambil Profil (Dengan Cache Redis) ---
+        const profileCacheKey = `user_profile:${isStudent ? 'student' : 'guru'}:${id}`;
+        let userProfile = await redis.get(profileCacheKey);
+        
+        if (userProfile) {
+            userProfile = JSON.parse(userProfile);
+        } else {
+            userProfile = isStudent
+                ? await Student.findByPk(id, { attributes: ['id', 'name', 'nama', 'class', 'kelas', 'photoUrl'], raw: true })
+                : await GuruTendik.findByPk(id, { attributes: ['id', 'name', 'nama', 'photoUrl'], raw: true });
 
-        if (!userProfile) throw new Error("Profil tidak ditemukan");
-
-        // --- 5. TRANSAKSI SINGKAT (Hanya untuk Tulis) ---
-        const t = await sequelize.transaction();
-        try {
-            const todayStart = moment().startOf('day').toDate();
-            const todayEnd = moment().endOf('day').toDate();
-
-            // Cek duplikasi di DB (Double Check)
-            const alreadyExists = await Attendance.findOne({
-                where: { [idKey]: id, createdAt: { [Op.between]: [todayStart, todayEnd] } },
-                transaction: t,
-                lock: t.LOCK.UPDATE 
-            });
-
-            if (alreadyExists) {
-                await t.rollback();
-                return res.status(400).json({ success: false, message: 'Anda sudah absen hari ini.' });
+            if (!userProfile) {
+                await redis.del(redisKey);
+                return res.status(404).json({ success: false, message: "Profil tidak ditemukan" });
             }
-
-            const newAttendance = await Attendance.create({ 
-                [idKey]: id,
-                userRole: isStudent ? 'student' : 'teacher',
-                schoolId, 
-                currentClass: isStudent ? (userProfile.class || userProfile.kelas) : 'GURU/STAFF',
-                status: 'Hadir',
-                latitude: userLat,
-                longitude: userLon
-            }, { transaction: t });
             
-            await t.commit();
+            // Cache profil 1 jam
+            await redis.set(profileCacheKey, JSON.stringify(userProfile), { EX: 3600 });
+        }
 
-            // --- 6. Post-Process (Socket.io) ---
+        // --- 5. DB Write TANPA cek duplikasi (Redis sudah jadi guard) ---
+        // Hapus findOne + LOCK.UPDATE → ini sumber bottleneck utama!
+        const newAttendance = await Attendance.create({
+            [idKey]: id,
+            userRole: isStudent ? 'student' : 'teacher',
+            schoolId,
+            currentClass: isStudent ? (userProfile.class || userProfile.kelas) : 'GURU/STAFF',
+            status: 'Hadir',
+            latitude: userLat,
+            longitude: userLon
+        });
+        // Tidak perlu transaksi karena Redis sudah guarantee 1x per user per hari
+
+        // --- 6. Socket.io emit (fire and forget) ---
+        setImmediate(() => {
             const io = req.app.get('socketio');
             io.to(`school-${schoolId}`).emit('attendance:new', {
                 student: {
@@ -414,15 +417,12 @@ exports.scanSelfDoubleQr = async (req, res) => {
                 },
                 qrPosition
             });
+        });
 
-            return res.json({ success: true, message: `Absensi Berhasil!` });
-
-        } catch (innerErr) {
-            if (t) await t.rollback();
-            throw innerErr;
-        }
+        return res.json({ success: true, message: `Absensi Berhasil!` });
 
     } catch (err) {
+        // Rollback Redis lock agar bisa retry
         await redis.del(redisKey);
         console.error("ERROR:", err.message);
         res.status(500).json({ success: false, message: "Gagal memproses" });
