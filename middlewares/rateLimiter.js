@@ -1,5 +1,5 @@
 // middleware/rateLimiter.js
-const rateLimit = require('express-rate-limit');
+const {rateLimit, ipKeyGenerator} = require('express-rate-limit');
 
 // 1. Global limiter: berlaku untuk semua route (bisa di-apply di app level)
 // Cocok untuk proteksi umum terhadap abuse/DoS sederhana
@@ -16,12 +16,13 @@ const globalLimiter = rateLimit({
 const strictLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: 5,
-  standardHeaders: 'draft-7',
-  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const profile = req.user?.profile || req.user;
+    if (profile?.id) return `scan:${profile.id}`; // pakai userId kalau ada
+    return ipKeyGenerator(req); // fallback ke IP dengan IPv6 support
+  },
   message: { success: false, message: 'Terlalu banyak percobaan, tunggu 1 menit.' },
   statusCode: 429,
-  // TAMBAHKAN INI:
-  validate: { xForwardedForHeader: false },
 });
 
 // 3. Limiter khusus untuk route berat (misal upload gambar/fasilitas)
