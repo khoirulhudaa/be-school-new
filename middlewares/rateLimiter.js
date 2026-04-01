@@ -14,8 +14,8 @@ const globalLimiter = rateLimit({
 
 // 2. Stricter limiter untuk route sensitif (misal login, create berita, upload)
 const strictLimiter = rateLimit({
-  windowMs: 60 * 1000,             // 1 menit
-  limit: 10,                       // max 10 request per menit
+  windowMs: 1 * 60 * 1000,             // 1 menit
+  limit: 100,                       // max 100 request per menit
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: { success: false, message: 'Terlalu banyak percobaan, tunggu 1 menit.' },

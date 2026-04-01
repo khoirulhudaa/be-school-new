@@ -11,24 +11,20 @@ const sequelize = new Sequelize(
     isolationLevel: Transaction.ISOLATION_LEVELS.REPEATABLE_READ,
     logging: false, 
     pool: {
-      max: 30,          // naikkan kalau traffic lumayan
-      min: 5,
-      acquire: 120000,  // 2 menit
-      idle: 30000,      // tutup koneksi idle setelah 30 detik
-      evict: 1000,      // cek koneksi mati setiap 1 detik  
+      max: 60,            // Dinaikkan untuk menangani lonjakan absen
+      min: 10,           // Standby koneksi lebih banyak
+      acquire: 60000,     // 1 menit cukup untuk timeout
+      idle: 10000,        // Tutup koneksi idle lebih cepat (10 detik)
+      evict: 1000,
     },
+    // dialectOptions: {
+    //   connectTimeout: 60000 
+    // },
     dialectOptions: {
-      connectTimeout: 60000 
+      connectTimeout: 60000,
+      // Membantu performa pada query besar
+      decimalNumbers: true 
     },
-    // hooks: {
-    //   beforeConnect: (config) => {
-    //     config.dialectOptions = {
-    //       ...config.dialectOptions,
-    //       wait_timeout: 3600,
-    //       interactive_timeout: 3600,
-    //     };
-    //   },
-    // }
   }
 );
 
