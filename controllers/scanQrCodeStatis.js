@@ -324,6 +324,9 @@ exports.scanSelf = async (req, res) => {
 //     }
 // };
 
+
+// DARI CLAUDE:
+
 exports.scanSelfDoubleQr = async (req, res) => {
     const { qrCodeData, userLat, userLon } = req.body;
     const profile = req.user?.profile || req.user;
