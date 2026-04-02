@@ -58,10 +58,10 @@ const io = new Server(server, {
     // Gunakan fungsi yang sama dengan cors express atau list domain Anda
     origin: "*", 
     methods: ['GET', 'POST'],
-    credentials: true // 👈 PENTING: Harus true jika frontend menggunakan session/cookie
+    // credentials: true // 👈 PENTING: Harus true jika frontend menggunakan session/cookie
   },
-  allowEIO3: true, // Support versi engine.io lama jika ada client lama
-  transports: ['websocket', 'polling'] // Izinkan keduanya, tapi utamakan websocket
+  // allowEIO3: true, // Support versi engine.io lama jika ada client lama
+  // transports: ['websocket', 'polling'] // Izinkan keduanya, tapi utamakan websocket
 });
 
 // --- 4. SIMPAN IO KE APP AGAR BISA DIAKSES DI CONTROLLER ---
