@@ -15,7 +15,7 @@ const globalLimiter = rateLimit({
 // 2. Stricter limiter untuk route sensitif (misal login, create berita, upload)
 const strictLimiter = rateLimit({
   windowMs: 60 * 1000,
-  limit: 10000,
+  limit: 5,
   keyGenerator: (req) => {
     const profile = req.user?.profile || req.user;
     if (profile?.id) return `scan:${profile.id}`; // pakai userId kalau ada
