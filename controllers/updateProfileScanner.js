@@ -359,12 +359,13 @@ exports.updateMyPhoto = async (req, res) => {
       data: updatedUser
     });
 
-  } catch (err) {
-    console.error("Update Photo Error:", err);
-
+ } catch (err) {
+    // Catch-all untuk error yang tidak terduga
+    console.error("Unexpected Update Photo Error:", err);
     res.status(500).json({
       success: false,
-      message: "Gagal mengupdate foto"
+      message: "Terjadi kesalahan sistem yang tidak terduga",
+      error: err.message
     });
   }
 };
