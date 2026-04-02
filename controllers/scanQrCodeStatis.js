@@ -439,6 +439,82 @@ exports.scanSelfDoubleQr = async (req, res) => {
     }
 };
 
+
+// STRESS-TEST
+
+// exports.scanSelfDoubleQr = async (req, res) => {
+//     const { qrCodeData, userLat, userLon } = req.body;
+//     const profile = req.user;
+
+//     if (!profile) return res.status(401).json({ success: false, message: "Sesi tidak valid" });
+
+//     const { id, role, schoolId } = profile;
+
+//     console.log({ userId: id, schoolId, qrCodeData });
+
+//     if (!qrCodeData || !schoolId) 
+//         return res.status(400).json({ success: false, message: "Data tidak lengkap" });
+
+//     const regex = new RegExp(`^SCHOOL_QR_${schoolId}_(LEFT|RIGHT)$`);
+//     const match = qrCodeData.match(regex);
+//     if (!match) 
+//         return res.status(403).json({ success: false, message: "QR Code tidak valid" });
+
+//     const qrPosition = match[1].toLowerCase();
+
+//     try {
+//         // Redis lock untuk 1x absen/hari
+//         const today = moment().format('YYYY-MM-DD');
+//         const redisKey = `absensi_check:${schoolId}:${id}:${today}`;
+//         const secondsUntilEndOfDay = moment().endOf('day').diff(moment(), 'seconds');
+
+//         const lock = await redis.set(redisKey, 'true', { NX: true, EX: secondsUntilEndOfDay });
+//         if (!lock) return res.status(400).json({ success: false, message: 'Anda sudah absen hari ini.' });
+
+//         const isStudent = role?.toLowerCase() === 'student' || role?.toLowerCase() === 'siswa';
+//         const idKey = isStudent ? 'studentId' : 'guruId';
+
+//         // dummy profil sudah ada di req.user untuk stress test
+//         const userProfile = profile;
+
+//         // DB Write
+//         await Attendance.create({
+//             [idKey]: id,
+//             userRole: isStudent ? 'student' : 'teacher',
+//             schoolId,
+//             currentClass: isStudent ? userProfile.class : 'GURU/STAFF',
+//             status: 'Hadir',
+//             latitude: userLat,
+//             longitude: userLon
+//         });
+
+//         // Socket emit hanya kalau bukan stress test
+//         if (process.env.STRESS_TEST.trim() !== 'true') {
+//             setImmediate(() => {
+//                 const io = req.app.get('socketio');
+//                 io.to(`school-${schoolId}`).emit('attendance:new', {
+//                     student: {
+//                         id: userProfile.id,
+//                         name: userProfile.name,
+//                         class: isStudent ? userProfile.class : 'GURU/STAFF',
+//                         photo: userProfile.photoUrl,
+//                         time: moment().format("HH:mm:ss")
+//                     },
+//                     qrPosition
+//                 });
+//             });
+//         }
+
+//         return res.json({ success: true, message: `Absensi Berhasil!` });
+
+//     } catch (err) {
+//         // rollback Redis
+//         await redis.del(`absensi_check:${schoolId}:${id}:${moment().format('YYYY-MM-DD')}`);
+//         console.error("ERROR:", err.message);
+//         return res.status(500).json({ success: false, message: "Gagal memproses" });
+//     }
+// };
+
 exports.loginWithQR = async (req, res) => {
   try {
     const { qrCodeData, role: requestedRole } = req.body; // role opsional: 'siswa' atau 'guru'

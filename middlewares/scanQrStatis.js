@@ -32,3 +32,42 @@ const scanQrMiddleware = (req, res, next) => {
 };
 
 module.exports = scanQrMiddleware;
+
+
+
+// const jwt = require('jsonwebtoken');
+
+// const scanQrMiddleware = (req, res, next) => {
+//   // 🔥 MODE STRESS TEST
+//   if (process.env.STRESS_TEST === 'true') {
+//     req.user = {
+//       id: req.body.userId,
+//       schoolId: 1
+//     };
+//   }
+
+//   // 🔒 MODE NORMAL
+//   const authHeader = req.headers.authorization;
+  
+//   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+//     return res.status(401).json({ 
+//       success: false, 
+//       message: 'Akses ditolak. Token tidak ditemukan.' 
+//     });
+//   }
+
+//   const token = authHeader.split(' ')[1];
+
+//   try {
+//     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+//     req.user = decoded;
+//     next();
+//   } catch (err) {
+//     return res.status(403).json({ 
+//       success: false, 
+//       message: 'Token tidak valid atau telah kadaluwarsa.' 
+//     });
+//   }
+// };
+
+// module.exports = scanQrMiddleware;
