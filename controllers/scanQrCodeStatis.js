@@ -180,7 +180,7 @@ exports.scanSelfDoubleQr = async (req, res) => {
     const regex = new RegExp(`^SCHOOL_QR_${schoolId}_(LEFT|RIGHT)$`);
     const match = qrCodeData.match(regex);
     if (!match) 
-        return res.status(403).json({ success: false, message: "QR Code tidak valid" });
+      return res.status(403).json({ success: false, message: "QR Code tidak valid" });
     const qrPosition = match[1].toLowerCase();
 
     // --- 2. Geofencing DULU (Zero DB, Pure CPU) ---

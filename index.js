@@ -32,9 +32,13 @@ const server = http.createServer(app);
 // --- 3. INISIALISASI SOCKET.IO ---
 const io = new Server(server, {
   cors: {
-    origin: '*', // Sesuaikan jika ingin lebih secure di production
-    methods: ['GET', 'POST']
-  }
+    // Gunakan fungsi yang sama dengan cors express atau list domain Anda
+    origin: allowedOrigins, 
+    methods: ['GET', 'POST'],
+    credentials: true // 👈 PENTING: Harus true jika frontend menggunakan session/cookie
+  },
+  allowEIO3: true, // Support versi engine.io lama jika ada client lama
+  transports: ['websocket', 'polling'] // Izinkan keduanya, tapi utamakan websocket
 });
 
 // --- 4. SIMPAN IO KE APP AGAR BISA DIAKSES DI CONTROLLER ---
