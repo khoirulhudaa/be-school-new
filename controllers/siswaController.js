@@ -1163,7 +1163,7 @@ exports.getAttendanceReport = async (req, res) => {
     const { count, rows } = await Attendance.findAndCountAll({
       where: {
         schoolId,
-        // userRole: role,
+        userRole: role,
         createdAt: { [Op.between]: [startDate, endDate] }
       },
       include: [
