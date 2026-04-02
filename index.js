@@ -29,6 +29,29 @@ const port = process.env.PORT || 5005;
 // --- 2. BUAT HTTP SERVER ---
 const server = http.createServer(app);
 
+const allowedOrigins = [
+  "https://presensitv.kiraproject.id",
+  "https://presensi.kiraproject.id",
+  "https://scan.kiraproject.id",
+  "https://e-library.kiraproject.id",
+  "https://go.kiraproject.id",
+  "https://cek.absen.kiraproject.id",
+  "https://smkn13jkt.kiraproject.id",
+  "https://new.sman25-jkt.sch.id",
+  "https://sman25-jkt.sch.id",
+  "https://sman101.kiraproject.id",
+  "https://sman78.kiraproject.id",
+  "https://sman40-jkt.sch.id",
+  "https://sdn09jkt.kiraproject.id",
+  "https://admin.kiraproject.id",
+  "http://localhost:5173",
+  "http://localhost:5111",
+  "http://localhost:5222",
+  "http://localhost:5333",
+  "http://localhost:5444",
+  "http://localhost:5555"
+];
+
 // --- 3. INISIALISASI SOCKET.IO ---
 const io = new Server(server, {
   cors: {
@@ -68,29 +91,6 @@ app.set('trust proxy', 1);
 if (process.env.NODE_ENV !== 'production') {
   app.set('json spaces', 2);
 }
-
-const allowedOrigins = [
-  "https://presensitv.kiraproject.id",
-  "https://presensi.kiraproject.id",
-  "https://scan.kiraproject.id",
-  "https://e-library.kiraproject.id",
-  "https://go.kiraproject.id",
-  "https://cek.absen.kiraproject.id",
-  "https://smkn13jkt.kiraproject.id",
-  "https://new.sman25-jkt.sch.id",
-  "https://sman25-jkt.sch.id",
-  "https://sman101.kiraproject.id",
-  "https://sman78.kiraproject.id",
-  "https://sman40-jkt.sch.id",
-  "https://sdn09jkt.kiraproject.id",
-  "https://admin.kiraproject.id",
-  "http://localhost:5173",
-  "http://localhost:5111",
-  "http://localhost:5222",
-  "http://localhost:5333",
-  "http://localhost:5444",
-  "http://localhost:5555"
-];
 
 app.use(cors({
   origin: function (origin, callback) {
