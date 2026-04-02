@@ -19,6 +19,7 @@ const processPhotoUpload = (buffer, schoolId, identifier, role) => {
         folder: `sekolah_${schoolId}/${role}`,
         public_id: `photo_${identifier}`,
         overwrite: true,
+        timeout: 60000,
         transformation: [
           { width: 400, height: 400, crop: 'thumb', gravity: 'face' },
           { quality: 'auto', fetch_format: 'auto' }
