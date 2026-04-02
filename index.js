@@ -65,8 +65,40 @@ if (process.env.NODE_ENV !== 'production') {
   app.set('json spaces', 2);
 }
 
+const allowedOrigins = [
+  "https://presensitv.kiraproject.id",
+  "https://presensi.kiraproject.id",
+  "https://scan.kiraproject.id",
+  "https://e-library.kiraproject.id",
+  "https://go.kiraproject.id",
+  "https://cek.absen.kiraproject.id",
+  "https://smkn13jkt.kiraproject.id",
+  "https://new.sman25-jkt.sch.id",
+  "https://sman25-jkt.sch.id",
+  "https://sman101.kiraproject.id",
+  "https://sman78.kiraproject.id",
+  "https://sman40-jkt.sch.id",
+  "https://sdn09jkt.kiraproject.id",
+  "https://admin.kiraproject.id",
+  "http://localhost:5173",
+  "http://localhost:5111",
+  "http://localhost:5222",
+  "http://localhost:5333",
+  "http://localhost:5444",
+  "http://localhost:5555"
+];
+
 app.use(cors({
-  origin: '*',
+  origin: function (origin, callback) {
+    // allow request tanpa origin (postman, mobile app, dll)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   credentials: true
