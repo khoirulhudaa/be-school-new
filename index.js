@@ -29,37 +29,12 @@ const port = process.env.PORT || 5005;
 // --- 2. BUAT HTTP SERVER ---
 const server = http.createServer(app);
 
-// const allowedOrigins = [
-//   "https://presensitv.kiraproject.id",
-//   "https://presensi.kiraproject.id",
-//   "https://scan.kiraproject.id",
-//   "https://e-library.kiraproject.id",
-//   "https://go.kiraproject.id",
-//   "https://cek.absen.kiraproject.id",
-//   "https://smkn13jkt.kiraproject.id",
-//   "https://new.sman25-jkt.sch.id",
-//   "https://sman25-jkt.sch.id",
-//   "https://sman101.kiraproject.id",
-//   "https://sman78.kiraproject.id",
-//   "https://sman40-jkt.sch.id",
-//   "https://sdn09jkt.kiraproject.id",
-//   "https://admin.kiraproject.id",
-//   "http://localhost:5173",
-//   "http://localhost:5111",
-//   "http://localhost:5222",
-//   "http://localhost:5333",
-//   "http://localhost:5444",
-//   "http://localhost:5555"
-// ];
-
 // --- 3. INISIALISASI SOCKET.IO ---
 const io = new Server(server, {
   cors: {
-    origin: "*", 
-    methods: ["GET", "POST"],
-    credentials: false
-  },
-  transports: ["websocket", "polling"] // Server boleh terima dua-duanya
+    origin: '*', // Sesuaikan jika ingin lebih secure di production
+    methods: ['GET', 'POST']
+  }
 });
 
 // --- 4. SIMPAN IO KE APP AGAR BISA DIAKSES DI CONTROLLER ---
@@ -90,26 +65,43 @@ if (process.env.NODE_ENV !== 'production') {
   app.set('json spaces', 2);
 }
 
-// app.use(cors({
-//   origin: function (origin, callback) {
-//     // allow request tanpa origin (postman, mobile app, dll)
-//     if (!origin) return callback(null, true);
-
-//     if (allowedOrigins.includes(origin)) {
-//       callback(null, true);
-//     } else {
-//       callback(new Error("Not allowed by CORS"));
-//     }
-//   },
-//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-//   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-//   credentials: true
-// }));
+const allowedOrigins = [
+  "https://presensitv.kiraproject.id",
+  "https://presensi.kiraproject.id",
+  "https://scan.kiraproject.id",
+  "https://e-library.kiraproject.id",
+  "https://go.kiraproject.id",
+  "https://cek.absen.kiraproject.id",
+  "https://smkn13jkt.kiraproject.id",
+  "https://new.sman25-jkt.sch.id",
+  "https://sman25-jkt.sch.id",
+  "https://sman101.kiraproject.id",
+  "https://sman78.kiraproject.id",
+  "https://sman40-jkt.sch.id",
+  "https://sdn09jkt.kiraproject.id",
+  "https://admin.kiraproject.id",
+  "http://localhost:5173",
+  "http://localhost:5111",
+  "http://localhost:5222",
+  "http://localhost:5333",
+  "http://localhost:5444",
+  "http://localhost:5555"
+];
 
 app.use(cors({
-  origin: '*', 
+  origin: function (origin, callback) {
+    // allow request tanpa origin (postman, mobile app, dll)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true
 }));
 
 app.use(express.json({ limit: '50mb' }));
