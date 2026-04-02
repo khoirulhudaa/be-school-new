@@ -18,7 +18,7 @@ Parent.hasMany(Student, { foreignKey: 'parentId', as: 'children' });
 Student.belongsTo(Parent, { foreignKey: 'parentId', as: 'parent' });
 
 // Import limiter global saja (karena yang lain sudah di routes/index.js)
-// const { globalLimiter } = require('./middlewares/rateLimiter');
+const { globalLimiter } = require('./middlewares/rateLimiter');
 
 // Import semua routes dari satu file
 const apiRoutes = require('./routes');  // → routes/index.js
@@ -127,7 +127,7 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // }));
 
 // Global limiter untuk SEMUA request (tetap di app level)
-// app.use(globalLimiter);
+app.use(globalLimiter);
 
 // Static folder
 const uploadDir = path.join(__dirname, 'uploads');
