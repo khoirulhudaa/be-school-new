@@ -1166,13 +1166,13 @@ exports.getAttendanceReport = async (req, res) => {
         userRole: role,
         createdAt: { [Op.between]: [startDate, endDate] }
       },
-      include: [
-        {
-          model: role === 'student' ? Student : GuruTendik,
-          as: role === 'student' ? 'student' : 'guru',
-          attributes: role === 'student' ? ['name', 'nis'] : ['nama', 'role', 'mapel']
-        }
-      ],
+      // include: [
+      //   {
+      //     model: role === 'student' ? Student : GuruTendik,
+      //     as: role === 'student' ? 'student' : 'guru',
+      //     attributes: role === 'student' ? ['name', 'nis'] : ['nama', 'role', 'mapel']
+      //   }
+      // ],
       limit: parseInt(limit),
       offset: (parseInt(page) - 1) * parseInt(limit),
       order: [['createdAt', 'DESC']],
