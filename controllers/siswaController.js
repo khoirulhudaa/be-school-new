@@ -28,7 +28,7 @@ const invalidateStudentCache = async (schoolId) => {
     const pattern = `cache:/siswa*schoolId=${schoolId}*`;
     const keys = await redisClient.keys(pattern);
     if (keys.length > 0) {
-      await redisClient.del(keys);
+      await redisClient.del(...keys); // Spread karena ioredis
       console.log(`✅ Cache invalidated: ${keys.length} keys for schoolId ${schoolId}`);
     }
   } catch (err) {

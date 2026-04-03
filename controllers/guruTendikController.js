@@ -19,7 +19,7 @@ const invalidateGuruTendikCache = async (schoolId) => {
     const pattern = `cache:/guruTendik*schoolId=${schoolId}*`;
     const keys = await redisClient.keys(pattern);
     if (keys.length > 0) {
-      await redisClient.del(keys);
+      await redisClient.del(...keys); // ← spread operator
       console.log(`✅ Cache invalidated: ${keys.length} keys for schoolId ${schoolId}`);
     }
   } catch (err) {
