@@ -133,18 +133,27 @@ app.use('/uploads', express.static(uploadDir));
 app.use('/', apiRoutes);          
 
 // Global error handler
+// =============================================
+// GLOBAL ERROR HANDLER
+// =============================================
 app.use((err, req, res, next) => {
-  console.error('[GLOBAL ERROR]:', err.message, err.stack?.substring(0, 300));
-  console.error('[ERROR]');
-  
-  if (err.status === 429) {
-    return res.status(429).json(err);
+  // 1. CETAK ERROR KE TERMINAL (Agar terlihat di PM2 Logs)
+  console.error(`[${new Date().toISOString()}] ERROR TERDETEKSI:`);
+  console.error(err.stack); // Ini akan menampilkan file & baris mana yang error
+
+  // 2. LOG TAMBAHAN (Opsional, untuk mempermudah debug)
+  console.error(`Method: ${req.method} | URL: ${req.originalUrl}`);
+  if (req.body && Object.keys(req.body).length > 0) {
+    console.error(`Body:`, JSON.stringify(req.body));
   }
 
-  res.status(500).json({
+  // 3. KIRIM RESPON KE FRONTEND
+  const statusCode = err.statusCode || 500;
+  res.status(statusCode).json({
     success: false,
-    message: 'Server error',
-    details: process.env.NODE_ENV === 'development' ? err.message : 'Internal error'
+    message: err.message || 'Internal Server Error',
+    // Tampilkan stack trace hanya jika di lingkungan development
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined 
   });
 });
 
