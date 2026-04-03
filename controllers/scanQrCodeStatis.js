@@ -598,6 +598,9 @@ exports.loginWithQRNew = async (req, res) => {
     // 1. Ambil instance io yang tadi kita simpan di app.set
     const io = req.app.get('socketio');
 
+    const room = io.sockets.adapter.rooms.get(qrCodeData);
+    console.log(`[EMIT TARGET] room='${qrCodeData}' | clients=${room?.size ?? 0}`);
+
     // 2. Kirim data login ke Web Perpus yang sedang menunggu di room 'qrCodeData'
     // Format payload disesuaikan dengan kebutuhan Vokadash (token & user)
     io.to(qrCodeData).emit('login-success', {
