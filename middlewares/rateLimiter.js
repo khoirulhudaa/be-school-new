@@ -1,7 +1,6 @@
 // middleware/rateLimiter.js
-const {rateLimit, ipKeyGenerator} = require('express-rate-limit');
+const {rateLimit} = require('express-rate-limit');
 
-// 1. Global Limiter - Kapasitas Tinggi untuk Jam Sibuk Absensi
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 menit
   limit: 2000,              // Max 2000 request per IP dalam 15 menit
@@ -18,7 +17,7 @@ const globalLimiter = rateLimit({
   },
 
   // Menggunakan header standard modern
-  standardHeaders: 'draft-8', 
+  standardHeaders: true, 
   legacyHeaders: false,
 
   // Pesan Error
@@ -46,7 +45,7 @@ const strictLimiter = rateLimit({
 const uploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,        // 1 jam
   limit: 50,                       // max 50 upload per jam per IP
-  standardHeaders: 'draft-8',
+  standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Batas upload harian tercapai (50/50).' },
   statusCode: 429,
