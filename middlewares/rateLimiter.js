@@ -19,6 +19,8 @@ const globalLimiter = rateLimit({
   // Menggunakan header standard modern
   standardHeaders: true, 
   legacyHeaders: false,
+  validate: { ip: false, xForwardedForHeader: false }, // ← TAMBAH INI
+
 
   // Pesan Error
   handler: (req, res) => {
@@ -37,6 +39,9 @@ const strictLimiter = rateLimit({
     const profile = req.user?.profile || req.user;
     return profile?.id ? `auth:${profile.id}` : req.ip;
   },
+  standardHeaders: true,  // ← tambah ini juga
+  legacyHeaders: false,
+  validate: { ip: false, xForwardedForHeader: false }, // ← TAMBAH INI
   message: { success: false, message: 'Terlalu banyak percobaan login, tunggu 1 menit.' },
   statusCode: 429,
 });
@@ -47,6 +52,7 @@ const uploadLimiter = rateLimit({
   limit: 50,                       // max 50 upload per jam per IP
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { ip: false, xForwardedForHeader: false }, // ← TAMBAH INI
   message: { success: false, message: 'Batas upload harian tercapai (50/50).' },
   statusCode: 429,
 });
