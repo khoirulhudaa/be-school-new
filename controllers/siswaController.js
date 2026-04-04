@@ -561,7 +561,7 @@ exports.getAllStudentsNoPagination = async (req, res) => {
       where: condition,
       order: [['name', 'ASC']],
       // Kita hanya ambil kolom yang diperlukan untuk kartu agar hemat memory
-      attributes: ['id', 'name', 'nis', 'nisn', 'class', 'photoUrl', 'qrCodeData']
+      attributes: ['id', 'name', 'nis', 'nisn', 'class', 'rfidUid', 'photoUrl', 'qrCodeData']
     });
 
     res.json({
