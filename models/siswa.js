@@ -26,6 +26,14 @@ const Student = sequelize.define('Student', {
     unique: true,
     allowNull: true
   },
+  faceDescriptor: {
+    type: DataTypes.TEXT('long'), // array 128 float disimpan JSON string
+    allowNull: true,
+  },
+  faceEnrolledAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
   isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
   isGraduated: { 
     type: DataTypes.BOOLEAN, 

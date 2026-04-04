@@ -40,6 +40,7 @@
     const scanQrStatis = require('./scanQrStatis');
     const orangTua = require('./orangTuaRoutes');
     const admin = require('./adminRoutes');
+    const faceRouter = require('./face');
 
     router.use('/auth', require('./authRoutes'));
     router.use('/profile', require('./updateProfileRouter'));
@@ -79,6 +80,7 @@
     router.use('/tugas', tugasSekolah);
     router.use('/scan-qr', scanQrStatis);
     router.use('/orang-tua', orangTua);
+    router.use('/face', faceRouter);
     
     // Route dengan upload/file berat → pakai uploadLimiter
     router.use('/gallery', galleryRouter);
