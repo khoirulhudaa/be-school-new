@@ -60,38 +60,73 @@ const processPhotoUpload = (buffer, schoolId, nis) => {
 
 exports.validateUserByQR = async (req, res) => {
   try {
-    const { qrCodeData, schoolId } = req.query;
+    const { qrCodeData, rfidUid, schoolId } = req.query;
+
+    let user = null;
+    let role = null;
+
 
     if (!qrCodeData || !schoolId) {
       return res.status(400).json({ success: false, message: "QR Data dan SchoolId diperlukan." });
     }
 
-    // 1. Cari di tabel Student
-    let user = await Student.findOne({ 
-      where: { qrCodeData, schoolId: parseInt(schoolId), isActive: true },
-      attributes: ['id', 'name', 'class', 'schoolId', 'nis', 'nisn', 'gender'] // Ambil yang perlu saja
-    });
-    let role = 'student';
-
-    // 2. Jika tidak ada di Student, cari di GuruTendik
-    if (!user) {
-      user = await GuruTendik.findOne({ 
-        where: { qrCodeData, schoolId: parseInt(schoolId), isActive: true },
-        attributes: ['id', ['nama', 'name'], 'role', 'schoolId', 'nip', 'jenisKelamin', 'jurusan', 'email'] // Aliasing 'nama' jadi 'name' agar seragam
+    // PRIORITAS RFID
+    if (rfidUid) {
+      user = await Student.findOne({ 
+        where: { rfidUid, schoolId: parseInt(schoolId), isActive: true },
+        attributes: ['id', 'name', 'class', 'schoolId', 'nis', 'nisn', 'gender']
       });
-      role = 'teacher';
+      role = 'student';
+
+      if (!user) {
+        user = await GuruTendik.findOne({ 
+          where: { rfidUid, schoolId: parseInt(schoolId), isActive: true },
+          attributes: ['id', ['nama', 'name'], 'role', 'schoolId', 'nip']
+        });
+        role = 'teacher';
+      }
+    }
+
+    // FALLBACK QR
+    if (!user && qrCodeData) {
+      user = await Student.findOne({ 
+        where: { qrCodeData, schoolId: parseInt(schoolId), isActive: true }
+      });
+      role = 'student';
     }
 
     if (!user) {
-      return res.status(404).json({ success: false, message: "Kartu tidak dikenali atau tidak aktif." });
+      return res.status(404).json({ success: false, message: "Kartu tidak dikenali." });
     }
 
-    // Kirim data user ke Server Perpus
-    res.json({ 
-      success: true, 
-      user, 
-      role 
-    });
+    res.json({ success: true, user, role });
+
+    // // 1. Cari di tabel Student
+    // let user = await Student.findOne({ 
+    //   where: { qrCodeData, schoolId: parseInt(schoolId), isActive: true },
+    //   attributes: ['id', 'name', 'class', 'schoolId', 'nis', 'nisn', 'gender'] // Ambil yang perlu saja
+    // });
+    // let role = 'student';
+
+    // // 2. Jika tidak ada di Student, cari di GuruTendik
+    // if (!user) {
+    //   user = await GuruTendik.findOne({ 
+    //     where: { qrCodeData, schoolId: parseInt(schoolId), isActive: true },
+    //     attributes: ['id', ['nama', 'name'], 'role', 'schoolId', 'nip', 'jenisKelamin', 'jurusan', 'email'] // Aliasing 'nama' jadi 'name' agar seragam
+    //   });
+    //   role = 'teacher';
+    // }
+
+    // if (!user) {
+    //   return res.status(404).json({ success: false, message: "Kartu tidak dikenali atau tidak aktif." });
+    // }
+
+    // // Kirim data user ke Server Perpus
+    // res.json({ 
+    //   success: true, 
+    //   user, 
+    //   role 
+    // });
 
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -168,6 +203,106 @@ exports.checkStudentAuth = async (req, res) => {
   }
 };
 
+exports.updateStudent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { 
+      name, nis, nisn, gender, birthPlace, birthDate, nik, 
+      isActive, class: className, batch, 
+      email, password, rfidUid // Tambahkan ini
+    } = req.body;
+
+    const student = await Student.findByPk(id);
+    if (!student) {
+      return res.status(404).json({ success: false, message: 'Siswa tidak ditemukan' });
+    }
+
+    // --- 1. VALIDASI DUPLIKAT ---
+
+    if (rfidUid && rfidUid !== student.rfidUid) {
+      const existingRfid = await Student.findOne({
+        where: { rfidUid, id: { [Op.ne]: id } }
+      });
+
+      if (existingRfid) {
+        return res.status(400).json({
+          success: false,
+          message: `RFID sudah digunakan oleh siswa lain`
+        });
+      }
+    }
+    
+    // Cek NIS (Unik per Sekolah)
+    if (nis && nis !== student.nis) {
+      const existingNis = await Student.findOne({
+        where: { schoolId: student.schoolId, nis: nis, id: { [Op.ne]: id } }
+      });
+      if (existingNis) return res.status(400).json({ success: false, message: `NIS ${nis} sudah terdaftar.` });
+    }
+
+    // Cek NISN (Unik Global)
+    if (nisn && nisn !== student.nisn) {
+      const existingNisn = await Student.findOne({
+        where: { nisn: nisn, id: { [Op.ne]: id } }
+      });
+      if (existingNisn) return res.status(400).json({ success: false, message: `NISN ${nisn} sudah terdaftar.` });
+    }
+
+    // Cek Email (Unik Global) - TAMBAHAN
+    if (email && email !== student.email) {
+      const existingEmail = await Student.findOne({
+        where: { email: email, id: { [Op.ne]: id } }
+      });
+      if (existingEmail) {
+        return res.status(400).json({ 
+          success: false, 
+          message: `Email ${email} sudah digunakan oleh pengguna lain.` 
+        });
+      }
+    }
+
+    // --- 2. PROSES DATA TAMBAHAN ---
+    
+    // Foto
+    let photoUrl = student.photoUrl;
+    if (req.file) {
+      photoUrl = await processPhotoUpload(req.file.buffer, student.schoolId, nis || student.nis);
+    }
+
+    // Hash Password jika ada perubahan - TAMBAHAN
+    let updatedData = {
+      name, nis, nisn, gender, birthPlace, birthDate, nik, isActive, 
+      class: className, batch, photoUrl, email, rfidUid
+    };
+
+    if (password && password.trim() !== "") {
+      const salt = await bcrypt.genSalt(10);
+      updatedData.password = await bcrypt.hash(password, salt);
+    }
+
+    // --- 3. EKSEKUSI UPDATE ---
+    await student.update(updatedData);
+
+    // Hilangkan password dari response agar aman
+    const responseData = student.toJSON();
+    responseData.role = 'siswa';
+    delete responseData.password;
+
+    await invalidateStudentCache(student.schoolId);
+
+    res.json({ success: true, message: 'Data siswa diperbarui', data: responseData });
+
+  } catch (err) {
+    if (err.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Gagal update: Email, NIS, atau NISN sudah digunakan.' 
+      });
+    }
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 exports.createStudent = async (req, res) => {
   try {
     const { 
@@ -178,6 +313,19 @@ exports.createStudent = async (req, res) => {
 
     if (!name || !nis || !schoolId) {
       return res.status(400).json({ success: false, message: 'Name, NIS, dan SchoolId wajib diisi!' });
+    }
+
+    if (rfidUid) {
+      const existingRfid = await Student.findOne({
+        where: { rfidUid }
+      });
+
+      if (existingRfid) {
+        return res.status(400).json({
+          success: false,
+          message: `RFID sudah digunakan`
+        });
+      }
     }
 
     const existing = await Student.findOne({ where: { nis, schoolId } });
@@ -746,8 +894,6 @@ exports.getUserDetail = async (req, res) => {
   }
 };
 
-// Export excel per-individual (history 1 tahun)
-
 exports.exportUserAttendance = async (req, res) => {
   try {
     const { id } = req.params;
@@ -814,89 +960,6 @@ function getDistance(lat1, lon1, lat2, lon2) {
 
   return R * c; // Hasil dalam meter
 }
-
-// SCAM DEVELOPMENT DENGAN KOORDINAT
-// exports.scanQRCode = async (req, res) => {
-//   // Terima userLat dan userLon dari aplikasi HP
-//   const { qrCodeData, role, userLat, userLon } = req.body; 
-//   const todayStart = moment().startOf('day').toDate();
-//   const todayEnd = moment().endOf('day').toDate();
-
-//   const t = await sequelize.transaction();
-
-//   try {
-//     let user;
-//     let updateFields = {};
-
-//     // 1. Cari User
-//     if (role === 'student') {
-//       user = await Student.findOne({ where: { qrCodeData, isActive: true } });
-//       if (user) updateFields = { idKey: 'studentId', id: user.id, name: user.name, class: user.class, schoolId: user.schoolId, nisn: user.nisn };
-//     } else {
-//       user = await GuruTendik.findOne({ where: { qrCodeData, isActive: true } }); 
-//       if (user) updateFields = { idKey: 'guruId', id: user.id, name: user.nama, class: 'GURU/STAFF', schoolId: user.schoolId, email: user.email };
-//     }
-
-//     if (!user) return res.status(404).json({ success: false, message: 'Data tidak ditemukan' });
-
-//     // 2. VALIDASI GEOFENCING
-//     const school = await SchoolProfile.findOne({ where: { schoolId: updateFields.schoolId } });
-    
-//     if (school && school.latitude && school.longitude) {
-//       if (!userLat || !userLon) {
-//         return res.status(400).json({ success: false, message: 'Lokasi GPS diperlukan' });
-//       }
-
-//       const distance = getDistance(userLat, userLon, school.latitude, school.longitude);
-//       const maxRadius = 100; // Toleransi 100 meter
-
-//       if (distance > maxRadius) {
-//         await t.rollback();
-//         return res.status(403).json({ 
-//           success: false, 
-//           message: `Anda berada di luar jangkauan sekolah (${Math.round(distance)}m).` 
-//         });
-//       }
-//     }
-
-//     // 3. Cek Absen Ganda
-//     const alreadyExists = await Attendance.findOne({
-//       where: { 
-//         [updateFields.idKey]: updateFields.id, 
-//         createdAt: { [Op.between]: [todayStart, todayEnd] } 
-//       },
-//       transaction: t,
-//       lock: true 
-//     });
-
-//     if (alreadyExists) {
-//       await t.rollback();
-//       return res.status(400).json({ success: false, message: 'Sudah absen hari ini.' });
-//     }
-
-//     // 4. Simpan dengan Koordinat
-//     await Attendance.create({ 
-//       [updateFields.idKey]: updateFields.id,
-//       userRole: role,
-//       schoolId: updateFields.schoolId, 
-//       currentClass: updateFields.class,
-//       status: 'Hadir',
-//       latitude: userLat,
-//       longitude: userLon
-//     }, { transaction: t });
-
-//     await t.commit();
-
-//     res.json({ 
-//       success: true, 
-//       message: `Absen berhasil: ${updateFields.name}`,
-//       data: { name: updateFields.name, class: updateFields.class }
-//     });
-//   } catch (err) {
-//     if (t) await t.rollback();
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
 
 // SCAN YANG ASLI TANPA KOORDINAT (PROD)
 exports.scanQRCode = async (req, res) => {
@@ -968,93 +1031,6 @@ exports.scanQRCode = async (req, res) => {
   }
 };
 
-exports.updateStudent = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { 
-      name, nis, nisn, gender, birthPlace, birthDate, nik, 
-      isActive, class: className, batch, 
-      email, password // Tambahkan ini
-    } = req.body;
-
-    const student = await Student.findByPk(id);
-    if (!student) {
-      return res.status(404).json({ success: false, message: 'Siswa tidak ditemukan' });
-    }
-
-    // --- 1. VALIDASI DUPLIKAT ---
-    
-    // Cek NIS (Unik per Sekolah)
-    if (nis && nis !== student.nis) {
-      const existingNis = await Student.findOne({
-        where: { schoolId: student.schoolId, nis: nis, id: { [Op.ne]: id } }
-      });
-      if (existingNis) return res.status(400).json({ success: false, message: `NIS ${nis} sudah terdaftar.` });
-    }
-
-    // Cek NISN (Unik Global)
-    if (nisn && nisn !== student.nisn) {
-      const existingNisn = await Student.findOne({
-        where: { nisn: nisn, id: { [Op.ne]: id } }
-      });
-      if (existingNisn) return res.status(400).json({ success: false, message: `NISN ${nisn} sudah terdaftar.` });
-    }
-
-    // Cek Email (Unik Global) - TAMBAHAN
-    if (email && email !== student.email) {
-      const existingEmail = await Student.findOne({
-        where: { email: email, id: { [Op.ne]: id } }
-      });
-      if (existingEmail) {
-        return res.status(400).json({ 
-          success: false, 
-          message: `Email ${email} sudah digunakan oleh pengguna lain.` 
-        });
-      }
-    }
-
-    // --- 2. PROSES DATA TAMBAHAN ---
-    
-    // Foto
-    let photoUrl = student.photoUrl;
-    if (req.file) {
-      photoUrl = await processPhotoUpload(req.file.buffer, student.schoolId, nis || student.nis);
-    }
-
-    // Hash Password jika ada perubahan - TAMBAHAN
-    let updatedData = {
-      name, nis, nisn, gender, birthPlace, birthDate, nik, isActive, 
-      class: className, batch, photoUrl, email
-    };
-
-    if (password && password.trim() !== "") {
-      const salt = await bcrypt.genSalt(10);
-      updatedData.password = await bcrypt.hash(password, salt);
-    }
-
-    // --- 3. EKSEKUSI UPDATE ---
-    await student.update(updatedData);
-
-    // Hilangkan password dari response agar aman
-    const responseData = student.toJSON();
-    responseData.role = 'siswa';
-    delete responseData.password;
-
-    await invalidateStudentCache(student.schoolId);
-
-    res.json({ success: true, message: 'Data siswa diperbarui', data: responseData });
-
-  } catch (err) {
-    if (err.name === 'SequelizeUniqueConstraintError') {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Gagal update: Email, NIS, atau NISN sudah digunakan.' 
-      });
-    }
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
 // --- DELETE SISWA (Soft Delete) ---
 exports.deleteStudent = async (req, res) => {
   try {
@@ -1078,7 +1054,6 @@ exports.deleteStudent = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
 
 exports.getTodayStats = async (req, res) => {
   try {
@@ -1624,7 +1599,6 @@ exports.processGraduation = async (req, res) => {
     res.status(500).json({ success: false, message: "Internal Server Error: " + err.message });
   }
 };
-
 
 
 exports.getStudentAttendance = async (req, res) => {

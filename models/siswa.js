@@ -21,6 +21,11 @@ const Student = sequelize.define('Student', {
   batch: { type: DataTypes.STRING, allowNull: false },
   photoUrl: { type: DataTypes.STRING },
   qrCodeData: { type: DataTypes.STRING, unique: true },
+  rfidUid: {
+    type: DataTypes.STRING,
+    unique: true,
+    allowNull: true
+  },
   isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
   isGraduated: { 
     type: DataTypes.BOOLEAN, 
