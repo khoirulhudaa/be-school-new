@@ -98,7 +98,6 @@ const allowedOrigins = [
   "https://sman40-jkt.sch.id",
   "https://sdn09jkt.kiraproject.id",
   "https://admin.kiraproject.id",
-  "http://localhost:5173",
   "http://localhost:5111",
   "http://localhost:5222",
   "http://localhost:5333",
