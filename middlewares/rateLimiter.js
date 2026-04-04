@@ -13,6 +13,8 @@ const globalLimiter = rateLimit({
   keyGenerator: (req) => {
     // Ambil ID dari profile (hasil middleware auth)
     const profile = req.user?.profile || req.user;
+    // Muncul di terminal aaPanel / PM2 / Docker logs
+    console.log(`[RateLimit] Incoming request from: ${profile}`);
     return profile?.id ? `auth:${profile.id}` : ipKeyGenerator(req);
   },
   // Menggunakan header standard modern
