@@ -308,11 +308,18 @@ exports.createStudent = async (req, res) => {
     const { 
       name, nis, nisn, gender, birthPlace, birthDate, nik, 
       schoolId, class: className, batch, 
-      email, password // Ambil email & password dari req.body
+      email, password, rfidUid // Ambil email & password dari req.body
     } = req.body;
 
     if (!name || !nis || !schoolId) {
       return res.status(400).json({ success: false, message: 'Name, NIS, dan SchoolId wajib diisi!' });
+    }
+
+    if (rfidUid && rfidUid.length < 5) {
+      return res.status(400).json({
+        success: false,
+        message: "RFID tidak valid"
+      });
     }
 
     if (rfidUid) {
@@ -351,6 +358,7 @@ exports.createStudent = async (req, res) => {
       birthPlace, 
       birthDate, 
       nik, 
+      rfidUid,
       schoolId: parseInt(schoolId),
       email: finalEmail,      
       password: finalPassword, 
