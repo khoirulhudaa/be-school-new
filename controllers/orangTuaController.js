@@ -234,3 +234,80 @@ exports.searchStudentForRegister = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// --- UPDATE PROFILE (Sesuai Model Parent) ---
+exports.updateProfile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { 
+      name, 
+      gender, 
+      relationStatus, 
+      type, 
+      phoneNumber,
+      email // Menjaga kompatibilitas jika frontend mengirim field 'email'
+    } = req.body;
+
+    // 1. Cari data orang tua
+    const parent = await Parent.findByPk(id);
+    if (!parent) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Data orang tua tidak ditemukan." 
+      });
+    }
+
+    // 2. Cek duplikasi nomor HP jika nomor diubah
+    const newPhone = phoneNumber || email; // Gunakan phoneNumber atau email dari body
+    if (newPhone && newPhone !== parent.phoneNumber) {
+      const existing = await Parent.findOne({ 
+        where: { phoneNumber: newPhone, isActive: true } 
+      });
+      if (existing) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Nomor telepon sudah digunakan oleh akun lain." 
+        });
+      }
+    }
+
+    // 3. Eksekusi Update (Hanya field yang ada di Model)
+    await Parent.update({
+      name: name || parent.name,
+      gender: gender || parent.gender,
+      relationStatus: relationStatus || parent.relationStatus,
+      type: type || parent.type,
+      phoneNumber: newPhone || parent.phoneNumber
+    }, { 
+      where: { id } 
+    });
+
+    // 4. Ambil data terbaru untuk dikirim balik ke frontend
+    const updatedData = await Parent.findByPk(id);
+
+    res.json({ 
+      success: true, 
+      message: "Profil berhasil diperbarui", 
+      data: updatedData 
+    });
+
+  } catch (err) {
+    console.error("Update Profile Error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getParentById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = await Parent.findByPk(id);
+    
+    if (!data) {
+      return res.status(404).json({ success: false, message: "Data tidak ditemukan" });
+    }
+    
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
