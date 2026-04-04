@@ -215,3 +215,22 @@ exports.loginParentWithoutPassword = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// Fungsi untuk membantu orang tua mencari data anak sebelum registrasi
+exports.searchStudentForRegister = async (req, res) => {
+  try {
+    const { nis, schoolId } = req.query;
+    const student = await Student.findOne({
+      where: { nis, schoolId, parentId: null }, // Hanya cari siswa yang belum punya ortu terdaftar
+      attributes: ['id', 'name', 'class', 'nis']
+    });
+
+    if (!student) {
+      return res.status(404).json({ success: false, message: "Siswa tidak ditemukan atau sudah terdaftar." });
+    }
+
+    res.json({ success: true, data: student });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};

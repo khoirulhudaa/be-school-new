@@ -8,5 +8,6 @@ router.put('/:id', parentController.updateParent);
 router.delete('/:id', parentController.deleteParent);
 router.get('/:parentId/kehadiran-siswa', parentController.getChildrenAttendance);
 router.post('/login', parentController.loginParentWithoutPassword);
+router.get('/search-student', parentController.searchStudentForRegister);
 
 module.exports = router;
