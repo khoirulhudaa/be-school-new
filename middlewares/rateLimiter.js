@@ -11,11 +11,13 @@ const globalLimiter = rateLimit({
   //   return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
   // },
   keyGenerator: (req) => {
-    // Ambil ID dari profile (hasil middleware auth)
     const profile = req.user?.profile || req.user;
-    // Muncul di terminal aaPanel / PM2 / Docker logs
-    console.log(`[RateLimit] Incoming request from: ${profile}`);
-    return profile?.id ? `auth:${profile.id}` : ipKeyGenerator(req);
+    const id = profile?.id || ipKeyGenerator(req); // Ambil ID atau fallback ke IP
+
+    // Cetak ID-nya saja agar terbaca di terminal
+    console.log(`[RateLimit] Incoming request from: ${id}`); 
+
+    return profile?.id ? `auth:${profile.id}` : id;
   },
   // Menggunakan header standard modern
   standardHeaders: true, 
