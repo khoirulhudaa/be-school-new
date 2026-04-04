@@ -1,5 +1,5 @@
 // middleware/rateLimiter.js
-const {rateLimit} = require('express-rate-limit');
+const {rateLimit, ipKeyGenerator} = require('express-rate-limit');
 
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 menit
@@ -13,9 +13,8 @@ const globalLimiter = rateLimit({
   keyGenerator: (req) => {
     // Ambil ID dari profile (hasil middleware auth)
     const profile = req.user?.profile || req.user;
-    return profile?.id ? `user-limit:${profile.id}` : req.ip; 
+    return profile?.id ? `auth:${profile.id}` : ipKeyGenerator(req);
   },
-
   // Menggunakan header standard modern
   standardHeaders: true, 
   legacyHeaders: false,
@@ -37,7 +36,7 @@ const strictLimiter = rateLimit({
   limit: 10,               // Max 10 kali coba per menit
   keyGenerator: (req) => {
     const profile = req.user?.profile || req.user;
-    return profile?.id ? `auth:${profile.id}` : req.ip;
+    return profile?.id ? `auth:${profile.id}` : ipKeyGenerator(req);
   },
   standardHeaders: true,  // ← tambah ini juga
   legacyHeaders: false,
