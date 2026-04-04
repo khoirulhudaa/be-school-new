@@ -28,8 +28,8 @@ module.exports = (req, res, next) => {
   const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('[decode]', decoded)
-    console.log('[decode profile]', decoded.profile)
+    // console.log('[decode]', decoded)
+    // console.log('[decode profile]', decoded.profile)
     
     // Normalisasi: Jika data ada di dalam 'profile', naikkan ke root req.user
     if (decoded.profile) {
