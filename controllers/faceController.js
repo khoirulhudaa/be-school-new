@@ -42,10 +42,30 @@ exports.enrollFace = async (req, res) => {
 
         return res.json({ success: true, message: 'Wajah berhasil didaftarkan!' });
     } catch (err) {
-        console.error('[ENROLL FACE]', err.message);
-        res.status(500).json({ success: false, message: 'Gagal mendaftarkan wajah' });
-    }
-};
+            console.error('[ENROLL FACE ERROR]:', err);
+
+            // Error Spesifik Database (Sequelize)
+            if (err.name === 'SequelizeConnectionError' || err.name === 'SequelizeConnectionRefusedError') {
+                return res.status(503).json({ 
+                    success: false, 
+                    message: 'Gagal terhubung ke database. Silakan coba beberapa saat lagi.' 
+                });
+            }
+
+            if (err.name === 'SequelizeUniqueConstraintError') {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Data wajah ini sudah terdaftar di akun lain.' 
+                });
+            }
+
+            // Default Error
+            res.status(500).json({ 
+                success: false, 
+                message: `Gagal menyimpan data: ${err.message || 'Terjadi kesalahan internal pada server'}` 
+            });
+        }
+    };
 
 // ── 2. GET DESCRIPTOR ──────────────────────────────────────────────────────
 exports.getDescriptor = async (req, res) => {
