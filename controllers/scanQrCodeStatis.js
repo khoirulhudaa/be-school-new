@@ -1,5 +1,4 @@
 const Student = require('../models/siswa');
-const StudentTesting = require('../models/siswa');
 const Attendance = require('../models/kehadiran');
 const { Op } = require('sequelize');
 const moment = require('moment');
@@ -210,20 +209,20 @@ exports.scanSelfDoubleQr = async (req, res) => {
         }
     }
 
-    // if (school?.latitude && school?.longitude) {
-    //     const distance = getDistance(
-    //         userLat, 
-    //         userLon, 
-    //         parseFloat(school.latitude), 
-    //         parseFloat(school.longitude)
-    //     );
-    //     if (distance > 200) {
-    //         return res.status(403).json({ 
-    //             success: false, 
-    //             message: `Luar jangkauan (${Math.round(distance)}m)` 
-    //         });
-    //     }
-    // }
+    if (school?.latitude && school?.longitude) {
+        const distance = getDistance(
+            userLat, 
+            userLon, 
+            parseFloat(school.latitude), 
+            parseFloat(school.longitude)
+        );
+        if (distance > 200) {
+            return res.status(403).json({ 
+                success: false, 
+                message: `Luar jangkauan (${Math.round(distance)}m)` 
+            });
+        }
+    }
 
     // ==================== REDIS LOCKING ====================
     const today = moment().format('YYYY-MM-DD');
@@ -273,7 +272,7 @@ exports.scanSelfDoubleQr = async (req, res) => {
             userProfile = JSON.parse(userProfile);
         } else {
             userProfile = isStudent
-                ? await StudentTesting.findByPk(id, { 
+                ? await Student.findByPk(id, { 
                     attributes: ['id', 'name', 'class', 'photoUrl', 'nis'], 
                     raw: true 
                   })

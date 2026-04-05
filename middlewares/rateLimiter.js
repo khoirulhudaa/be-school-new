@@ -6,16 +6,16 @@ const globalLimiter = rateLimit({
   limit: 2000,              // Max 2000 request per IP dalam 15 menit
   
   // Skip untuk Localhost (Penting agar Load Test tidak terhenti)
-  skip: (req) => {
-    const ip = req.ip || req.connection.remoteAddress;
-    return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
-  },
+  // skip: (req) => {
+  //   const ip = req.ip || req.connection.remoteAddress;
+  //   return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+  // },
   keyGenerator: (req) => {
     const profile = req.user?.profile || req.user;
     const id = profile?.id || ipKeyGenerator(req); // Ambil ID atau fallback ke IP
 
     // Cetak ID-nya saja agar terbaca di terminal
-    // console.log(`[RateLimit] Incoming request from: ${id}`); 
+    console.log(`[RateLimit] Incoming request from: ${id}`); 
 
     return profile?.id ? `auth:${profile.id}` : id;
   },
