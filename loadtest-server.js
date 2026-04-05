@@ -6,7 +6,7 @@ const http = require('http');
 const PORT = 5005; 
 const HOST = '127.0.0.1'; // Pakai IP, jangan localhost
 const ENDPOINT = '/scan-qr/double-qr';
-const TOTAL_STUDENTS = 10000;
+const TOTAL_STUDENTS = 100000;
 const SCHOOL_ID = 101;
 const JWT_SECRET = 'BESCHOOLNEW';
 
@@ -94,6 +94,9 @@ async function main() {
     } else {
       fail++;
       process.stdout.write(`${C.red}✗${C.reset}`);
+      // LOG SEMUA ERROR KE FILE AGAR TIDAK MENGOTORI TERMINAL
+      const errorMsg = `[ID: ${i + 1}] Status: ${res.status} - ${JSON.stringify(res.body)}\n`;
+      require('fs').appendFileSync('loadtest_errors.log', errorMsg);
       // Munculkan bocoran error pertama agar kita tahu kenapa gagal
       if (fail === 1) {
         console.log(`\n\n${C.red}Bocoran Error Pertama:${C.reset}`);
