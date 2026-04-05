@@ -71,7 +71,12 @@ async function main() {
     };
     return jwt.sign(payload, JWT_SECRET);
   });
+  
+  console.log(`${C.green}      ${TOTAL_STUDENTS} tokens generated.${C.reset}`);
+  // --- TARUH DISINI ---
+  console.log(`${C.cyan}${C.bold}DEBUG TOKEN 1:${C.reset}\n${tokens[0]}\n`);
 
+  // --------------------
   // 2. Redis Flush
   const redis = new Redis({ host: '127.0.0.1', port: 6379, password: 'e7ee408114792b1c' });
   await redis.flushall();
