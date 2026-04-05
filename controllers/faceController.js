@@ -16,18 +16,77 @@ function getDistance(lat1, lon1, lat2, lon2) {
 }
 
 // ── 1. ENROLLMENT ──────────────────────────────────────────────────────────
+// exports.enrollFace = async (req, res) => {
+//     try {
+//         const { descriptor } = req.body; // Float32Array as plain array (128 numbers)
+//         const profile = req.user?.profile || req.user;
+
+//         if (!profile) return res.status(401).json({ success: false, message: 'Sesi tidak valid' });
+//         if (profile.role !== 'siswa' && profile.role !== 'student') {
+//             return res.status(403).json({ success: false, message: 'Hanya siswa yang bisa enroll wajah' });
+//         }
+//         if (!descriptor || descriptor.length !== 128) {
+//             return res.status(400).json({ success: false, message: 'Descriptor wajah tidak valid' });
+//         }
+
+//         await Student.update(
+//             {
+//                 faceDescriptor: JSON.stringify(descriptor),
+//                 faceEnrolledAt: new Date(),
+//             },
+//             { where: { id: profile.id } }
+//         );
+
+//         // Hapus cache profile agar descriptor terbaru terbaca
+//         await redis.del(`user_profile:student:${profile.id}`).catch(() => {});
+
+//         return res.json({ success: true, message: 'Wajah berhasil didaftarkan!' });
+//     } catch (err) {
+//             console.error('[ENROLL FACE ERROR]:', err);
+
+//             // Error Spesifik Database (Sequelize)
+//             if (err.name === 'SequelizeConnectionError' || err.name === 'SequelizeConnectionRefusedError') {
+//                 return res.status(503).json({ 
+//                     success: false, 
+//                     message: 'Gagal terhubung ke database. Silakan coba beberapa saat lagi.' 
+//                 });
+//             }
+
+//             if (err.name === 'SequelizeUniqueConstraintError') {
+//                 return res.status(400).json({ 
+//                     success: false, 
+//                     message: 'Data wajah ini sudah terdaftar di akun lain.' 
+//                 });
+//             }
+
+//             // Default Error
+//             res.status(500).json({ 
+//                 success: false, 
+//                 message: `Gagal menyimpan data: ${err.message || 'Terjadi kesalahan internal pada server'}` 
+//             });
+//         }
+// };
+
+// ── 1. ENROLLMENT / UPDATE WAJAH ───────────────────────────────────────────
 exports.enrollFace = async (req, res) => {
     try {
-        const { descriptor } = req.body; // Float32Array as plain array (128 numbers)
+        const { descriptor } = req.body;
         const profile = req.user?.profile || req.user;
 
         if (!profile) return res.status(401).json({ success: false, message: 'Sesi tidak valid' });
         if (profile.role !== 'siswa' && profile.role !== 'student') {
-            return res.status(403).json({ success: false, message: 'Hanya siswa yang bisa enroll wajah' });
+            return res.status(403).json({ success: false, message: 'Hanya siswa yang bisa mendaftarkan wajah' });
         }
         if (!descriptor || descriptor.length !== 128) {
             return res.status(400).json({ success: false, message: 'Descriptor wajah tidak valid' });
         }
+
+        // Cek apakah sudah pernah enroll sebelumnya
+        const existingStudent = await Student.findByPk(profile.id, {
+            attributes: ['faceDescriptor', 'faceEnrolledAt', 'name']
+        });
+
+        const isUpdate = !!existingStudent?.faceDescriptor;
 
         await Student.update(
             {
@@ -37,35 +96,33 @@ exports.enrollFace = async (req, res) => {
             { where: { id: profile.id } }
         );
 
-        // Hapus cache profile agar descriptor terbaru terbaca
+        // Hapus cache agar data terbaru terbaca
         await redis.del(`user_profile:student:${profile.id}`).catch(() => {});
 
-        return res.json({ success: true, message: 'Wajah berhasil didaftarkan!' });
+        return res.json({ 
+            success: true, 
+            message: isUpdate 
+                ? '✅ Data wajah berhasil diperbarui!' 
+                : '✅ Wajah berhasil didaftarkan!',
+            isUpdate: isUpdate
+        });
+
     } catch (err) {
-            console.error('[ENROLL FACE ERROR]:', err);
+        console.error('[ENROLL FACE ERROR]:', err);
 
-            // Error Spesifik Database (Sequelize)
-            if (err.name === 'SequelizeConnectionError' || err.name === 'SequelizeConnectionRefusedError') {
-                return res.status(503).json({ 
-                    success: false, 
-                    message: 'Gagal terhubung ke database. Silakan coba beberapa saat lagi.' 
-                });
-            }
-
-            if (err.name === 'SequelizeUniqueConstraintError') {
-                return res.status(400).json({ 
-                    success: false, 
-                    message: 'Data wajah ini sudah terdaftar di akun lain.' 
-                });
-            }
-
-            // Default Error
-            res.status(500).json({ 
+        if (err.name === 'SequelizeConnectionError' || err.name === 'SequelizeConnectionRefusedError') {
+            return res.status(503).json({ 
                 success: false, 
-                message: `Gagal menyimpan data: ${err.message || 'Terjadi kesalahan internal pada server'}` 
+                message: 'Gagal terhubung ke database. Silakan coba beberapa saat lagi.' 
             });
         }
-    };
+
+        res.status(500).json({ 
+            success: false, 
+            message: `Gagal menyimpan data wajah: ${err.message}` 
+        });
+    }
+};
 
 // ── 2. GET DESCRIPTOR ──────────────────────────────────────────────────────
 exports.getDescriptor = async (req, res) => {
