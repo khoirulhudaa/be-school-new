@@ -9,7 +9,7 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const PORT = 5005; 
 const HOST = '127.0.0.1'; // Pakai IP, jangan localhost
 const ENDPOINT = '/scan-qr/double-qr';
-const TOTAL_STUDENTS = 100000;
+const TOTAL_STUDENTS = 50000;
 const SCHOOL_ID = 101;
 const JWT_SECRET = 'BESCHOOLNEW';
 
@@ -102,7 +102,7 @@ async function main() {
     }
 
     // --- TAMBAHKAN JEDA DISINI ---
-    await sleep(20); // Jeda 20 milidetik antar request
+    await sleep(50); // Jeda 50 milidetik antar request
 
     if ((i + 1) % 50 === 0) {
       console.log(` [${i+1}]`);
