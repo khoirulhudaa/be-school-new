@@ -2,7 +2,7 @@ require('dotenv').config();
 
 const { Worker } = require('bullmq');
 const Redis = require('ioredis');
-const Attendance = require('../models/kehadiran');
+const Attendance = require('../models/kehadirantesting');
 
 const connection = new Redis(process.env.REDIS_URL, {
   maxRetriesPerRequest: null
