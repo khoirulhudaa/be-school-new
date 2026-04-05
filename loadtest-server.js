@@ -94,17 +94,21 @@ async function main() {
     } else {
       fail++;
       process.stdout.write(`${C.red}✗${C.reset}`);
-      // LOG SEMUA ERROR KE FILE AGAR TIDAK MENGOTORI TERMINAL
       const errorMsg = `[ID: ${i + 1}] Status: ${res.status} - ${JSON.stringify(res.body)}\n`;
       require('fs').appendFileSync('loadtest_errors.log', errorMsg);
-      // Munculkan bocoran error pertama agar kita tahu kenapa gagal
-      if (fail === 1) {
-        console.log(`\n\n${C.red}Bocoran Error Pertama:${C.reset}`);
-        console.log(`Status: ${res.status}`);
-        console.log(`Response: ${JSON.stringify(res.body)}\n`);
+    }
+
+    // --- TAMBAHKAN JEDA DISINI ---
+    await sleep(20); // Jeda 20 milidetik antar request
+
+    if ((i + 1) % 50 === 0) {
+      console.log(` [${i+1}]`);
+      // Opsional: Beri nafas lebih panjang setiap 500 siswa
+      if ((i + 1) % 500 === 0) {
+        console.log(`${C.yellow} Cooling down 1 detik...${C.reset}`);
+        await sleep(1000);
       }
     }
-    if ((i + 1) % 50 === 0) console.log(` [${i+1}]`);
   }
   
   console.log(`\n\nSelesai. Sukses: ${success}, Gagal: ${fail}`);
