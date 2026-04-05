@@ -87,7 +87,7 @@ async function main() {
   // 2. Flush Redis
   const today = new Date().toISOString().split('T')[0];
   console.log(`${C.yellow}[2/3] Flushing Redis locks...${C.reset}`);
-  const redis = new Redis({ host: '127.0.0.1', port: 6379 });
+  const redis = new Redis({ host: '127.0.0.1', port: 6379, password: 'e7ee408114792b1c' });
   const pipeline = redis.pipeline();
   for (let i = 1; i <= TOTAL_STUDENTS; i++) {
     pipeline.del(`absensi_check:${SCHOOL_ID}:${i}:${today}`);
