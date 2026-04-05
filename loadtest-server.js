@@ -2,6 +2,9 @@ const jwt = require('jsonwebtoken');
 const Redis = require('ioredis');
 const http = require('http');
 
+// --- FUNGSI SLEEP (WAJIB ADA) ---
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 // --- TWEAK DISINI ---
 const PORT = 5005; 
 const HOST = '127.0.0.1'; // Pakai IP, jangan localhost
