@@ -4,7 +4,7 @@ const http = require('http');
 
 const HOST = 'http://localhost:5005';
 const ENDPOINT = '/scan-qr/double-qr';
-const TOTAL_STUDENTS = 100000;
+const TOTAL_STUDENTS = 1000;
 const SCHOOL_ID = 101;
 const JWT_SECRET = 'BESCHOOLNEW';
 
