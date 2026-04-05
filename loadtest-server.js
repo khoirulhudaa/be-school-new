@@ -4,8 +4,8 @@ const http = require('http');
 
 const HOST = 'http://localhost:5005';
 const ENDPOINT = '/scan-qr/double-qr';
-const TOTAL_STUDENTS = 10000;
-const SCHOOL_ID = 1;
+const TOTAL_STUDENTS = 100000;
+const SCHOOL_ID = 101;
 const JWT_SECRET = 'BESCHOOLNEW';
 
 const CLASSES = [
@@ -125,7 +125,7 @@ async function main() {
 
         // Jeda lebih agresif untuk 3000 siswa (rata-rata 100ms)
         // Supaya test tidak terlalu lama tapi tetap realistis
-        const delay = (i % 50 === 0) ? 200 : 80; 
+        const delay = (i % 100 === 0) ? 20 : 2; 
         await new Promise(r => setTimeout(r, delay));
 
         // Tambahkan baris baru setiap 100 simbol agar tidak meluber di terminal

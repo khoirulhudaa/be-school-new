@@ -1,4 +1,5 @@
 const Student = require('../models/siswa');
+const StudentTesting = require('../models/siswa');
 const Attendance = require('../models/kehadiran');
 const { Op } = require('sequelize');
 const moment = require('moment');
@@ -272,7 +273,7 @@ exports.scanSelfDoubleQr = async (req, res) => {
             userProfile = JSON.parse(userProfile);
         } else {
             userProfile = isStudent
-                ? await Student.findByPk(id, { 
+                ? await StudentTesting.findByPk(id, { 
                     attributes: ['id', 'name', 'class', 'photoUrl', 'nis'], 
                     raw: true 
                   })
