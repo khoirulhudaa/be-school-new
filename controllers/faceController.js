@@ -121,6 +121,7 @@ exports.faceAbsen = async (req, res) => {
     // ── Redis lock ─────────────────────────────────────────────────────────
     const lockToken = `lock-${id}-${Date.now()}`;
     let acquired = await redis.set(lockKey, lockToken, 'NX', 'PX', 30000);
+    console.log(`[LOCK FACE] userId:${id} | acquired:${acquired ? 'OK' : 'FAILED'} | time:${moment().format('HH:mm:ss.SSS')} | schoolId:${schoolId}`);
     if (!acquired) {
         await new Promise(r => setTimeout(r, 800));
         acquired = await redis.set(lockKey, lockToken, 'NX', 'PX', 30000);
@@ -170,7 +171,8 @@ exports.faceAbsen = async (req, res) => {
             currentClass: userProfile.class || 'Unknown',
             latitude:     userLat,
             longitude:    userLon,
-            qrPosition:   'face', // ← penanda absen via wajah
+            method:       'face',           // ← ini yang kamu minta
+            qrPosition:   null, // ← penanda absen via wajah
             faceDistance,
         }, {
             attempts: 3,
@@ -185,7 +187,9 @@ exports.faceAbsen = async (req, res) => {
             try {
                 const io = req.app.get('socketio');
                 if (io) {
-                    io.to(`school-${schoolId}`).emit('attendance:new', {
+                    io.to(`school-${schoolId}`).emit('attendance:face', {
+                        success: true,
+                        method: 'face',
                         student: {
                             id:    userProfile.id,
                             name:  userProfile.name,
@@ -193,7 +197,8 @@ exports.faceAbsen = async (req, res) => {
                             photo: userProfile.photoUrl,
                             time:  moment().format('HH:mm:ss'),
                         },
-                        qrPosition: 'face',
+                        faceDistance: faceDistance,
+                        message: 'Absensi wajah berhasil'
                     });
                 }
             } catch (e) {

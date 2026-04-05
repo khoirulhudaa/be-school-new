@@ -251,7 +251,7 @@ exports.scanSelfDoubleQr = async (req, res) => {
         acquired = await redis.set(lockKey, lockToken, 'NX', 'PX', 30000);
     }
 
-    console.log(`[LOCK] userId:${id} | acquired:${acquired ? 'OK' : 'null'} | time:${moment().format('HH:mm:ss.SSS')}`);
+    console.log(`[LOCK QRCODE] userId:${id} | acquired:${acquired ? 'OK' : 'null'} | time:${moment().format('HH:mm:ss.SSS')}`);
 
     if (!acquired) {
         return res.status(429).json({ 
