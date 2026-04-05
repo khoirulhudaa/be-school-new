@@ -76,23 +76,23 @@ exports.scanSelf = async (req, res) => {
             }
         }
 
-        if (school && school.latitude && school.longitude) {
-            if (!userLat || !userLon) {
-                await t.rollback();
-                return res.status(400).json({ success: false, message: 'Lokasi GPS diperlukan' });
-            }
+        // if (school && school.latitude && school.longitude) {
+        //     if (!userLat || !userLon) {
+        //         await t.rollback();
+        //         return res.status(400).json({ success: false, message: 'Lokasi GPS diperlukan' });
+        //     }
 
-            const distance = getDistance(userLat, userLon, parseFloat(school.latitude), parseFloat(school.longitude));
-            const maxRadius = 200; // 200m
+        //     const distance = getDistance(userLat, userLon, parseFloat(school.latitude), parseFloat(school.longitude));
+        //     const maxRadius = 200; // 200m
 
-            if (distance > maxRadius) {
-                await t.rollback();
-                return res.status(403).json({ 
-                    success: false, 
-                    message: `Anda di luar jangkauan (${Math.round(distance)}m). Maksimal ${maxRadius}m.` 
-                });
-            }
-        }
+        //     if (distance > maxRadius) {
+        //         await t.rollback();
+        //         return res.status(403).json({ 
+        //             success: false, 
+        //             message: `Anda di luar jangkauan (${Math.round(distance)}m). Maksimal ${maxRadius}m.` 
+        //         });
+        //     }
+        // }
 
         const isStudent = role.toLowerCase() === 'siswa' || role === 'student';
         const idKey = isStudent ? 'studentId' : 'guruId';
