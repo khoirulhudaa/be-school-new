@@ -6,7 +6,7 @@ const http = require('http');
 const PORT = 5005; 
 const HOST = '127.0.0.1'; // Pakai IP, jangan localhost
 const ENDPOINT = '/scan-qr/double-qr';
-const TOTAL_STUDENTS = 1000;
+const TOTAL_STUDENTS = 10000;
 const SCHOOL_ID = 101;
 const JWT_SECRET = 'BESCHOOLNEW';
 
@@ -71,7 +71,7 @@ async function main() {
     };
     return jwt.sign(payload, JWT_SECRET);
   });
-  
+
   console.log(`${C.green}      ${TOTAL_STUDENTS} tokens generated.${C.reset}`);
   // --- TARUH DISINI ---
   console.log(`${C.cyan}${C.bold}DEBUG TOKEN 1:${C.reset}\n${tokens[0]}\n`);
