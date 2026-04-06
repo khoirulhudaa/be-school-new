@@ -234,6 +234,7 @@ exports.scanSelfDoubleQr = async (req, res) => {
     // Cek apakah sudah absen hari ini
     const alreadyAbsen = await redis.get(checkKey);
     if (alreadyAbsen) {
+        console.log(`[ALREADY PRESENSI] userId:${id} | already:${alreadyAbsen ? 'YES' : 'NO'} | time:${moment().format('HH:mm:ss.SSS')}`);
         return res.status(400).json({ 
             success: false, 
             message: 'Anda sudah absen hari ini.' 
