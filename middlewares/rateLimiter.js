@@ -1,31 +1,34 @@
 // middleware/rateLimiter.js
 const {rateLimit, ipKeyGenerator} = require('express-rate-limit');
+const { RedisStore } = require('rate-limit-redis');
+
+const redisClient = require('../config/redis');
+
+const makeRedisStore = (prefix) => new RedisStore({
+  prefix,
+  sendCommand: (command, ...args) => redisClient.call(command, ...args),
+});
 
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 menit
-  limit: 2000,              // Max 2000 request per IP dalam 15 menit
-  
-  // Skip untuk Localhost (Penting agar Load Test tidak terhenti)
+  windowMs: 15 * 60 * 1000, 
+  limit: 2000,              
+  store: makeRedisStore('rl:global:'),
   // skip: (req) => {
   //   const ip = req.ip || req.connection.remoteAddress;
   //   return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
   // },
   keyGenerator: (req) => {
     const profile = req.user?.profile || req.user;
-    const id = profile?.id || ipKeyGenerator(req); // Ambil ID atau fallback ke IP
+    const id = profile?.id || ipKeyGenerator(req);
 
-    // Cetak ID-nya saja agar terbaca di terminal
     console.log(`[RateLimit] Incoming request from: ${id}`); 
 
     return profile?.id ? `auth:${profile.id}` : id;
   },
-  // Menggunakan header standard modern
   standardHeaders: true, 
   legacyHeaders: false,
   validate: { ip: false, xForwardedForHeader: false }, // ← TAMBAH INI
 
-
-  // Pesan Error
   handler: (req, res) => {
     res.status(429).json({
       success: false,
@@ -34,10 +37,38 @@ const globalLimiter = rateLimit({
   }
 });
 
+const loginLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  limit: 10,
+  store: makeRedisStore('rl:login:'),
+  keyGenerator: (req) => {
+    const email = req.body?.email || '';
+    const ip    = ipKeyGenerator(req);
+    const key   = `${ip}:${email}`;
+
+    console.log(`[loginLimiter] email=${email} | ip=${ip} | key=${key}`);
+
+    return key;
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { ip: false, xForwardedForHeader: false },
+  handler: (req, res) => {
+    const email = req.body?.email;
+    const ip    = ipKeyGenerator(req);
+    console.log(`[loginLimiter] ⛔ BLOCKED email=${email} | ip=${ip}`);
+    res.status(429).json({
+      success: false,
+      message: 'Terlalu banyak percobaan login, coba lagi dalam 1 menit.'
+    });
+  }
+});
+
 // 2. Stricter limiter untuk route sensitif (misal login, create berita, upload)
 const strictLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 menit
-  limit: 10,               // Max 10 kali coba per menit
+  limit: 10,          
+  store: makeRedisStore('rl:strict:'),
   keyGenerator: (req) => {
     const profile = req.user?.profile || req.user;
     return profile?.id ? `auth:${profile.id}` : ipKeyGenerator(req);
@@ -52,7 +83,8 @@ const strictLimiter = rateLimit({
 // 3. Limiter khusus untuk route berat (misal upload gambar/fasilitas)
 const uploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,        // 1 jam
-  limit: 50,                       // max 50 upload per jam per IP
+  limit: 50,      
+  store: makeRedisStore('rl:upload:'),
   standardHeaders: true,
   legacyHeaders: false,
   validate: { ip: false, xForwardedForHeader: false }, // ← TAMBAH INI
@@ -63,6 +95,7 @@ const uploadLimiter = rateLimit({
 // Export supaya bisa dipakai per route atau global
 module.exports = {
   globalLimiter,
+  loginLimiter,
   strictLimiter,
   uploadLimiter,
 };

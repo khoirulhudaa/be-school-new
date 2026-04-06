@@ -4,6 +4,7 @@ const multer = require('multer');
 const guruTendikController = require('../controllers/guruTendikController');
 const siswaController = require('../controllers/siswaController');
 const cache = require('../middlewares/cache');
+const { loginLimiter } = require('../middlewares/rateLimiter');
 
 const router = express.Router();
 
@@ -13,7 +14,7 @@ const upload = multer({ storage });
 
 // Routes
 router.get('/', cache(120), guruTendikController.getAllGuruTendik);
-router.post('/login', guruTendikController.checkGuruAuth);
+router.post('/login', loginLimiter, guruTendikController.checkGuruAuth);
 router.post('/mark-absence', siswaController.markAbsence);
 router.get('/detail/:id', siswaController.getUserDetail);
 router.get('/absensi', cache(120), siswaController.getAllTeachers);

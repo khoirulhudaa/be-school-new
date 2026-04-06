@@ -3,6 +3,7 @@ const multer = require('multer');
 const studentController = require('../controllers/siswaController');
 const { protectForSiswa } = require('../middlewares/protectForSiswa');
 const cache = require('../middlewares/cache');
+const { loginLimiter } = require('../middlewares/rateLimiter');
 
 const router = express.Router();
 
@@ -18,7 +19,7 @@ router.get('/search', studentController.getStudentSearch);
 router.get('/', cache(120), studentController.getAllStudents); // Sesuai fetch di frontend tadi
 router.get('/all-no-pagination', studentController.getAllStudentsNoPagination);
 router.post('/', upload.single('photo'), studentController.createStudent);
-router.post('/login', studentController.checkStudentAuth);
+router.post('/login', loginLimiter, studentController.checkStudentAuth);
 router.put('/:id', upload.single('photo'), studentController.updateStudent);
 router.delete('/:id', studentController.deleteStudent);
 router.get('/:parentId/anak', studentController.getParentChildren);
