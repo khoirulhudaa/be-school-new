@@ -11,15 +11,12 @@ const sequelize = new Sequelize(
     isolationLevel: Transaction.ISOLATION_LEVELS.REPEATABLE_READ,
     logging: false, 
     pool: {
-      max: 10,            // Dinaikkan untuk menangani lonjakan absen
-      min: 2,           // Standby koneksi lebih banyak
-      acquire: 30000,     // 1 menit cukup untuk timeout
-      idle: 10000,        // Tutup koneksi idle lebih cepat (10 detik)
+      max: 10,            
+      min: 2,           
+      acquire: 30000,     
+      idle: 10000,        
       evict: 1000,
     },
-    // dialectOptions: {
-    //   connectTimeout: 60000 
-    // },
     dialectOptions: {
       connectTimeout: 60000,
       // Membantu performa pada query besar

@@ -42,12 +42,21 @@ const loginLimiter = rateLimit({
   limit: 10,
   store: makeRedisStore('rl:login:'),
   keyGenerator: (req) => {
-    const email = req.body?.email || '';
-    const ip    = ipKeyGenerator(req);
-    const key   = `${ip}:${email}`;
+    const email = req.body?.email || 'no-email';
+    
+    // Pastikan kita mengambil string-nya, bukan object-nya
+    let ip = ipKeyGenerator(req);
+    
+    // Jika ipKeyGenerator mengembalikan object (misal dari library request-ip atau sejenisnya)
+    // Kita coba ambil property clientIp atau semacamnya, atau paksa ke string
+    if (typeof ip === 'object') {
+      ip = ip.clientIp || req.ip || req.headers['x-forwarded-for'] || 'unknown-ip';
+    }
+
+    const key = `${ip}:${email}`;
 
     console.log(`[loginLimiter] email=${email} | ip=${ip} | key=${key}`);
-
+    
     return key;
   },
   standardHeaders: true,
