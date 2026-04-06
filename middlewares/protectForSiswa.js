@@ -14,6 +14,10 @@ const protectForSiswa = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'Akses ditolak, token tidak ditemukan' });
     }
 
+    if (token.split('.').length !== 3) {
+      return res.status(401).json({ message: 'Format token tidak valid' });
+    }
+
     // 2. Verifikasi Token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
