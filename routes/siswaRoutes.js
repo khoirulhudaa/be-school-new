@@ -21,6 +21,7 @@ router.post('/', upload.single('photo'), studentController.createStudent);
 router.post('/login', studentController.checkStudentAuth);
 router.put('/:id', upload.single('photo'), studentController.updateStudent);
 router.delete('/:id', studentController.deleteStudent);
+router.get('/:parentId/anak', studentController.getParentChildren);
 
 // --- API ABSENSI ---
 // Endpoint: /api/siswa/scan

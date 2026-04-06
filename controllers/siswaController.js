@@ -1650,3 +1650,40 @@ exports.getStudentAttendance = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// Route: GET /orang-tua/:parentId/anak
+exports.getParentChildren = async (req, res) => {
+  try {
+    const { parentId } = req.params;
+    const { schoolId } = req.query; // opsional, untuk filter
+
+    const parent = await Parent.findByPk(parentId);
+    if (!parent) {
+      return res.status(404).json({ success: false, message: 'Orang tua tidak ditemukan' });
+    }
+
+    // Asumsi ada relasi di model (Parent.hasMany(Student, { as: 'children', foreignKey: 'parentId' }))
+    // Jika belum ada relasi, gunakan query manual:
+
+    const children = await Student.findAll({
+      where: { 
+        schoolId: parent.schoolId,
+        // Jika kamu punya kolom parentId di tabel siswa:
+        parentId: parentId 
+      },
+      attributes: [
+        'id', 'name', 'nis', 'nisn', 'nik', 'gender', 
+        'birthPlace', 'birthDate', 'class', 'batch', 'photoUrl', 'isActive'
+      ],
+      order: [['name', 'ASC']]
+    });
+
+    res.json({
+      success: true,
+      data: children
+    });
+
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
