@@ -11,10 +11,10 @@ const sequelize = new Sequelize(
     isolationLevel: Transaction.ISOLATION_LEVELS.REPEATABLE_READ,
     logging: false, 
     pool: {
-      max: 10,            
-      min: 2,           
-      acquire: 30000,     
-      idle: 10000,        
+      max: 5,           // Total 200 koneksi (Sangat aman untuk limit 500)
+      min: 2,           // Sisakan 2 per core agar "hangat" & siap saat jam absen tiba
+      idle: 10000,      // Biarkan koneksi bertahan 10 detik saat jam sibuk
+      acquire: 30000,   // Jangan sampai siswa gagal absen karena timeout singkat    
       evict: 1000,
     },
     dialectOptions: {
