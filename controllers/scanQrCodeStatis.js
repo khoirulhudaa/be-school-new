@@ -504,7 +504,7 @@ exports.loginWithQRNew = async (req, res) => {
       user: userProfile // Data profile lengkap siswa/guru
     });
 
-    console.log('[profile user]', userProfile)
+    // console.log('[profile user]', userProfile)
 
     return res.json({ 
       success: true, 
