@@ -353,6 +353,7 @@ exports.faceAbsen = async (req, res) => {
     }
 
     const { id, role, schoolId } = profile;
+    console.log('ROLEEEEEEEEE', role)
     const guruMode = isGuru(role);
 
     // ── Validasi faceDistance dari client ─────────────────────────────────
