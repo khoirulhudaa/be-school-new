@@ -1,8 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const kelasController = require('../controllers/kelasController');
+const { globalLimiter } = require('../middlewares/rateLimiter');
+const optionalAuth = require('../middlewares/optionalLimiter');
 
-router.get('/', kelasController.getAllClasses);
+router.get('/', optionalAuth, globalLimiter, kelasController.getAllClasses);
 router.post('/', kelasController.createClass);
 router.put('/:id', kelasController.updateClass);
 router.delete('/:id/:schoolId', kelasController.deleteClass);

@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const tugasController = require('../controllers/tugasController');
+const { globalLimiter } = require('../middlewares/rateLimiter');
+const optionalAuth = require('../middlewares/optionalLimiter');
 
 const upload = multer({ 
   storage: multer.memoryStorage(),
@@ -9,8 +11,8 @@ const upload = multer({
 });
 
 router.post('/', tugasController.createTugas);
-router.get('/', tugasController.getAllTugas);
-router.get('/:id', tugasController.getTugasById);
+router.get('/', optionalAuth, globalLimiter, tugasController.getAllTugas);
+router.get('/:id', optionalAuth, globalLimiter, tugasController.getTugasById);
 router.put('/:id', tugasController.updateTugas);
 router.delete('/:id/:schoolId', tugasController.deleteTugas);
 

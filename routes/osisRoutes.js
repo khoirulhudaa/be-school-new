@@ -1,6 +1,8 @@
 const express = require('express');
 const multer = require('multer');
 const osisController = require('../controllers/osisController');
+const { globalLimiter } = require('../middlewares/rateLimiter');
+const optionalAuth = require('../middlewares/optionalLimiter');
 
 const router = express.Router();
 
@@ -20,7 +22,7 @@ const upload = multer({
 });
 
 // Routes
-router.get('/', osisController.getOsis);
+router.get('/', optionalAuth, globalLimiter, osisController.getOsis);
 
 // POST dengan multiple files (4 field foto berbeda)
 router.post(

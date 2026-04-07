@@ -10,8 +10,8 @@ const makeRedisStore = (prefix) => new RedisStore({
 });
 
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, 
-  limit: 2000,              
+  windowMs: 10 * 60 * 1000, 
+  limit: 5000,              
   store: makeRedisStore('rl:global:'),
   // skip: (req) => {
   //   const ip = req.ip || req.connection.remoteAddress;
@@ -38,11 +38,12 @@ const globalLimiter = rateLimit({
 });
 
 const loginLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  limit: 10,
+  windowMs: 5 * 60 * 1000,
+  limit: 500,
   store: makeRedisStore('rl:login:'),
   keyGenerator: (req) => {
     const email = req.body?.email || 'no-email';
+    console.log('[email LOG]:', email)
     
     // Pastikan kita mengambil string-nya, bukan object-nya
     let ip = ipKeyGenerator(req);
@@ -75,8 +76,8 @@ const loginLimiter = rateLimit({
 
 // 2. Stricter limiter untuk route sensitif (misal login, create berita, upload)
 const strictLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 menit
-  limit: 10,          
+  windowMs: 5 * 60 * 1000, // 1 menit
+  limit: 7000,          
   store: makeRedisStore('rl:strict:'),
   keyGenerator: (req) => {
     const profile = req.user?.profile || req.user;
@@ -91,8 +92,8 @@ const strictLimiter = rateLimit({
 
 // 3. Limiter khusus untuk route berat (misal upload gambar/fasilitas)
 const uploadLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,        // 1 jam
-  limit: 50,      
+  windowMs: 10 * 60 * 1000,        // 1 jam
+  limit: 7000,      
   store: makeRedisStore('rl:upload:'),
   standardHeaders: true,
   legacyHeaders: false,
