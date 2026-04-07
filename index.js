@@ -8,6 +8,10 @@ const { createAdapter } = require('@socket.io/redis-adapter');
 const Redis = require('ioredis');
 // const compression = require('compression');
 
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('[UNHANDLED REJECTION] Reason:', JSON.stringify(reason, null, 2));
+    console.error('[UNHANDLED REJECTION] Stack:', reason?.stack);
+});
 
 // --- 1. IMPORT HTTP & SOCKET.IO ---
 const http = require('http');
@@ -22,6 +26,7 @@ Student.belongsTo(Parent, { foreignKey: 'parentId', as: 'parent' });
 
 // Import semua routes dari satu file
 const apiRoutes = require('./routes');  // → routes/index.js
+
 
 const app = express();
 const port = process.env.PORT || 5005;
