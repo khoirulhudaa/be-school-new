@@ -342,7 +342,8 @@ exports.createStudent = async (req, res) => {
 
     // --- Logika Default Email & Password ---
     const finalEmail = email || `${nis}@gmail.com`;
-    const finalPassword = password || 'sekolah123';
+    const rawPassword = password || 'sekolah123';
+    const hashedPassword = await bcrypt.hash(rawPassword, 10);
     // ---------------------------------------
 
     let photoUrl = null;
@@ -361,7 +362,7 @@ exports.createStudent = async (req, res) => {
       rfidUid,
       schoolId: parseInt(schoolId),
       email: finalEmail,      
-      password: finalPassword, 
+      password: hashedPassword, 
       photoUrl,
       class: className, 
       batch,

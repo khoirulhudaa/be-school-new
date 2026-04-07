@@ -293,7 +293,7 @@ exports.login = async (req, res) => {
     const token = jwt.sign(
       { id: user.id, schoolId: user.id },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '365d' }
     );
 
     res.json({

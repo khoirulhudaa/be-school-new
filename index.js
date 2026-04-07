@@ -9,8 +9,9 @@ const Redis = require('ioredis');
 // const compression = require('compression');
 
 process.on('unhandledRejection', (reason, promise) => {
-    console.error('[UNHANDLED REJECTION] Reason:', JSON.stringify(reason, null, 2));
-    console.error('[UNHANDLED REJECTION] Stack:', reason?.stack);
+    console.error('⚠️ [FATAL ERROR] Unhandled Rejection!');
+    console.error('Reason:', reason instanceof Error ? reason.message : JSON.stringify(reason));
+    if (reason?.stack) console.error('Stack:', reason.stack);
 });
 
 // --- 1. IMPORT HTTP & SOCKET.IO ---
