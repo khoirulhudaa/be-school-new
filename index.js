@@ -90,6 +90,7 @@ const allowedOrigins = [
   "https://e-library.kiraproject.id",
   "https://go.kiraproject.id",
   "https://cek.absen.kiraproject.id",
+  "https://parent.kiraproject.id",
   "https://smkn13jkt.kiraproject.id",
   "https://new.sman25-jkt.sch.id",
   "https://sman78-jkt.sch.id",
