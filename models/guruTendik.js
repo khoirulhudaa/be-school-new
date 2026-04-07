@@ -21,6 +21,14 @@ const GuruTendik = sequelize.define('GuruTendik', {
   jurusan: { type: DataTypes.STRING, allowNull: true },
   jenisKelamin: { type: DataTypes.STRING(10), allowNull: false },
   photoUrl: { type: DataTypes.STRING(255), allowNull: true },
+  faceDescriptor: {
+    type: DataTypes.TEXT('long'), // array 128 float disimpan JSON string
+    allowNull: true,
+  },
+  faceEnrolledAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
   isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
   password: { 
     type: DataTypes.STRING, 
