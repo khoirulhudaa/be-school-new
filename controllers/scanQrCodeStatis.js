@@ -302,7 +302,7 @@ exports.scanSelfDoubleQr = async (req, res) => {
             schoolId,
             userRole: isStudent ? 'student' : 'teacher',
             studentId: isStudent ? id : null,
-            guruId: !isStudent ? id : null,
+            guruId: isStudent ? null : id,
             currentClass: isStudent 
                 ? (userProfile.class || userProfile.kelas || 'Unknown') 
                 : 'GURU/STAFF',
