@@ -55,7 +55,7 @@ const loginLimiter = rateLimit({
 
     const key = `${ip}:${email}`;
 
-    console.log(`[loginLimiter] email=${email} | ip=${ip} | key=${key}`);
+    // console.log(`[loginLimiter] email=${email} | ip=${ip} | key=${key}`);
     
     return key;
   },

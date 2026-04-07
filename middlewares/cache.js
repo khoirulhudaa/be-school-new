@@ -47,8 +47,8 @@ const redisClient = require('../config/redis');
 const cacheMiddleware = (durationSeconds = 60) => {
   return async (req, res, next) => {
     const key = `cache:${req.originalUrl || req.url}`;
-    console.log('originalURL REDIS 1:', req.originalUrl);
-    console.log('originalURL REDIS 2:', req.url);
+    // console.log('originalURL REDIS 1:', req.originalUrl);
+    // console.log('originalURL REDIS 2:', req.url);
 
     try {
       // ioredis: cek koneksi pakai .status bukan .isReady
@@ -70,7 +70,7 @@ const cacheMiddleware = (durationSeconds = 60) => {
           // ioredis: set(key, value, 'EX', seconds)
           redisClient.set(key, JSON.stringify(data), 'EX', durationSeconds);
           res.set('X-Cache-Status', 'SET');
-          console.log(`Cache SET: ${key} (${durationSeconds}s)`);
+          // console.log(`Cache SET: ${key} (${durationSeconds}s)`);
         }
         return oldJson.call(this, data);
       };
