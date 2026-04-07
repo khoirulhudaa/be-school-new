@@ -19,11 +19,16 @@ const globalLimiter = rateLimit({
   // },
   keyGenerator: (req) => {
     const profile = req.user?.profile || req.user;
-    const id = profile?.id || ipKeyGenerator(req);
+    // Ambil IP asli, pastikan string
+    const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    
+    const id = profile?.id ? `auth:${profile.id}` : ip;
 
-    console.log(`[RateLimit] Incoming request from: ${id}`); 
+    // Cek jika id adalah objek, stringify dulu supaya tidak muncul [object Object]
+    const logId = typeof id === 'object' ? JSON.stringify(id) : id;
+    console.log(`[RateLimit] Incoming request from: ${logId}`); 
 
-    return profile?.id ? `auth:${profile.id}` : id;
+    return id;
   },
   standardHeaders: true, 
   legacyHeaders: false,
