@@ -53,16 +53,19 @@ const connection = new Redis(process.env.REDIS_URL, {
 const worker = new Worker(
   'attendance-queue',
   async job => {
+    console.log("=== JOB DITERIMA WORKER ===");
+    console.log("Data Job:", JSON.stringify(job.data, null, 2)); // Cek apakah targetTable & guruId muncul
     const data = job.data;
-
-    const isGuruJob = data.targetTable === 'kehadiran_guru' || !!data.guruId;
-
+    
+    const roleLower = (data.userRole || '').toLowerCase();
+    const isGuruJob = roleLower !== 'student' && roleLower !== 'siswa';
+    
     if (isGuruJob) {
       // ── Guru / Tendik → kehadiran_guru ──────────────────────────────────
       await KehadiranGuru.create({
         schoolId:     data.schoolId,
         guruId:       data.guruId,
-        userRole:     data.userRole === 'teacher' ? 'teacher' : 'tendik',
+        userRole:     'teacher',
         status:       'Hadir',
         currentClass: data.currentClass || null,
         latitude:     data.latitude,

@@ -18,7 +18,7 @@ const KehadiranGuru = sequelize.define('KehadiranGuru', {
         references: { model: 'guruTendik', key: 'id' },
     },
     userRole: {
-        type: DataTypes.ENUM('teacher', 'tendik'),
+        type: DataTypes.STRING(20),
         allowNull: false,
         defaultValue: 'teacher',
     },
