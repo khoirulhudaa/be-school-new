@@ -354,7 +354,8 @@ exports.faceAbsen = async (req, res) => {
 
     const { id, role, schoolId } = profile;
     console.log('ROLEEEEEEEEE', role)
-    const guruMode = isGuru(role);
+    console.log('ID GURU/SISWA', id)
+    
 
     // ── Validasi faceDistance dari client ─────────────────────────────────
     if (!faceDistance || faceDistance > 0.45) {
@@ -363,7 +364,7 @@ exports.faceAbsen = async (req, res) => {
 
     // ── Redis guard: sudah absen hari ini? ────────────────────────────────
     const today               = moment().format('YYYY-MM-DD');
-    const entityKey           = guruMode ? `guru:${id}` : `student:${id}`;
+    const entityKey           = guruMode === 'Guru' ? `guru:${id}` : `student:${id}`;
     const checkKey            = `absensi_check:${schoolId}:${entityKey}:${today}`;
     const lockKey             = `absensi_lock:${schoolId}:${entityKey}:${today}`;
     const secondsUntilEndOfDay = moment().endOf('day').diff(moment(), 'seconds');
@@ -414,7 +415,7 @@ exports.faceAbsen = async (req, res) => {
 
         if (!userProfile) {
             const Model      = getModel(role);
-            const attributes = guruMode
+            const attributes = guruMode === 'Guru'
                 ? ['id', 'nama', 'role', 'photoUrl', 'nip']   // GuruTendik
                 : ['id', 'name', 'class', 'photoUrl', 'nis'];  // Student
 
@@ -431,14 +432,14 @@ exports.faceAbsen = async (req, res) => {
         }
 
         // ── Masukkan ke attendance queue ──────────────────────────────────
-        const jobId = `${schoolId}-${guruMode ? 'guru' : 'student'}-${id}-${today}-face`;
+        const jobId = `${schoolId}-${guruMode === 'Guru' ? 'guru' : 'student'}-${id}-${today}-face`;
 
         await attendanceQueue.add('create-attendance', {
             id,
             schoolId,
-            userRole:     guruMode ? 'teacher' : 'student',
-            studentId:    guruMode ? null : id,
-            guruId:       guruMode ? id : null,
+            userRole:     guruMode === 'Guru' ? 'teacher' : 'student',
+            studentId:    guruMode === 'Guru' ? null : id,
+            guruId:       guruMode === 'Guru' ? id : null,
             currentClass: userProfile.class || userProfile.currentClass || null,
             latitude:     userLat,
             longitude:    userLon,
@@ -446,7 +447,7 @@ exports.faceAbsen = async (req, res) => {
             qrPosition:   null,
             faceDistance,
             // flag untuk worker agar tahu tabel tujuan
-            targetTable:  guruMode ? 'kehadiran_guru' : 'kehadiran',
+            targetTable:  guruMode === 'Guru' ? 'kehadiran_guru' : 'kehadiran',
         }, {
             attempts:         3,
             backoff:          3000,
@@ -460,11 +461,11 @@ exports.faceAbsen = async (req, res) => {
             try {
                 const io = req.app.get('socketio');
                 if (io) {
-                    const displayName = guruMode ? userProfile.nama : userProfile.name;
+                    const displayName = guruMode === 'Guru' ? userProfile.nama : userProfile.name;
                     io.to(`school-${schoolId}`).emit('attendance:face', {
                         success:      true,
                         method:       'face',
-                        userType:     guruMode ? 'guru' : 'student',
+                        userType:     guruMode === 'Guru' ? 'guru' : 'student',
                         student: {
                             id:    userProfile.id,
                             name:  displayName,
