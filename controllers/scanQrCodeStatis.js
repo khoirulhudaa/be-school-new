@@ -228,8 +228,11 @@ exports.scanSelfDoubleQr = async (req, res) => {
     const today = moment().format('YYYY-MM-DD');
     const secondsUntilEndOfDay = moment().endOf('day').diff(moment(), 'seconds');
 
-    const lockKey = `absensi_lock:${schoolId}:${id}:${today}`;     
-    const checkKey = `absensi_check:${schoolId}:${id}:${today}`;   
+    const isStudent = role?.toLowerCase?.() === 'siswa' || role === 'student';
+    const entityKey = isStudent ? `student:${id}` : `guru:${id}`;
+
+    const lockKey = `absensi_lock:${schoolId}:${entityKey}:${today}`;     
+    const checkKey = `absensi_check:${schoolId}:${entityKey}:${today}`;   
 
     // Cek apakah sudah absen hari ini
     const alreadyAbsen = await redis.get(checkKey);
