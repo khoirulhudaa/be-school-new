@@ -246,7 +246,7 @@ function resolveProfile(req) {
 }
 
 function isGuru(role = '') {
-    return role.toLowerCase() !== 'siswa' && role.toLowerCase() !== 'student';
+    return role === 'Guru' || role === 'teacher';
 }
 
 function getModel(role) {
