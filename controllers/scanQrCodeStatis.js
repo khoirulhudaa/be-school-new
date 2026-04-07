@@ -480,10 +480,21 @@ exports.loginWithQRNew = async (req, res) => {
     const room = io.sockets.adapter.rooms.get(qrCodeData);
     console.log(`[EMIT TARGET] room='${qrCodeData}' | clients=${room?.size ?? 0}`);
 
+    // ✅ Generate token baru dari data req.user hasil decode middleware
+    const webToken = jwt.sign(
+      { 
+        id: userProfile.id, 
+        role: userProfile.role,
+        schoolId: userProfile.schoolId // sesuaikan field yang ada di payload token kamu
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '365d' }
+    );
+
     // 2. Kirim data login ke Web Perpus yang sedang menunggu di room 'qrCodeData'
     // Format payload disesuaikan dengan kebutuhan Vokadash (token & user)
     io.to(qrCodeData).emit('login-success', {
-      token: req.headers.authorization.split(' ')[1], // Meneruskan token aktif HP
+      token: webToken, // Meneruskan token aktif HP
       user: userProfile // Data profile lengkap siswa/guru
     });
 
