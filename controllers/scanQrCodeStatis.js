@@ -305,13 +305,16 @@ exports.scanSelfDoubleQr = async (req, res) => {
                 : 'GURU/STAFF',
             latitude: userLat,
             longitude: userLon,
-            qrPosition
+            qrPosition,
+            method:       'qr',
+            targetTable:  isStudent ? 'kehadiran' : 'kehadiran_guru', // ← tambah ini
         }, {
             attempts: 3,
-            backoff: 3000,
-            jobId: `${schoolId}-${id}-${today}`,
+            backoff: { type: 'fixed', delay: 3000 }, // ← fix dari number ke object
+            // jobId: `${schoolId}-${id}-${today}`,
+            jobId: `${schoolId}-${isStudent ? 'student' : 'guru'}-${id}-${today}-${Date.now()}`, 
             removeOnComplete: true,
-            removeOnFail: false
+            removeOnFail: true
         });
 
         // Socket.io emit (fire and forget)
