@@ -20,14 +20,15 @@ const globalLimiter = rateLimit({
   validate: { ip: false, xForwardedForHeader: false }, // ← satu saja, hapus `validate: false` di atas
   keyGenerator: (req) => {
     const userId = req.user?.id || req.user?.profile?.id;
+
     if (userId) {
       console.log(`[LIMITER-GLOBAL]: auth:${userId}`);
       return `auth:${userId}`;
     }
 
-    const ip = ipKeyGenerator(req); // ← pakai ini, bukan req.socket.remoteAddress manual
+    const ip = String(ipKeyGenerator(req)); // ← pakai ini, bukan req.socket.remoteAddress manual
     const ua = req.headers['user-agent'] || 'no-ua';
-    console.log(`[LIMITER-GLOBAL]: pub:${ip}`);
+    console.log(`[LIMITER-GLOBAL]: pub:${ip}:${ua}`);
     return `pub:${ip}:${ua}`;
   },
   standardHeaders: true, 
