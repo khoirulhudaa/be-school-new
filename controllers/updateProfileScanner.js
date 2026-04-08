@@ -278,7 +278,6 @@ exports.updateMyProfile = async (req, res) => {
     const finalData = { ...user, ...dataToUpdate };
     delete finalData.password; // Pastikan password tidak ikut dikirim
 
-    console.log('KODE BARU UPDATE PROFILE ME')
     res.json({
         success: true,
         message: "Profile berhasil diupdate",

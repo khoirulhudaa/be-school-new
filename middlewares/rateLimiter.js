@@ -22,16 +22,16 @@ const globalLimiter = rateLimit({
       const userId = req.user?.id || req.user?.profile?.id;
       
       if (userId) {
-      return `auth:${userId}`;
+        console.log(`[LIMITER-GLOBAL]: userId${userId}`);
+        return `auth:${userId}`;
       }
-      console.log(`[LIMITER-GLOBAL]: userId${userId}`);
 
       // Ambil IP dari header jika di belakang proxy (Nginx), atau req.ip
       const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown-ip';
       const ua = req.headers['user-agent'] || 'no-ua';
       
       // Gunakan satu log saja agar tidak memenuhi layar
-      console.log(`[LIMITER-GLOBAL]: pub:${ip}`);
+      console.log(`[LIMITER-GLOBAL]: pub:${ip}:${ua}`);
       
       return `pub:${ip}:${ua}`;
   },
