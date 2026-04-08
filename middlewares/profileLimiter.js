@@ -1,16 +1,20 @@
 const rateLimit = require('express-rate-limit');
-const RedisStore = require('rate-limit-redis');
+const {RedisStore} = require('rate-limit-redis');
 const redisClient = require('../../config/redisConfig'); 
+
+const makeRedisStore = (prefix) => new RedisStore({
+  prefix,
+  sendCommand: (command, ...args) => redisClient.call(command, ...args),
+});
 
 const profileLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 Menit
     limit: 10, // Maksimal 10 kali update per 15 menit
     standardHeaders: true,
     legacyHeaders: false,
-    store: new RedisStore({
-        sendCommand: (...args) => redisClient.sendCommand(args),
-        prefix: 'rl:profile:',
-    }),
+    // PERBAIKAN 2: Tambahkan validate ini untuk menghilangkan error IPv6
+    validate: { xForwardedForHeader: false, ip: false },
+    store: makeRedisStore('rl:profile:'),
     keyGenerator: (req) => {
         /**
          * Karena menggunakan protectMultiRole, req.user sudah terisi.

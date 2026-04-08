@@ -1,13 +1,18 @@
 const rateLimit = require('express-rate-limit');
-const RedisStore = require('rate-limit-redis');
+const {RedisStore} = require('rate-limit-redis');
+const redisClient = require('../config/redis');
+
+const makeRedisStore = (prefix) => new RedisStore({
+  prefix,
+  sendCommand: (command, ...args) => redisClient.call(command, ...args),
+});
 
 const beritaLimiter = rateLimit({
     windowMs: 5 * 60 * 1000, // 1 Menit
     limit: 100, 
-    store: new RedisStore({
-        sendCommand: (...args) => redisClient.sendCommand(args),
-        prefix: 'rl:berita:',
-    }),
+    // PERBAIKAN 2: Tambahkan validate ini untuk menghilangkan error IPv6
+    validate: { xForwardedForHeader: false, ip: false },
+    store: makeRedisStore('rl:berita:'),
     keyGenerator: (req) => {
         const userId = req.user?.id || req.user?.profile?.id;
         if (userId) return `auth:${userId}`;
