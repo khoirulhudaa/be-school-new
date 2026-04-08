@@ -1937,7 +1937,7 @@ exports.getClassRecapWithDetails = async (req, res) => {
         if (attendance.status === 'Hadir') {
           if (scanTime <= deadline) {
             acc[className].stats.onTime++;
-            statusInfo = "Hadir Tepat Waktu";
+            statusInfo = "Tepat Waktu";
           } else {
             acc[className].stats.late++;
             statusInfo = "Telat";
