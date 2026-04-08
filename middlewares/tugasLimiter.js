@@ -13,8 +13,6 @@ const tugasLimiter = rateLimit({
     limit: 100, // Jatah 60 request per menit per siswa
     standardHeaders: true, 
     legacyHeaders: false,
-    // PERBAIKAN 2: Tambahkan validate ini untuk menghilangkan error IPv6
-    validate: { xForwardedForHeader: false, ip: false },
     store: makeRedisStore('rl:tugas:'),
     keyGenerator: (req) => {
         const userId = req.user?.id || req.user?.profile?.id;
@@ -24,7 +22,7 @@ const tugasLimiter = rateLimit({
         const ua = req.headers['user-agent'] || 'no-ua';
         return `pub:${ip}:${ua}`;
     },
-    
+    validate: { ip: false, xForwardedForHeader: false }, // ← TAMBAH INI
     handler: (req, res) => {
         res.status(429).json({
             success: false,

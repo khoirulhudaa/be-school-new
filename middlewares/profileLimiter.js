@@ -12,8 +12,6 @@ const profileLimiter = rateLimit({
     limit: 10, // Maksimal 10 kali update per 15 menit
     standardHeaders: true,
     legacyHeaders: false,
-    // PERBAIKAN 2: Tambahkan validate ini untuk menghilangkan error IPv6
-    validate: { xForwardedForHeader: false, ip: false },
     store: makeRedisStore('rl:profile:'),
     keyGenerator: (req) => {
         /**
@@ -32,6 +30,7 @@ const profileLimiter = rateLimit({
         console.log(`[PROFILELIMITER]: pub:${ip}:${ua}`)
         return `pub:${ip}:${ua}`;
     },
+    validate: { ip: false, xForwardedForHeader: false }, // ← TAMBAH INI
     handler: (req, res) => {
         res.status(429).json({
             success: false,

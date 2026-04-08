@@ -10,8 +10,6 @@ const makeRedisStore = (prefix) => new RedisStore({
 const pengumumanLimiter = rateLimit({
     windowMs: 5 * 60 * 1000, // 5 Menit
     limit: 100, 
-    // PERBAIKAN 2: Tambahkan validate ini untuk menghilangkan error IPv6
-    validate: { xForwardedForHeader: false, ip: false },
     store: makeRedisStore('rl:pengumuman:'),
     keyGenerator: (req) => {
         const userId = req.user?.id || req.user?.profile?.id;
@@ -23,6 +21,7 @@ const pengumumanLimiter = rateLimit({
         console.log(`[GLOBALLIMITER]: pub:${ip}:${ua}`)
         return `pub:${ip}:${ua}`;
     },
+    validate: { ip: false, xForwardedForHeader: false }, // ← TAMBAH INI
     handler: (req, res) => {
         res.status(429).json({
             success: false,
