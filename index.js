@@ -9,8 +9,7 @@ const Redis = require('ioredis');
 // const compression = require('compression');
 
 process.on('unhandledRejection', (reason, promise) => {
-    console.error('⚠️ [FATAL ERROR] Unhandled Rejection!');
-    console.error('Reason:', reason instanceof Error ? reason.message : JSON.stringify(reason));
+    console.error('[FATAL ERROR]:', reason instanceof Error ? reason.message : JSON.stringify(reason));
     if (reason?.stack) console.error('Stack:', reason.stack);
 });
 
@@ -136,7 +135,6 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
-  console.log('Folder uploads dibuat otomatis');
 }
 app.use('/uploads', express.static(uploadDir));
 
@@ -177,11 +175,9 @@ app.use((err, req, res, next) => {
 // --- 7. DATABASE CONNECTION & START SERVER ---
 sequelize.authenticate()
   .then(() => {
-    console.log('MySQL connected!');
     return sequelize.sync({ alter: false, force: false });
   })
   .then(() => {
-    console.log('Tables synced');
     server.listen(port, '0.0.0.0', () => {
       console.log(`Server with Socket.io running on port ${port}`);
     });
