@@ -12,6 +12,7 @@ const Alumni = require('../models/alumni');
 const Parent = require('../models/orangTua');
 const bcrypt = require('bcrypt');
 const SchoolProfile = require('../models/profileSekolah');
+const KehadiranGuru = require('../models/kehadiranGuru');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -1061,15 +1062,145 @@ exports.deleteStudent = async (req, res) => {
   }
 };
 
+// exports.getTodayStats = async (req, res) => {
+//   try {
+//     const { schoolId, role = 'student' } = req.query;
+
+//     // Ambil semua data kehadiran hari ini untuk sekolah & role terkait
+//     const attendanceData = await Attendance.findAll({
+//       where: {
+//         schoolId: parseInt(schoolId),
+//         userRole: role,
+//         createdAt: {
+//           [Op.between]: [
+//             moment().startOf('day').toDate(), 
+//             moment().endOf('day').toDate()
+//           ]
+//         }
+//       },
+//       raw: true 
+//     });
+
+//     // Struktur summary dengan key Terlambat yang terpisah
+//     const summary = { 
+//       Hadir: 0, 
+//       Terlambat: 0, // Key baru
+//       Sakit: 0, 
+//       Izin: 0, 
+//       Alpha: 0 
+//     };
+
+//     // Definisikan batas waktu (07:00:00)
+//     // Gunakan format string 'HH:mm:ss' agar perbandingannya mudah
+//     const deadline = "07:00:00";
+
+//     attendanceData.forEach(item => {
+//       if (item.status === 'Hadir') {
+//         // Ambil bagian jam dari createdAt (HH:mm:ss)
+//         const scanTime = moment(item.createdAt).format("HH:mm:ss");
+
+//         if (scanTime > deadline) {
+//           summary.Terlambat += 1;
+//         } else {
+//           summary.Hadir += 1;
+//         }
+//       } else {
+//         // Mapping untuk status Sakit, Izin, Alpha
+//         if (summary.hasOwnProperty(item.status)) {
+//           summary[item.status] += 1;
+//         }
+//       }
+//     });
+
+//     res.json({ 
+//       success: true, 
+//       data: { 
+//         date: moment().format('YYYY-MM-DD'),
+//         deadlineInfo: deadline,
+//         ...summary 
+//       } 
+//     });
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
+// exports.getAttendanceReport = async (req, res) => {
+//   try {
+//     // Tambahkan 'date' ke destructuring query
+//     const { schoolId, role, year, month, date, page = 1, limit = 50 } = req.query;
+
+//     let startDate, endDate;
+
+//     if (date) {
+//       // Jika ada filter tanggal spesifik (format: YYYY-MM-DD)
+//       startDate = moment(date).startOf('day').toDate();
+//       endDate = moment(date).endOf('day').toDate();
+//     } else {
+//       // Default: Filter berdasarkan bulan dan tahun
+//       startDate = moment(`${year}-${month}-01`).startOf('month').toDate();
+//       endDate = moment(startDate).endOf('month').toDate();
+//     }
+
+//     const { count, rows } = await Attendance.findAndCountAll({
+//       where: {
+//         schoolId,
+//         userRole: role,
+//         createdAt: { [Op.between]: [startDate, endDate] }
+//       },
+//       include: [
+//         {
+//           model: role === 'student' ? Student : GuruTendik,
+//           as: role === 'student' ? 'student' : 'guru',
+//           attributes: role === 'student' ? ['name', 'nis'] : ['nama', 'role', 'mapel']
+//         }
+//       ],
+//       limit: parseInt(limit),
+//       offset: (parseInt(page) - 1) * parseInt(limit),
+//       order: [['createdAt', 'DESC']],
+//       raw: false 
+//     });
+
+//     const deadline = "07:00:00";
+
+//     const processedRows = rows.map(record => {
+//       const attendance = record.toJSON();
+//       const scanTime = moment(attendance.createdAt).format("HH:mm:ss");
+      
+//       attendance.isLate = attendance.status === 'Hadir' && scanTime > deadline;
+//       attendance.scanTime = scanTime;
+
+//       return attendance;
+//     });
+
+//     res.json({ 
+//       success: true, 
+//       data: processedRows, 
+//       pagination: {
+//         totalItems: count,
+//         totalPages: Math.ceil(count / limit),
+//         currentPage: parseInt(page)
+//       }
+//     });
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
 exports.getTodayStats = async (req, res) => {
   try {
     const { schoolId, role = 'student' } = req.query;
 
-    // Ambil semua data kehadiran hari ini untuk sekolah & role terkait
-    const attendanceData = await Attendance.findAll({
+    // 1. Tentukan Model secara dinamis berdasarkan role
+    const isStudent = role === 'student';
+    const MainModel = isStudent ? Attendance : KehadiranGuru;
+
+    // 2. Ambil data kehadiran hari ini
+    const attendanceData = await MainModel.findAll({
       where: {
         schoolId: parseInt(schoolId),
-        userRole: role,
+        // Filter userRole hanya jika menggunakan model Attendance (siswa)
+        ...(isStudent && { userRole: role }), 
         createdAt: {
           [Op.between]: [
             moment().startOf('day').toDate(), 
@@ -1080,26 +1211,27 @@ exports.getTodayStats = async (req, res) => {
       raw: true 
     });
 
-    // Struktur summary dengan key Terlambat yang terpisah
+    // 3. Inisialisasi struktur summary
     const summary = { 
       Hadir: 0, 
-      Terlambat: 0, // Key baru
+      Terlambat: 0, 
       Sakit: 0, 
       Izin: 0, 
       Alpha: 0 
     };
 
-    // Definisikan batas waktu (07:00:00)
-    // Gunakan format string 'HH:mm:ss' agar perbandingannya mudah
     const deadline = "07:00:00";
 
+    // 4. Hitung Statistik
     attendanceData.forEach(item => {
       if (item.status === 'Hadir') {
-        // Ambil bagian jam dari createdAt (HH:mm:ss)
         const scanTime = moment(item.createdAt).format("HH:mm:ss");
 
         if (scanTime > deadline) {
           summary.Terlambat += 1;
+          // Opsional: Jika ingin Terlambat juga dihitung sebagai Hadir, 
+          // aktifkan baris di bawah ini:
+          // summary.Hadir += 1; 
         } else {
           summary.Hadir += 1;
         }
@@ -1111,49 +1243,63 @@ exports.getTodayStats = async (req, res) => {
       }
     });
 
+    // 5. Kirim Response
     res.json({ 
       success: true, 
       data: { 
+        role, // Tambahkan info role di response agar frontend yakin
         date: moment().format('YYYY-MM-DD'),
         deadlineInfo: deadline,
         ...summary 
       } 
     });
   } catch (err) {
+    console.error(`[getTodayStats] Error for role ${role}:`, err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
 exports.getAttendanceReport = async (req, res) => {
   try {
-    // Tambahkan 'date' ke destructuring query
     const { schoolId, role, year, month, date, page = 1, limit = 50 } = req.query;
 
     let startDate, endDate;
 
+    // 1. Tentukan Rentang Waktu
     if (date) {
-      // Jika ada filter tanggal spesifik (format: YYYY-MM-DD)
       startDate = moment(date).startOf('day').toDate();
       endDate = moment(date).endOf('day').toDate();
     } else {
-      // Default: Filter berdasarkan bulan dan tahun
       startDate = moment(`${year}-${month}-01`).startOf('month').toDate();
       endDate = moment(startDate).endOf('month').toDate();
     }
 
-    const { count, rows } = await Attendance.findAndCountAll({
+    // 2. Tentukan Model dan Include secara dinamis berdasarkan Role
+    const isStudent = role === 'student';
+    
+    // ModelUtama: Jika student pakai 'Attendance', jika teacher pakai 'KehadiranGuru'
+    const MainModel = isStudent ? Attendance : KehadiranGuru;
+    
+    const includeOptions = [
+      {
+        model: isStudent ? Student : GuruTendik,
+        as: isStudent ? 'student' : 'guru',
+        attributes: isStudent 
+          ? ['name', 'nis'] 
+          : [['nama', 'name'], 'role', 'mapel'] // Alias 'nama' jadi 'name' agar frontend konsisten
+      }
+    ];
+
+    // 3. Eksekusi Query
+    const { count, rows } = await MainModel.findAndCountAll({
       where: {
         schoolId,
-        userRole: role,
+        // Jika di tabel KehadiranGuru tidak ada kolom userRole, 
+        // kita hanya masukkan filter ini untuk tabel Attendance (siswa)
+        ...(isStudent && { userRole: role }),
         createdAt: { [Op.between]: [startDate, endDate] }
       },
-      include: [
-        {
-          model: role === 'student' ? Student : GuruTendik,
-          as: role === 'student' ? 'student' : 'guru',
-          attributes: role === 'student' ? ['name', 'nis'] : ['nama', 'role', 'mapel']
-        }
-      ],
+      include: includeOptions,
       limit: parseInt(limit),
       offset: (parseInt(page) - 1) * parseInt(limit),
       order: [['createdAt', 'DESC']],
@@ -1166,10 +1312,16 @@ exports.getAttendanceReport = async (req, res) => {
       const attendance = record.toJSON();
       const scanTime = moment(attendance.createdAt).format("HH:mm:ss");
       
-      attendance.isLate = attendance.status === 'Hadir' && scanTime > deadline;
-      attendance.scanTime = scanTime;
-
-      return attendance;
+      // Ambil data user dari alias yang dinamis (student atau guru)
+      const userData = isStudent ? attendance.student : attendance.guru;
+      
+      return {
+        ...attendance,
+        name: userData?.name || userData?.nama || '-', // Fallback nama
+        identifier: isStudent ? userData?.nis : userData?.role, // NIS atau Jabatan
+        isLate: attendance.status === 'Hadir' && scanTime > deadline,
+        scanTime: scanTime
+      };
     });
 
     res.json({ 
@@ -1182,6 +1334,7 @@ exports.getAttendanceReport = async (req, res) => {
       }
     });
   } catch (err) {
+    console.error("Error Report:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
