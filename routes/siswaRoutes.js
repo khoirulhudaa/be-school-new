@@ -3,7 +3,8 @@ const multer = require('multer');
 const studentController = require('../controllers/siswaController');
 const { protectForSiswa } = require('../middlewares/protectForSiswa');
 const cache = require('../middlewares/cache');
-const { loginLimiter } = require('../middlewares/rateLimiter');
+const { loginLimiter, globalLimiter } = require('../middlewares/rateLimiter');
+const optionalAuth = require('../middlewares/optionalLimiter');
 
 const router = express.Router();
 
@@ -43,9 +44,9 @@ router.get('/early-warning', studentController.getEarlyWarningReport);
 router.get('/hall-of-fame', cache(300), studentController.getPublicHallOfFame);
 
 // Endpoint Laporan & Export (Perbaikan ejaan: attendance)
-router.get('/attendance-report', studentController.getAttendanceReport);
+router.get('/attendance-report', optionalAuth, globalLimiter, studentController.getAttendanceReport);
 router.get('/export-attendance', studentController.exportAttendanceExcel);
-router.get('/recap-kelas', studentController.getClassRecapWithDetails);
+router.get('/recap-kelas', optionalAuth, globalLimiter, studentController.getClassRecapWithDetails);
 
 router.post('/process-graduation', studentController.processGraduation);
 
