@@ -799,17 +799,14 @@ exports.getUserDetail = async (req, res) => {
       });
     }
 
+    // Tentukan kolom secara dinamis
+    const selectedAttributes = isStudent 
+      ? ['id', 'name', 'nis', 'nisn', 'class', 'batch', 'photoUrl', 'gender', 'qrCodeData']
+      : ['id', ['nama', 'name'], 'nip', 'email', 'mapel', 'jurusan', 'photoUrl', ['jenisKelamin', 'gender'], 'qrCodeData'];
+      
     const user = await Model.findOne({
       where: { id, isActive: true },
-      attributes: isStudent 
-        ? [  // hanya field siswa
-            'id', 'name', 'nis', 'nisn', 'class', 'batch', 'photoUrl',
-            'gender', 'birthDate', 'qrCodeData', 'qrCodeData'
-          ]
-        : [  // field guru (sesuaikan dengan model GuruTendik)
-            'id', 'name', 'nip', 'email', 'mapel', 'jurusan', 'photoUrl',
-            // tambah field guru lain jika ada
-          ],
+      attributes: selectedAttributes,
       include: includeOptions
     });
 
