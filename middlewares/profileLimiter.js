@@ -8,29 +8,28 @@ const makeRedisStore = (prefix) => new RedisStore({
 });
 
 const profileLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 Menit
-    limit: 10, // Maksimal 10 kali update per 15 menit
+    windowMs: 5 * 60 * 1000, // 15 Menit
+    limit: 100, // Maksimal 10 kali update per 15 menit
     standardHeaders: true,
     legacyHeaders: false,
     store: makeRedisStore('rl:profile:'),
+    validate: false, 
     keyGenerator: (req) => {
-        /**
-         * Karena menggunakan protectMultiRole, req.user sudah terisi.
-         * Kita gunakan ID dan Role agar kunci benar-benar unik.
-         */
-        const userId = req.user?.id;
-        const role = req.user?.role;
+        const userId = req.user?.id || req.user?.profile?.id;
         
-        if (userId) return `auth:${role}:${userId}`;
-        console.log(`[PROFILELIMITER]: ${userId}`)
-        
-        // Fallback (meskipun jarang terjadi karena ada protectMultiRole)
-        const ip = req.ip || 'unknown-ip';
+        if (userId) {
+        return `auth:${userId}`;
+        }
+
+        // Ambil IP dari header jika di belakang proxy (Nginx), atau req.ip
+        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown-ip';
         const ua = req.headers['user-agent'] || 'no-ua';
-        console.log(`[PROFILELIMITER]: pub:${ip}:${ua}`)
+        
+        // Gunakan satu log saja agar tidak memenuhi layar
+        console.log(`[LIMITER-PROFILE]: pub:${ip}`);
+        
         return `pub:${ip}:${ua}`;
     },
-    validate: { ip: false, xForwardedForHeader: false }, // ← TAMBAH INI
     handler: (req, res) => {
         res.status(429).json({
             success: false,

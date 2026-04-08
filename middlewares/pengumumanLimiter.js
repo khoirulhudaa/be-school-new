@@ -11,17 +11,23 @@ const pengumumanLimiter = rateLimit({
     windowMs: 5 * 60 * 1000, // 5 Menit
     limit: 100, 
     store: makeRedisStore('rl:pengumuman:'),
+    validate: false, 
     keyGenerator: (req) => {
         const userId = req.user?.id || req.user?.profile?.id;
-        if (userId) return `auth:${userId}`;
-        console.log(`[GLOBALLIMITER]: ${userId}`)
         
-        const ip = req.ip || 'unknown-ip';
+        if (userId) {
+        return `auth:${userId}`;
+        }
+
+        // Ambil IP dari header jika di belakang proxy (Nginx), atau req.ip
+        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown-ip';
         const ua = req.headers['user-agent'] || 'no-ua';
-        console.log(`[GLOBALLIMITER]: pub:${ip}:${ua}`)
+        
+        // Gunakan satu log saja agar tidak memenuhi layar
+        console.log(`[LIMITER-PENGUMUMAN]: pub:${ip}`);
+        
         return `pub:${ip}:${ua}`;
     },
-    validate: { ip: false, xForwardedForHeader: false }, // ← TAMBAH INI
     handler: (req, res) => {
         res.status(429).json({
             success: false,

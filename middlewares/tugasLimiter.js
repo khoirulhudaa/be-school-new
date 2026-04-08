@@ -14,15 +14,23 @@ const tugasLimiter = rateLimit({
     standardHeaders: true, 
     legacyHeaders: false,
     store: makeRedisStore('rl:tugas:'),
+    validate: false, 
     keyGenerator: (req) => {
         const userId = req.user?.id || req.user?.profile?.id;
-        if (userId) return `auth:${userId}`;
         
-        const ip = req.ip || 'unknown-ip';
+        if (userId) {
+        return `auth:${userId}`;
+        }
+
+        // Ambil IP dari header jika di belakang proxy (Nginx), atau req.ip
+        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown-ip';
         const ua = req.headers['user-agent'] || 'no-ua';
+        
+        // Gunakan satu log saja agar tidak memenuhi layar
+        console.log(`[LIMITER-TUGAS]: pub:${ip}`);
+        
         return `pub:${ip}:${ua}`;
     },
-    validate: { ip: false, xForwardedForHeader: false }, // ← TAMBAH INI
     handler: (req, res) => {
         res.status(429).json({
             success: false,
