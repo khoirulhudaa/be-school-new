@@ -7,10 +7,10 @@ const makeRedisStore = (prefix) => new RedisStore({
   sendCommand: (command, ...args) => redisClient.call(command, ...args),
 });
 
-const beritaLimiter = rateLimit({
+const alumniLimiter = rateLimit({
     windowMs: 5 * 60 * 1000, // 1 Menit
     limit: 100, 
-    store: makeRedisStore('rl:berita:'),
+    store: makeRedisStore('rl:alumni:'),
     validate: { ip: false, xForwardedForHeader: false },
     keyGenerator: (req) => {
         const userId = req.user?.id || req.user?.profile?.id;
@@ -20,7 +20,7 @@ const beritaLimiter = rateLimit({
         const ip = ipKeyGenerator(req);
         const ua = req.headers['user-agent'] || 'no-ua';
 
-        console.log(`[LIMITER-BERITA]: pub:${ip}`);
+        console.log(`[LIMITER-ALUMNI]: pub:${ip}`);
         return `pub:${ip}:${ua}`;
     },
     handler: (req, res) => {
@@ -31,4 +31,4 @@ const beritaLimiter = rateLimit({
     }
 });
 
-module.exports = beritaLimiter;
+module.exports = alumniLimiter;

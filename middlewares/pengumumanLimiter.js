@@ -1,4 +1,4 @@
-const rateLimit = require('express-rate-limit');
+const {rateLimit, ipKeyGenerator} = require('express-rate-limit');
 const {RedisStore} = require('rate-limit-redis');
 const redisClient = require('../config/redis');
 
@@ -11,21 +11,16 @@ const pengumumanLimiter = rateLimit({
     windowMs: 5 * 60 * 1000, // 5 Menit
     limit: 100, 
     store: makeRedisStore('rl:pengumuman:'),
-    validate: false, 
+    validate: { ip: false, xForwardedForHeader: false },
     keyGenerator: (req) => {
         const userId = req.user?.id || req.user?.profile?.id;
-        
-        if (userId) {
-        return `auth:${userId}`;
-        }
+        if (userId) return `auth:${userId}`;
 
-        // Ambil IP dari header jika di belakang proxy (Nginx), atau req.ip
-        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown-ip';
+        // ipKeyGenerator menangani normalisasi IPv6 otomatis
+        const ip = ipKeyGenerator(req);
         const ua = req.headers['user-agent'] || 'no-ua';
-        
-        // Gunakan satu log saja agar tidak memenuhi layar
+
         console.log(`[LIMITER-PENGUMUMAN]: pub:${ip}`);
-        
         return `pub:${ip}:${ua}`;
     },
     handler: (req, res) => {

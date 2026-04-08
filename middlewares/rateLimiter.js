@@ -17,27 +17,21 @@ const globalLimiter = rateLimit({
   //   const ip = req.ip || req.connection.remoteAddress;
   //   return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
   // },
-  validate: false, 
+  validate: { ip: false, xForwardedForHeader: false }, // ← satu saja, hapus `validate: false` di atas
   keyGenerator: (req) => {
-      const userId = req.user?.id || req.user?.profile?.id;
-      
-      if (userId) {
-        console.log(`[LIMITER-GLOBAL]: userId${userId}`);
-        return `auth:${userId}`;
-      }
+    const userId = req.user?.id || req.user?.profile?.id;
+    if (userId) {
+      console.log(`[LIMITER-GLOBAL]: auth:${userId}`);
+      return `auth:${userId}`;
+    }
 
-      // Ambil IP dari header jika di belakang proxy (Nginx), atau req.ip
-      const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown-ip';
-      const ua = req.headers['user-agent'] || 'no-ua';
-      
-      // Gunakan satu log saja agar tidak memenuhi layar
-      console.log(`[LIMITER-GLOBAL]: pub:${ip}:${ua}`);
-      
-      return `pub:${ip}:${ua}`;
+    const ip = ipKeyGenerator(req); // ← pakai ini, bukan req.socket.remoteAddress manual
+    const ua = req.headers['user-agent'] || 'no-ua';
+    console.log(`[LIMITER-GLOBAL]: pub:${ip}`);
+    return `pub:${ip}:${ua}`;
   },
   standardHeaders: true, 
   legacyHeaders: false,
-  validate: { ip: false, xForwardedForHeader: false }, // ← TAMBAH INI
 
   handler: (req, res) => {
     res.status(429).json({
