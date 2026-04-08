@@ -1350,7 +1350,7 @@ exports.getAttendanceReport = async (req, res) => {
           'minutes'
         );
         
-        lateDuration = `${diffInMinutes} Menit`;
+        lateDuration = `${diffInMinutes}`;
       }
 
       const userData = isStudent ? attendance.student : attendance.guru;
@@ -1876,6 +1876,116 @@ exports.getParentChildren = async (req, res) => {
     });
 
   } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getClassRecapWithDetails = async (req, res) => {
+  try {
+    const { schoolId, date } = req.query;
+
+    const targetDate = date ? moment(date) : moment();
+    const startDate = targetDate.startOf('day').toDate();
+    const endDate = targetDate.endOf('day').toDate();
+    const deadline = "07:00:00";
+
+    // 1. Ambil semua siswa di sekolah tersebut
+    // Sertakan data absensi menggunakan alias 'studentAttendances' sesuai model Student
+    const allStudents = await Student.findAll({
+      where: { 
+        schoolId,
+        isActive: true, // Hanya hitung siswa aktif
+        isGraduated: false // Abaikan siswa yang sudah lulus
+      },
+      include: [
+        {
+          model: Attendance,
+          as: 'studentAttendances', // ALIAS SESUAI MODEL STUDENT
+          where: {
+            createdAt: { [Op.between]: [startDate, endDate] }
+          },
+          required: false // Agar siswa yang belum absen tetap muncul (LEFT JOIN)
+        }
+      ],
+      order: [['name', 'ASC']]
+    });
+
+    // 2. Grouping Logic
+    const groupedData = allStudents.reduce((acc, student) => {
+      const className = student.class || "Tanpa Kelas";
+      
+      if (!acc[className]) {
+        acc[className] = {
+          className,
+          totalStudents: 0,
+          stats: { onTime: 0, late: 0, izin: 0, sakit: 0, alpha: 0, belumHadir: 0 },
+          students: []
+        };
+      }
+
+      // Ambil data absensi pertama (karena hasMany mengembalikan array)
+      const attendance = student.studentAttendances && student.studentAttendances[0];
+      
+      let statusInfo = "Belum Hadir";
+      let isLate = false;
+      let scanTime = null;
+
+      if (attendance) {
+        scanTime = moment(attendance.createdAt).format("HH:mm:ss");
+        
+        if (attendance.status === 'Hadir') {
+          if (scanTime <= deadline) {
+            acc[className].stats.onTime++;
+            statusInfo = "Hadir Tepat Waktu";
+          } else {
+            acc[className].stats.late++;
+            statusInfo = "Telat";
+            isLate = true;
+          }
+        } else {
+          // Izin, Sakit, Alpha (Status Manual)
+          const statusKey = attendance.status.toLowerCase();
+          if (acc[className].stats[statusKey] !== undefined) {
+            acc[className].stats[statusKey]++;
+          }
+          statusInfo = attendance.status;
+        }
+      } else {
+        acc[className].stats.belumHadir++;
+      }
+
+      acc[className].totalStudents++;
+      
+      // Push detail siswa ke array
+      acc[className].students.push({
+        id: student.id,
+        name: student.name,
+        nis: student.nis,
+        status: statusInfo,
+        scanTime: scanTime,
+        isLate: isLate,
+        photoUrl: student.photoUrl
+      });
+
+      return acc;
+    }, {});
+
+    // Mapping ke Array untuk response
+    const finalData = Object.values(groupedData).sort((a, b) => 
+      a.className.localeCompare(b.className)
+    );
+
+    res.json({
+      success: true,
+      meta: {
+        date: targetDate.format("YYYY-MM-DD"),
+        deadline
+      },
+      data: finalData
+    });
+
+  } catch (err) {
+    console.error("Error Detail Recap:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };

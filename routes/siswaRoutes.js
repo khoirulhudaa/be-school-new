@@ -45,6 +45,7 @@ router.get('/hall-of-fame', cache(300), studentController.getPublicHallOfFame);
 // Endpoint Laporan & Export (Perbaikan ejaan: attendance)
 router.get('/attendance-report', studentController.getAttendanceReport);
 router.get('/export-attendance', studentController.exportAttendanceExcel);
+router.get('/recap-kelas', studentController.getClassRecapWithDetails);
 
 router.post('/process-graduation', studentController.processGraduation);
 
