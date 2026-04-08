@@ -18,12 +18,15 @@ const globalLimiter = rateLimit({
   //   return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
   // },
   keyGenerator: (req) => {
-    const profile = req.user?.profile || req.user;
-    const id = profile?.id || ipKeyGenerator(req);
+    const userId = req.user?.id || req.user?.profile?.id;
+    if (userId) return `auth:${userId}`;
 
-    console.log(`[RateLimit] Incoming request from: ${id}`); 
-
-    return profile?.id ? `auth:${profile.id}` : id;
+    console.log(`[GLOBALLIMITER]: ${userId}`)
+    
+    const ip = req.ip || 'unknown-ip';
+    const ua = req.headers['user-agent'] || 'no-ua';
+    console.log(`[GLOBALLIMITER]: pub:${ip}:${ua}`)
+    return `pub:${ip}:${ua}`;
   },
   standardHeaders: true, 
   legacyHeaders: false,
