@@ -1902,7 +1902,8 @@ exports.getClassRecapWithDetails = async (req, res) => {
           model: Attendance,
           as: 'studentAttendances', // ALIAS SESUAI MODEL STUDENT
           where: {
-            createdAt: { [Op.between]: [startDate, endDate] }
+            createdAt: { [Op.between]: [startDate, endDate] },
+            userRole: 'student'
           },
           required: false // Agar siswa yang belum absen tetap muncul (LEFT JOIN)
         }
