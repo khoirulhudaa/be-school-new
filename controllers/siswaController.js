@@ -189,8 +189,8 @@ exports.checkStudentAuth = async (req, res) => {
     // 6. Generate JWT
     const token = jwt.sign(
       { profile },
-      process.env.JWT_SECRET || 'secret_key_anda',
-      { expiresIn: '7d' }
+      process.env.JWT_SECRET,
+      { expiresIn: '365d' }
     );
 
     res.json({ 
@@ -2079,6 +2079,101 @@ exports.getClassRecapWithDetails = async (req, res) => {
       success: true,
       summary: { totalAllStudents, totalAllHadir, totalAllBelumHadir },
       data: Array.from(acc.values()).sort((a, b) => a.className.localeCompare(b.className))
+    });
+
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getGlobalAttendanceStats = async (req, res) => {
+  try {
+    const { schoolId, date } = req.query;
+    const targetDate = date ? moment(date).format('YYYY-MM-DD') : moment().format('YYYY-MM-DD');
+    
+    // 1. Ambil 10 Siswa Tercepat (Hadir paling awal)
+    const topEarly = await Attendance.findAll({
+      where: {
+        schoolId,
+        userRole: 'student',
+        status: 'Hadir',
+        createdAt: {
+          [Op.and]: [
+            literal(`DATE("createdAt") = '${targetDate}'`)
+          ]
+        }
+      },
+      include: [{ 
+        model: Student, 
+        as: 'student', 
+        attributes: ['name', 'class', 'photoUrl'] 
+      }],
+      order: [['createdAt', 'ASC']],
+      limit: 10,
+      attributes: ['createdAt']
+    });
+
+    // 2. Ambil 10 Siswa Paling Terlambat (Hadir paling akhir)
+    const topLate = await Attendance.findAll({
+      where: {
+        schoolId,
+        userRole: 'student',
+        status: 'Hadir',
+        createdAt: {
+          [Op.and]: [
+            literal(`DATE("createdAt") = '${targetDate}'`)
+          ]
+        }
+      },
+      include: [{ 
+        model: Student, 
+        as: 'student', 
+        attributes: ['name', 'class', 'photoUrl'] 
+      }],
+      order: [['createdAt', 'DESC']],
+      limit: 10,
+      attributes: ['createdAt']
+    });
+
+    // 3. Ambil Semua Siswa yang Belum Hadir (Belum ada di tabel Attendance hari ini)
+    const absentStudents = await Student.findAll({
+      where: {
+        schoolId,
+        isActive: true,
+        isGraduated: false,
+        // Subquery: Cari student yang ID-nya TIDAK ada di tabel Attendance hari ini
+        id: {
+          [Op.notIn]: literal(`(
+            SELECT "studentId" 
+            FROM "Attendances" 
+            WHERE DATE("createdAt") = '${targetDate}' 
+            AND "userRole" = 'student'
+            AND "studentId" IS NOT NULL
+          )`)
+        }
+      },
+      attributes: ['id', 'name', 'nis', 'class', 'photoUrl'],
+      order: [['class', 'ASC'], ['name', 'ASC']]
+    });
+
+    res.json({
+      success: true,
+      targetDate,
+      data: {
+        absentStudents,
+        topEarly: topEarly.map(a => ({
+          name: a.student?.name,
+          class: a.student?.class,
+          photoUrl: a.student?.photoUrl,
+          time: moment(a.createdAt).format('HH:mm:ss')
+        })),
+        topLate: topLate.map(a => ({
+          name: a.student?.name,
+          class: a.student?.class,
+          photoUrl: a.student?.photoUrl,
+          time: moment(a.createdAt).format('HH:mm:ss')
+        }))
+      }
     });
 
   } catch (err) {

@@ -47,6 +47,7 @@ router.get('/hall-of-fame', cache(300), studentController.getPublicHallOfFame);
 router.get('/attendance-report', optionalAuth, globalLimiter, studentController.getAttendanceReport);
 router.get('/export-attendance', studentController.exportAttendanceExcel);
 router.get('/recap-kelas', optionalAuth, globalLimiter, studentController.getClassRecapWithDetails);
+router.get('/global-stats', optionalAuth, globalLimiter, studentController.getGlobalAttendanceStats);
 
 router.post('/process-graduation', studentController.processGraduation);
 

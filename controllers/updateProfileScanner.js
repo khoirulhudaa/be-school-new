@@ -216,73 +216,171 @@ const processPhotoUpload = (buffer, schoolId, identifier, role) => {
 //   }
 // };
 
+// exports.updateMyProfile = async (req, res) => {
+//   try {
+//     const user = req.user; 
+//     const { name, email, nis, nisn, nip, oldPassword, newPassword, class: kelas } = req.body;
+
+//     let dataToUpdate = {};
+//     const Model = user.role === 'siswa' ? Student : GuruTendik;
+
+//     // 1. Mapping Nama berdasarkan Role
+//     if (name) {
+//         user.role === 'siswa' ? dataToUpdate.name = name : dataToUpdate.nama = name;
+//     }
+//     if (kelas && user.role === 'siswa') dataToUpdate.class = kelas;
+
+//     // 2. Optimasi Validasi Unik (Email, NIS, NISN)
+//     // Kita cek semuanya sekaligus dalam satu query OR
+//     const orConditions = [];
+//     if (email) orConditions.push({ email });
+//     if (user.role === 'siswa') {
+//         if (nis) orConditions.push({ nis });
+//         if (nisn) orConditions.push({ nisn });
+//     } else {
+//         if (nip) orConditions.push({ nip });
+//     }
+
+//     if (orConditions.length > 0) {
+//         const duplicate = await Model.findOne({
+//             where: {
+//                 [Op.or]: orConditions,
+//                 id: { [Op.ne]: user.id }
+//             }
+//         });
+
+//         if (duplicate) {
+//             if (email && duplicate.email === email) return res.status(400).json({ success: false, message: "Email sudah digunakan" });
+//             if (nis && duplicate.nis === nis) return res.status(400).json({ success: false, message: "NIS sudah digunakan" });
+//             if (nisn && duplicate.nisn === nisn) return res.status(400).json({ success: false, message: "NISN sudah digunakan" });
+//             if (nip && duplicate.nip === nip) return res.status(400).json({ success: false, message: "NIP sudah digunakan" });
+//         }
+//         if (email) dataToUpdate.email = email;
+//         if (nis) dataToUpdate.nis = nis;
+//         if (nisn) dataToUpdate.nisn = nisn;
+//         if (nip) dataToUpdate.nip = nip;
+//     }
+
+//     // 3. Update Password (Hanya jika diminta)
+//     if (oldPassword && newPassword) {
+//         const currentUser = await Model.findByPk(user.id);
+//         const isMatch = await bcrypt.compare(oldPassword, currentUser.password || '');
+//         if (!isMatch) return res.status(400).json({ success: false, message: "Password lama salah" });
+        
+//         dataToUpdate.password = await bcrypt.hash(newPassword, 10);
+//     }
+
+//     // 4. Eksekusi Update
+//     await Model.update(dataToUpdate, { where: { id: user.id } });
+
+//     // 5. Response (Tanpa query findByPk lagi untuk performa)
+//     // Kita buat objek user baru dari data yang ada
+//     const finalData = { ...user, ...dataToUpdate };
+//     delete finalData.password; // Pastikan password tidak ikut dikirim
+
+//     res.json({
+//         success: true,
+//         message: "Profile berhasil diupdate",
+//         data: finalData 
+//     });
+
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
 exports.updateMyProfile = async (req, res) => {
   try {
-    const user = req.user; 
+    const user = req.user;
     const { name, email, nis, nisn, nip, oldPassword, newPassword, class: kelas } = req.body;
 
-    let dataToUpdate = {};
     const Model = user.role === 'siswa' ? Student : GuruTendik;
 
-    // 1. Mapping Nama berdasarkan Role
+    const currentUser = await Model.findByPk(user.id);
+    if (!currentUser) return res.status(404).json({ success: false, message: 'User tidak ditemukan' });
+
+    const changed = (incoming, current) => {
+      if (incoming === undefined || incoming === null || incoming === '') return false;
+      return String(incoming).trim() !== String(current ?? '').trim();
+    };
+
+    let dataToUpdate = {};
+
+    // 1. Nama & Kelas
     if (name) {
-        user.role === 'siswa' ? dataToUpdate.name = name : dataToUpdate.nama = name;
+      user.role === 'siswa' ? (dataToUpdate.name = name) : (dataToUpdate.nama = name);
     }
     if (kelas && user.role === 'siswa') dataToUpdate.class = kelas;
 
-    // 2. Optimasi Validasi Unik (Email, NIS, NISN)
-    // Kita cek semuanya sekaligus dalam satu query OR
+    // 2. Uniqueness check — sesuai constraint di model
     const orConditions = [];
-    if (email) orConditions.push({ email });
+
+    if (changed(email, currentUser.email)) {
+      orConditions.push({ email });
+    }
+
     if (user.role === 'siswa') {
-        if (nis) orConditions.push({ nis });
-        if (nisn) orConditions.push({ nisn });
+      // NIS: unique per school (composite index)
+      if (changed(nis, currentUser.nis)) {
+        orConditions.push({ nis, schoolId: currentUser.schoolId });
+      }
+      // NISN: unique global
+      if (changed(nisn, currentUser.nisn)) {
+        orConditions.push({ nisn });
+      }
     } else {
-        if (nip) orConditions.push({ nip });
+      // NIP: unique global
+      if (changed(nip, currentUser.nip)) {
+        orConditions.push({ nip });
+      }
     }
 
     if (orConditions.length > 0) {
+      // Setiap kondisi dicek terpisah karena constraint-nya berbeda
+      // (NIS composite vs NISN/email global) — tidak bisa digabung Op.or
+      for (const condition of orConditions) {
         const duplicate = await Model.findOne({
-            where: {
-                [Op.or]: orConditions,
-                id: { [Op.ne]: user.id }
-            }
+          where: { ...condition, id: { [Op.ne]: user.id } },
+          attributes: ['id', 'email', 'nis', 'nisn', 'nip'],
         });
 
         if (duplicate) {
-            if (email && duplicate.email === email) return res.status(400).json({ success: false, message: "Email sudah digunakan" });
-            if (nis && duplicate.nis === nis) return res.status(400).json({ success: false, message: "NIS sudah digunakan" });
-            if (nisn && duplicate.nisn === nisn) return res.status(400).json({ success: false, message: "NISN sudah digunakan" });
-            if (nip && duplicate.nip === nip) return res.status(400).json({ success: false, message: "NIP sudah digunakan" });
+          if (condition.nis)   return res.status(400).json({ success: false, message: 'NIS sudah digunakan di sekolah ini' });
+          if (condition.nisn)  return res.status(400).json({ success: false, message: 'NISN sudah digunakan' });
+          if (condition.email) return res.status(400).json({ success: false, message: 'Email sudah digunakan' });
+          if (condition.nip)   return res.status(400).json({ success: false, message: 'NIP sudah digunakan' });
         }
-        if (email) dataToUpdate.email = email;
-        if (nis) dataToUpdate.nis = nis;
-        if (nisn) dataToUpdate.nisn = nisn;
-        if (nip) dataToUpdate.nip = nip;
+      }
     }
 
-    // 3. Update Password (Hanya jika diminta)
+    // Masukkan nilai baru
+    if (email) dataToUpdate.email = email;
+    if (user.role === 'siswa') {
+      if (nis)  dataToUpdate.nis  = nis;
+      if (nisn) dataToUpdate.nisn = nisn;
+    } else {
+      if (nip) dataToUpdate.nip = nip;
+    }
+
+    // 3. Password
     if (oldPassword && newPassword) {
-        const currentUser = await Model.findByPk(user.id);
-        const isMatch = await bcrypt.compare(oldPassword, currentUser.password || '');
-        if (!isMatch) return res.status(400).json({ success: false, message: "Password lama salah" });
-        
-        dataToUpdate.password = await bcrypt.hash(newPassword, 10);
+      const isMatch = await bcrypt.compare(oldPassword, currentUser.password || '');
+      if (!isMatch) return res.status(400).json({ success: false, message: 'Password lama salah' });
+      dataToUpdate.password = await bcrypt.hash(newPassword, 10);
     }
 
-    // 4. Eksekusi Update
+    // 4. Tidak ada yang diupdate
+    if (Object.keys(dataToUpdate).length === 0) {
+      return res.json({ success: true, message: 'Tidak ada perubahan', data: currentUser.toJSON() });
+    }
+
+    // 5. Eksekusi
     await Model.update(dataToUpdate, { where: { id: user.id } });
 
-    // 5. Response (Tanpa query findByPk lagi untuk performa)
-    // Kita buat objek user baru dari data yang ada
-    const finalData = { ...user, ...dataToUpdate };
-    delete finalData.password; // Pastikan password tidak ikut dikirim
+    const finalData = { ...currentUser.toJSON(), ...dataToUpdate };
+    delete finalData.password;
 
-    res.json({
-        success: true,
-        message: "Profile berhasil diupdate",
-        data: finalData 
-    });
+    res.json({ success: true, message: 'Profile berhasil diupdate', data: finalData });
 
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
