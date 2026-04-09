@@ -1,6 +1,7 @@
 const {rateLimit, ipKeyGenerator} = require('express-rate-limit');
 const {RedisStore} = require('rate-limit-redis');
 const redisClient = require('../config/redis');
+const normalizeIp = require('../hooks/normalizeIp');
 
 const makeRedisStore = (prefix) => new RedisStore({
   prefix,
@@ -19,10 +20,10 @@ const profileLimiter = rateLimit({
         if (userId) return `auth:${userId}`;
 
         // ipKeyGenerator menangani normalisasi IPv6 otomatis
-        const ip = ipKeyGenerator(req);
-        const ua = req.headers['user-agent'] || 'no-ua';
+        const ip = normalizeIp(req);
+        const ua = (req.headers['user-agent'] || 'no-ua').substring(0, 80);
 
-        console.log(`[LIMITER-PRFILE]: pub:${ip}`);
+        console.log(`[LIMITER-PROFILE]: pub:${ip}:${ua}`);
         return `pub:${ip}:${ua}`;
     },
     handler: (req, res) => {
