@@ -2088,63 +2088,48 @@ exports.getClassRecapWithDetails = async (req, res) => {
 
 exports.getGlobalAttendanceStats = async (req, res) => {
   try {
-    const { schoolId, date } = req.query;
-    const targetDate = date
-      ? moment(date).format('YYYY-MM-DD')
-      : moment().format('YYYY-MM-DD');
+    const { schoolId, date, search = '', page = 1, limit = 10 } = req.query;
+    
+    const targetDate  = date ? moment(date).format('YYYY-MM-DD') : moment().format('YYYY-MM-DD');
+    const startOfDay  = `${targetDate} 00:00:00`;
+    const endOfDay    = `${targetDate} 23:59:59`;
+    const offset      = (Number(page) - 1) * Number(limit);
 
-    // ✅ Range-based filter — bisa pakai index pada createdAt
-    const startOfDay = `${targetDate} 00:00:00`;
-    const endOfDay   = `${targetDate} 23:59:59`;
+    const createdAtRange = { [Op.between]: [startOfDay, endOfDay] };
+    const baseWhere = { schoolId, userRole: 'student', status: 'Hadir', createdAt: createdAtRange };
 
-    const createdAtRange = {
-      [Op.between]: [startOfDay, endOfDay]
-    };
+    // Where untuk absent students + search
+    const absentWhere = { schoolId, isActive: true, isGraduated: false };
+    if (search.trim()) {
+      absentWhere[Op.or] = [
+        { name: { [Op.like]: `%${search.trim()}%` } },
+        { nis:  { [Op.like]: `%${search.trim()}%` } },
+      ];
+    }
 
-    const baseWhere = {
-      schoolId,
-      userRole: 'student',
-      status:   'Hadir',
-      createdAt: createdAtRange,
-    };
-
-    const includeStudent = [{
-      model:      Student,
-      as:         'student',
-      attributes: ['name', 'class', 'photoUrl'],
-    }];
-
-    // ✅ Jalankan parallel — tidak perlu tunggu satu-satu
-    const [allHadir, absentStudents] = await Promise.all([
-
-      // 1 query untuk topEarly & topLate sekaligus
+    const [allHadir, { rows: absentStudents, count: totalAbsent }] = await Promise.all([
       Attendance.findAll({
         where:      baseWhere,
-        include:    includeStudent,
+        include:    [{ model: Student, as: 'student', attributes: ['name', 'class', 'photoUrl'] }],
         order:      [['createdAt', 'ASC']],
         attributes: ['createdAt', 'studentId'],
-        // Ambil semua, slice di JS — lebih efisien dari 2 query
       }),
 
-      // ✅ LEFT JOIN lebih cepat dari NOT IN untuk data besar
-      Student.findAll({
-        where: {
-          schoolId,
-          isActive:    true,
-          isGraduated: false,
-        },
-        attributes: ['id', 'name', 'nis', 'class', 'photoUrl'],
+      Student.findAndCountAll({
+        where:   absentWhere,
         include: [{
-          model:    Attendance,
-          as:       'studentAttendances',
-          required: false, // LEFT JOIN
-          where:    { createdAt: createdAtRange, userRole: 'student' },
+          model:      Attendance,
+          as:         'studentAttendances',
+          required:   false,
+          where:      { createdAt: createdAtRange, userRole: 'student' },
           attributes: [],
         }],
-        // Siswa yang tidak punya attendance hari ini
         having:   literal('COUNT(`studentAttendances`.`id`) = 0'),
         group:    ['Student.id'],
         order:    [['class', 'ASC'], ['name', 'ASC']],
+        attributes: ['id', 'name', 'nis', 'class', 'photoUrl'],
+        limit:    Number(limit),
+        offset,
         subQuery: false,
       }),
     ]);
@@ -2164,6 +2149,12 @@ exports.getGlobalAttendanceStats = async (req, res) => {
       targetDate,
       data: {
         absentStudents,
+        absentMeta: {
+          total:      totalAbsent.length, // findAndCountAll dengan group returns array
+          page:       Number(page),
+          limit:      Number(limit),
+          totalPages: Math.ceil(totalAbsent.length / Number(limit)),
+        },
         topEarly: topEarly.map(formatAttendance),
         topLate:  topLate.map(formatAttendance),
       },
