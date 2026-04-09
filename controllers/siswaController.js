@@ -1996,8 +1996,10 @@ exports.getClassRecapWithDetails = async (req, res) => {
   try {
     const { schoolId, date } = req.query;
     const targetDate = date ? moment(date) : moment();
-    const startDate = targetDate.startOf('day').toDate();
-    const endDate = targetDate.endOf('day').toDate();
+    
+    const startDate = targetDate.clone().startOf('day').utc().format('YYYY-MM-DD HH:mm:ss');
+    const endDate = targetDate.clone().endOf('day').utc().format('YYYY-MM-DD HH:mm:ss');
+
     const deadline = "07:00:00";
 
     // OPTIMASI 1: Gunakan Attributes untuk membatasi kolom yang ditarik dari DB
