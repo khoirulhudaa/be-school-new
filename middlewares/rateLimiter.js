@@ -12,7 +12,7 @@ const makeRedisStore = (prefix) => new RedisStore({
 
 const globalLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, 
-  limit: 5000,              
+  limit: 150,              
   store: makeRedisStore('rl:global:'),
   // skip: (req) => {
   //   const ip = req.ip || req.connection.remoteAddress;
@@ -29,7 +29,7 @@ const globalLimiter = rateLimit({
 
     const ip = normalizeIp(req);
     const ua = (req.headers['user-agent'] || 'no-ua').substring(0, 80);
-    console.log(`[LIMITER-GLOBAL]: pub:${ip}:${ua}`);
+    console.log(`[LIMITER-GLOBAL]: pub:${ip}`);
     return `pub:${ip}:${ua}`;
   },
   standardHeaders: true, 
@@ -45,7 +45,7 @@ const globalLimiter = rateLimit({
 
 const loginLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
-  limit: 500,
+  limit: 20,
   store: makeRedisStore('rl:login:'),
   keyGenerator: (req) => {
     const email = req.body?.email || 'no-email';
@@ -82,16 +82,23 @@ const loginLimiter = rateLimit({
 
 // 2. Stricter limiter untuk route sensitif (misal login, create berita, upload)
 const strictLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000, // 1 menit
-  limit: 7000,          
+  windowMs: 5 * 60 * 1000, // 5 menit
+  limit: 100,          
   store: makeRedisStore('rl:strict:'),
+  validate: { ip: false, xForwardedForHeader: false },
   keyGenerator: (req) => {
-    const profile = req.user?.profile || req.user;
-    return profile?.id ? `auth:${profile.id}` : ipKeyGenerator(req);
+    const userId = req.user?.id || req.user?.profile?.id;
+
+    if (userId) {
+      return `auth:${userId}`;
+    }
+
+    const ip = normalizeIp(req);
+    const ua = (req.headers['user-agent'] || 'no-ua').substring(0, 80);
+    return `pub:${ip}:${ua}`;
   },
   standardHeaders: true,  // ← tambah ini juga
   legacyHeaders: false,
-  validate: { ip: false, xForwardedForHeader: false }, // ← TAMBAH INI
   message: { success: false, message: 'Terlalu banyak percobaan login, tunggu 1 menit.' },
   statusCode: 429,
 });
