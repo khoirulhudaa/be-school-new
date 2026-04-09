@@ -2089,71 +2089,74 @@ exports.getClassRecapWithDetails = async (req, res) => {
 exports.getGlobalAttendanceStats = async (req, res) => {
   try {
     const { schoolId, date } = req.query;
-    const targetDate = date ? moment(date).format('YYYY-MM-DD') : moment().format('YYYY-MM-DD');
-    
-    // 1. Ambil 10 Siswa Tercepat (Hadir paling awal)
-    const topEarly = await Attendance.findAll({
-      where: {
-        schoolId,
-        userRole: 'student',
-        status: 'Hadir',
-        createdAt: {
-          [Op.and]: [
-            literal(`DATE("createdAt") = '${targetDate}'`)
-          ]
-        }
-      },
-      include: [{ 
-        model: Student, 
-        as: 'student', 
-        attributes: ['name', 'class', 'photoUrl'] 
-      }],
-      order: [['createdAt', 'ASC']],
-      limit: 10,
-      attributes: ['createdAt']
-    });
+    const targetDate = date
+      ? moment(date).format('YYYY-MM-DD')
+      : moment().format('YYYY-MM-DD');
 
-    // 2. Ambil 10 Siswa Paling Terlambat (Hadir paling akhir)
-    const topLate = await Attendance.findAll({
-      where: {
-        schoolId,
-        userRole: 'student',
-        status: 'Hadir',
-        createdAt: {
-          [Op.and]: [
-            literal(`DATE("createdAt") = '${targetDate}'`)
-          ]
-        }
-      },
-      include: [{ 
-        model: Student, 
-        as: 'student', 
-        attributes: ['name', 'class', 'photoUrl'] 
-      }],
-      order: [['createdAt', 'DESC']],
-      limit: 10,
-      attributes: ['createdAt']
-    });
+    // ✅ Range-based filter — bisa pakai index pada createdAt
+    const startOfDay = `${targetDate} 00:00:00`;
+    const endOfDay   = `${targetDate} 23:59:59`;
 
-    // 3. Ambil Semua Siswa yang Belum Hadir (Belum ada di tabel Attendance hari ini)
-    const absentStudents = await Student.findAll({
-      where: {
-        schoolId,
-        isActive: true,
-        isGraduated: false,
-        // Subquery: Cari student yang ID-nya TIDAK ada di tabel Attendance hari ini
-        id: {
-          [Op.notIn]: literal(`(
-            SELECT "studentId" 
-            FROM "Attendances" 
-            WHERE DATE("createdAt") = '${targetDate}' 
-            AND "userRole" = 'student'
-            AND "studentId" IS NOT NULL
-          )`)
-        }
-      },
-      attributes: ['id', 'name', 'nis', 'class', 'photoUrl'],
-      order: [['class', 'ASC'], ['name', 'ASC']]
+    const createdAtRange = {
+      [Op.between]: [startOfDay, endOfDay]
+    };
+
+    const baseWhere = {
+      schoolId,
+      userRole: 'student',
+      status:   'Hadir',
+      createdAt: createdAtRange,
+    };
+
+    const includeStudent = [{
+      model:      Student,
+      as:         'student',
+      attributes: ['name', 'class', 'photoUrl'],
+    }];
+
+    // ✅ Jalankan parallel — tidak perlu tunggu satu-satu
+    const [allHadir, absentStudents] = await Promise.all([
+
+      // 1 query untuk topEarly & topLate sekaligus
+      Attendance.findAll({
+        where:      baseWhere,
+        include:    includeStudent,
+        order:      [['createdAt', 'ASC']],
+        attributes: ['createdAt', 'studentId'],
+        // Ambil semua, slice di JS — lebih efisien dari 2 query
+      }),
+
+      // ✅ LEFT JOIN lebih cepat dari NOT IN untuk data besar
+      Student.findAll({
+        where: {
+          schoolId,
+          isActive:    true,
+          isGraduated: false,
+        },
+        attributes: ['id', 'name', 'nis', 'class', 'photoUrl'],
+        include: [{
+          model:    Attendance,
+          as:       'studentAttendances',
+          required: false, // LEFT JOIN
+          where:    { createdAt: createdAtRange, userRole: 'student' },
+          attributes: [],
+        }],
+        // Siswa yang tidak punya attendance hari ini
+        having:   literal('COUNT(`studentAttendances`.`id`) = 0'),
+        group:    ['Student.id'],
+        order:    [['class', 'ASC'], ['name', 'ASC']],
+        subQuery: false,
+      }),
+    ]);
+
+    const topEarly = allHadir.slice(0, 10);
+    const topLate  = [...allHadir].reverse().slice(0, 10);
+
+    const formatAttendance = (a) => ({
+      name:     a.student?.name,
+      class:    a.student?.class,
+      photoUrl: a.student?.photoUrl,
+      time:     moment(a.createdAt).format('HH:mm:ss'),
     });
 
     res.json({
@@ -2161,19 +2164,9 @@ exports.getGlobalAttendanceStats = async (req, res) => {
       targetDate,
       data: {
         absentStudents,
-        topEarly: topEarly.map(a => ({
-          name: a.student?.name,
-          class: a.student?.class,
-          photoUrl: a.student?.photoUrl,
-          time: moment(a.createdAt).format('HH:mm:ss')
-        })),
-        topLate: topLate.map(a => ({
-          name: a.student?.name,
-          class: a.student?.class,
-          photoUrl: a.student?.photoUrl,
-          time: moment(a.createdAt).format('HH:mm:ss')
-        }))
-      }
+        topEarly: topEarly.map(formatAttendance),
+        topLate:  topLate.map(formatAttendance),
+      },
     });
 
   } catch (err) {
