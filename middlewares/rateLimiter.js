@@ -51,19 +51,9 @@ const loginLimiter = rateLimit({
     const email = req.body?.email || 'no-email';
     console.log('[email LOG]:', email)
     
-    // Pastikan kita mengambil string-nya, bukan object-nya
-    let ip = ipKeyGenerator(req);
-    
-    // Jika ipKeyGenerator mengembalikan object (misal dari library request-ip atau sejenisnya)
-    // Kita coba ambil property clientIp atau semacamnya, atau paksa ke string
-    if (typeof ip === 'object') {
-      ip = ip.clientIp || req.ip || req.headers['x-forwarded-for'] || 'unknown-ip';
-    }
-
+    const ip = normalizeIp(req);
     const key = `${ip}:${email}`;
 
-    // console.log(`[loginLimiter] email=${email} | ip=${ip} | key=${key}`);
-    
     return key;
   },
   standardHeaders: true,
