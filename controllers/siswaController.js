@@ -2149,8 +2149,8 @@ exports.getGlobalAttendanceStats = async (req, res) => {
       }),
     ]);
 
-    const topEarly = allHadir.slice(0, 10);
-    const topLate  = [...allHadir].reverse().slice(0, 10);
+    const topEarly = allHadir.slice(0, 5);
+    const topLate  = [...allHadir].reverse().slice(0, 5);
 
     const formatAttendance = (a) => ({
       name:     a.student?.name,
