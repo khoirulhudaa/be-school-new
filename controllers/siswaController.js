@@ -405,6 +405,120 @@ exports.getStudentSearch = async (req, res) => {
   }
 };
 
+// exports.getAllStudents = async (req, res) => {
+//   try {
+//     const { 
+//       schoolId, 
+//       page = 1, 
+//       limit = 10, 
+//       class: studentClass, 
+//       batch, 
+//       search,
+//       isDuplicateOnly // <--- Parameter baru dari frontend
+//     } = req.query;
+
+//     if (!schoolId || isNaN(parseInt(schoolId))) {
+//       return res.status(400).json({ success: false, message: "schoolId diperlukan." });
+//     }
+
+//     const sId = parseInt(schoolId);
+//     let condition = { schoolId: sId, isActive: true };
+
+//     // --- 1. LOGIKA IDENTIFIKASI DUPLIKAT ---
+    
+//     // Cari daftar NIS yang duplikat di sekolah ini
+//     const dupNisRows = await Student.findAll({
+//       where: { schoolId: sId, isActive: true },
+//       attributes: ['nis'],
+//       group: ['nis'],
+//       having: sequelizeWhere(fn('COUNT', col('nis')), '>', 1),
+//       raw: true
+//     });
+
+//     // Cari daftar NISN yang duplikat secara global
+//     const dupNisnRows = await Student.findAll({
+//       where: { isActive: true, nisn: { [Op.ne]: null } },
+//       attributes: ['nisn'],
+//       group: ['nisn'],
+//       having: sequelizeWhere(fn('COUNT', col('nisn')), '>', 1),
+//       raw: true
+//     });
+
+//     const duplicateNisList = dupNisRows.map(d => d.nis);
+//     const duplicateNisnList = dupNisnRows.map(d => d.nisn);
+
+//     // --- 2. PENYUSUNAN FILTER QUERY ---
+
+//     if (name) condition.name = { [Op.like]: `%${name}%` };
+//     if (studentClass) condition.class = studentClass;
+//     if (batch) condition.batch = batch;
+
+//     // Jika isDuplicateOnly bernilai true, filter data agar hanya menampilkan yang bermasalah
+//     if (isDuplicateOnly === 'true') {
+//       condition[Op.or] = [
+//         { nis: { [Op.in]: duplicateNisList } },            // Kembar di sistem
+//         { nisn: { [Op.in]: duplicateNisnList } },          // NISN kembar
+//         { nis: { [Op.like]: '%-DUP-%' } },                 // Ditandai "-DUP-" oleh SQL sebelumnya
+//         { nisn: { [Op.like]: '%-DUP-%' } }                 // (Opsional) jika NISN juga ditandai
+//       ];
+//     }
+
+//     const offset = (parseInt(page) - 1) * parseInt(limit);
+
+//     // --- 3. QUERY UTAMA DATA SISWA ---
+//     const { count, rows } = await Student.findAndCountAll({
+//       where: condition,
+//       limit: parseInt(limit),
+//       offset: offset,
+//       order: [['name', 'ASC']],
+//       include: [{
+//         model: Attendance,
+//         as: 'studentAttendances',
+//         where: {
+//           createdAt: {
+//             [Op.between]: [moment().startOf('day').toDate(), moment().endOf('day').toDate()]
+//           }
+//         },
+//         required: false
+//       }]
+//     });
+
+//     // --- 4. MAPPING DATA & FLAG DUPLIKAT ---
+//     const dataWithStatus = rows.map(s => {
+//       const student = s.toJSON();
+//       const attendanceToday = student.studentAttendances?.[0];
+      
+//       student.statusKehadiran = attendanceToday ? attendanceToday.status : 'Belum Hadir';
+      
+//       // Flag untuk frontend agar bisa memberi warna merah pada baris
+//       student.isNisDuplicate = duplicateNisList.includes(student.nis) || student.nis.includes('-DUP-');
+//       student.isNisnDuplicate = student.nisn ? (duplicateNisnList.includes(student.nisn) || student.nisn.includes('-DUP-')) : false;
+
+//       delete student.studentAttendances;
+//       return student;
+//     });
+
+//     // --- 5. KIRIM RESPONSE ---
+//     res.json({
+//       success: true,
+//       summary: {
+//         uniqueNisDuplicates: duplicateNisList.length,
+//         uniqueNisnDuplicates: duplicateNisnList.length,
+//         hasIssues: duplicateNisList.length > 0 || duplicateNisnList.length > 0 || (isDuplicateOnly === 'true' && count > 0)
+//       },
+//       data: dataWithStatus,
+//       pagination: {
+//         totalItems: count,
+//         totalPages: Math.ceil(count / parseInt(limit)),
+//         currentPage: parseInt(page)
+//       }
+//     });
+
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
 exports.getAllStudents = async (req, res) => {
   try {
     const { 
@@ -413,8 +527,8 @@ exports.getAllStudents = async (req, res) => {
       limit = 10, 
       class: studentClass, 
       batch, 
-      name,
-      isDuplicateOnly // <--- Parameter baru dari frontend
+      search,
+      isDuplicateOnly
     } = req.query;
 
     if (!schoolId || isNaN(parseInt(schoolId))) {
@@ -425,8 +539,6 @@ exports.getAllStudents = async (req, res) => {
     let condition = { schoolId: sId, isActive: true };
 
     // --- 1. LOGIKA IDENTIFIKASI DUPLIKAT ---
-    
-    // Cari daftar NIS yang duplikat di sekolah ini
     const dupNisRows = await Student.findAll({
       where: { schoolId: sId, isActive: true },
       attributes: ['nis'],
@@ -435,7 +547,6 @@ exports.getAllStudents = async (req, res) => {
       raw: true
     });
 
-    // Cari daftar NISN yang duplikat secara global
     const dupNisnRows = await Student.findAll({
       where: { isActive: true, nisn: { [Op.ne]: null } },
       attributes: ['nisn'],
@@ -448,19 +559,35 @@ exports.getAllStudents = async (req, res) => {
     const duplicateNisnList = dupNisnRows.map(d => d.nisn);
 
     // --- 2. PENYUSUNAN FILTER QUERY ---
-
-    if (name) condition.name = { [Op.like]: `%${name}%` };
     if (studentClass) condition.class = studentClass;
     if (batch) condition.batch = batch;
 
-    // Jika isDuplicateOnly bernilai true, filter data agar hanya menampilkan yang bermasalah
+    const filters = [];
+
+    // Filter search: nama atau NIS
+    if (search) {
+      filters.push({
+        [Op.or]: [
+          { name: { [Op.like]: `%${search}%` } },
+          { nis:  { [Op.like]: `%${search}%` } },
+        ]
+      });
+    }
+
+    // Filter duplikat
     if (isDuplicateOnly === 'true') {
-      condition[Op.or] = [
-        { nis: { [Op.in]: duplicateNisList } },            // Kembar di sistem
-        { nisn: { [Op.in]: duplicateNisnList } },          // NISN kembar
-        { nis: { [Op.like]: '%-DUP-%' } },                 // Ditandai "-DUP-" oleh SQL sebelumnya
-        { nisn: { [Op.like]: '%-DUP-%' } }                 // (Opsional) jika NISN juga ditandai
-      ];
+      filters.push({
+        [Op.or]: [
+          { nis:  { [Op.in]: duplicateNisList } },
+          { nisn: { [Op.in]: duplicateNisnList } },
+          { nis:  { [Op.like]: '%-DUP-%' } },
+          { nisn: { [Op.like]: '%-DUP-%' } },
+        ]
+      });
+    }
+
+    if (filters.length > 0) {
+      condition[Op.and] = filters;
     }
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -476,7 +603,10 @@ exports.getAllStudents = async (req, res) => {
         as: 'studentAttendances',
         where: {
           createdAt: {
-            [Op.between]: [moment().startOf('day').toDate(), moment().endOf('day').toDate()]
+            [Op.between]: [
+              moment().startOf('day').toDate(),
+              moment().endOf('day').toDate()
+            ]
           }
         },
         required: false
@@ -489,10 +619,10 @@ exports.getAllStudents = async (req, res) => {
       const attendanceToday = student.studentAttendances?.[0];
       
       student.statusKehadiran = attendanceToday ? attendanceToday.status : 'Belum Hadir';
-      
-      // Flag untuk frontend agar bisa memberi warna merah pada baris
       student.isNisDuplicate = duplicateNisList.includes(student.nis) || student.nis.includes('-DUP-');
-      student.isNisnDuplicate = student.nisn ? (duplicateNisnList.includes(student.nisn) || student.nisn.includes('-DUP-')) : false;
+      student.isNisnDuplicate = student.nisn 
+        ? (duplicateNisnList.includes(student.nisn) || student.nisn.includes('-DUP-')) 
+        : false;
 
       delete student.studentAttendances;
       return student;
@@ -504,7 +634,7 @@ exports.getAllStudents = async (req, res) => {
       summary: {
         uniqueNisDuplicates: duplicateNisList.length,
         uniqueNisnDuplicates: duplicateNisnList.length,
-        hasIssues: duplicateNisList.length > 0 || duplicateNisnList.length > 0 || (isDuplicateOnly === 'true' && count > 0)
+        hasIssues: duplicateNisList.length > 0 || duplicateNisnList.length > 0
       },
       data: dataWithStatus,
       pagination: {
@@ -1996,11 +2126,16 @@ exports.getClassRecapWithDetails = async (req, res) => {
   try {
     const { schoolId, date } = req.query;
     const targetDate = date ? moment(date) : moment();
-    
+
     const startDate = targetDate.clone().startOf('day').utc().format('YYYY-MM-DD HH:mm:ss');
     const endDate = targetDate.clone().endOf('day').utc().format('YYYY-MM-DD HH:mm:ss');
 
     const deadline = "07:00:00";
+
+    // new Sequelize(db, user, pass, {
+    //   dialect: 'mysql',
+    //   timezone: '+07:00', // Sequelize otomatis handle konversi
+    // })
 
     // OPTIMASI 1: Gunakan Attributes untuk membatasi kolom yang ditarik dari DB
     const allStudents = await Student.findAll({

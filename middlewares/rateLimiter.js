@@ -1,5 +1,5 @@
 // middleware/rateLimiter.js
-const {rateLimit, ipKeyGenerator} = require('express-rate-limit');
+const {rateLimit} = require('express-rate-limit');
 const { RedisStore } = require('rate-limit-redis');
 
 const redisClient = require('../config/redis');
@@ -12,7 +12,7 @@ const makeRedisStore = (prefix) => new RedisStore({
 
 const globalLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, 
-  limit: 150,              
+  limit: 500,              
   store: makeRedisStore('rl:global:'),
   // skip: (req) => {
   //   const ip = req.ip || req.connection.remoteAddress;
@@ -45,7 +45,7 @@ const globalLimiter = rateLimit({
 
 const loginLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
-  limit: 20,
+  limit: 100,
   store: makeRedisStore('rl:login:'),
   keyGenerator: (req) => {
     const email = req.body?.email || 'no-email';
@@ -61,11 +61,11 @@ const loginLimiter = rateLimit({
   validate: { ip: false, xForwardedForHeader: false },
   handler: (req, res) => {
     const email = req.body?.email;
-    const ip    = ipKeyGenerator(req);
+    const ip = normalizeIp(req);
     console.log(`[loginLimiter] ⛔ BLOCKED email=${email} | ip=${ip}`);
     res.status(429).json({
       success: false,
-      message: 'Terlalu banyak percobaan login, coba lagi dalam 1 menit.'
+      message: 'Terlalu banyak percobaan login, coba lagi dalam 5 menit.'
     });
   }
 });
