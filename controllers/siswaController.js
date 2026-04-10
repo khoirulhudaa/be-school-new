@@ -377,6 +377,113 @@ exports.createStudent = async (req, res) => {
   }
 };
 
+// exports.bulkCreateStudents = async (req, res) => {
+//   try {
+//     const { students, schoolId } = req.body;
+
+//     if (!schoolId || !Array.isArray(students) || students.length === 0) {
+//       return res.status(400).json({ success: false, message: 'Data tidak valid' });
+//     }
+
+//     const nisList = students.map(s => s.nis).filter(Boolean);
+
+//     // Cek semua NIS sekaligus dalam 1 query
+//     const existingStudents = await Student.findAll({
+//       where: { nis: { [Op.in]: nisList }, schoolId: parseInt(schoolId) },
+//       attributes: ['nis', 'name'],
+//       raw: true
+//     });
+
+//     // Cek RFID duplikat sekaligus
+//     const rfidList = students.map(s => s.rfidUid).filter(Boolean);
+//     const existingRfids = rfidList.length > 0 ? await Student.findAll({
+//       where: { rfidUid: { [Op.in]: rfidList } },
+//       attributes: ['rfidUid', 'name'],
+//       raw: true
+//     }) : [];
+
+//     const duplicateNis = existingStudents.map(s => ({ nis: s.nis, name: s.name }));
+//     const duplicateRfid = existingRfids.map(s => ({ rfidUid: s.rfidUid, name: s.name }));
+
+//     // Filter data yang bisa diproses
+//     const existingNisSet = new Set(existingStudents.map(s => s.nis));
+//     const existingRfidSet = new Set(existingRfids.map(s => s.rfidUid));
+    
+//     const validStudents = students.filter(s => 
+//       !existingNisSet.has(s.nis) && 
+//       (!s.rfidUid || !existingRfidSet.has(s.rfidUid))
+//     );
+
+//     // Proses yang valid
+//     const created = [];
+//     const failed = [];
+
+//     for (const s of validStudents) {
+//       try {
+//         const finalEmail = s.email || `${s.nis}@gmail.com`;
+//         const hashedPassword = await bcrypt.hash(s.password || 'sekolah123', 10);
+        
+//         let photoUrl = null;
+        
+//         const student = await Student.create({
+//           name: s.name,
+//           nis: s.nis,
+//           nisn: s.nisn,
+//           gender: s.gender,
+//           birthPlace: s.birthPlace,
+//           birthDate: s.birthDate,
+//           nik: s.nik,
+//           rfidUid: s.rfidUid || null,
+//           schoolId: parseInt(schoolId),
+//           email: finalEmail,
+//           password: hashedPassword,
+//           photoUrl,
+//           class: s.class,
+//           batch: s.batch,
+//           qrCodeData: `QR-${s.nis}-${Date.now()}`
+//         });
+
+//         created.push({ nis: s.nis, name: s.name });
+//       } catch (err) {
+//         let reason = err.message; // default
+
+//         if (err.name === 'SequelizeUniqueConstraintError') {
+//           const fields = err.errors?.map(e => `${e.path} = "${e.value}"`).join(', ');
+//           reason = `Duplikat pada: ${fields}`;
+//         } else if (err.name === 'SequelizeValidationError') {
+//           const fields = err.errors?.map(e => `${e.path}: ${e.message}`).join('; ');
+//           reason = `Validasi gagal — ${fields}`;
+//         } else if (err.name === 'SequelizeDatabaseError') {
+//           reason = `Database error: ${err.original?.sqlMessage || err.message}`;
+//         }
+
+//         failed.push({ nis: s.nis, name: s.name, reason });
+//       }
+//     }
+
+//     await invalidateStudentCache(parseInt(schoolId));
+
+//     return res.json({
+//       success: true,
+//       summary: {
+//         total: students.length,
+//         berhasil: created.length,
+//         dilewati: duplicateNis.length + duplicateRfid.length,
+//         gagal: failed.length,
+//       },
+//       detail: {
+//         berhasil: created,
+//         nisDuplikat: duplicateNis,      // [{nis, name}] — sudah ada di DB
+//         rfidDuplikat: duplicateRfid,    // [{rfidUid, name}]
+//         gagal: failed                   // [{nis, name, reason}]
+//       }
+//     });
+
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
 exports.bulkCreateStudents = async (req, res) => {
   try {
     const { students, schoolId } = req.body;
@@ -385,97 +492,168 @@ exports.bulkCreateStudents = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Data tidak valid' });
     }
 
-    const nisList = students.map(s => s.nis).filter(Boolean);
-
-    // Cek semua NIS sekaligus dalam 1 query
-    const existingStudents = await Student.findAll({
-      where: { nis: { [Op.in]: nisList }, schoolId: parseInt(schoolId) },
-      attributes: ['nis', 'name'],
-      raw: true
-    });
-
-    // Cek RFID duplikat sekaligus
+    const sId = parseInt(schoolId);
+    const nisList  = students.map(s => s.nis).filter(Boolean);
     const rfidList = students.map(s => s.rfidUid).filter(Boolean);
-    const existingRfids = rfidList.length > 0 ? await Student.findAll({
-      where: { rfidUid: { [Op.in]: rfidList } },
-      attributes: ['rfidUid', 'name'],
-      raw: true
-    }) : [];
 
-    const duplicateNis = existingStudents.map(s => ({ nis: s.nis, name: s.name }));
+    // ✅ Semua pre-check jalan paralel sekaligus
+    const [existingStudents, existingRfids] = await Promise.all([
+      Student.findAll({
+        where: { nis: { [Op.in]: nisList }, schoolId: sId },
+        attributes: ['nis', 'name'],
+        raw: true
+      }),
+      rfidList.length > 0
+        ? Student.findAll({
+            where: { rfidUid: { [Op.in]: rfidList } },
+            attributes: ['rfidUid', 'name'],
+            raw: true
+          })
+        : Promise.resolve([])
+    ]);
+
+    const existingNisSet  = new Set(existingStudents.map(s => s.nis));
+    const existingRfidSet = new Set(existingRfids.map(s => s.rfidUid));
+
+    const duplicateNis  = existingStudents.map(s => ({ nis: s.nis, name: s.name }));
     const duplicateRfid = existingRfids.map(s => ({ rfidUid: s.rfidUid, name: s.name }));
 
-    // Filter data yang bisa diproses
-    const existingNisSet = new Set(existingStudents.map(s => s.nis));
-    const existingRfidSet = new Set(existingRfids.map(s => s.rfidUid));
-    
-    const validStudents = students.filter(s => 
-      !existingNisSet.has(s.nis) && 
+    const validStudents = students.filter(s =>
+      !existingNisSet.has(s.nis) &&
       (!s.rfidUid || !existingRfidSet.has(s.rfidUid))
     );
 
-    // Proses yang valid
-    const created = [];
+    if (validStudents.length === 0) {
+      return res.json({
+        success: true,
+        summary: { total: students.length, berhasil: 0, dilewati: duplicateNis.length + duplicateRfid.length, gagal: 0 },
+        detail: { berhasil: [], nisDuplikat: duplicateNis, rfidDuplikat: duplicateRfid, gagal: [] }
+      });
+    }
+
+    // ✅ Bcrypt paralel dengan concurrency limit (jangan semua 1000 sekaligus)
+    const BCRYPT_CONCURRENCY = 10;
+    const preparedStudents = [];
     const failed = [];
 
-    for (const s of validStudents) {
-      try {
-        const finalEmail = s.email || `${s.nis}@gmail.com`;
-        const hashedPassword = await bcrypt.hash(s.password || 'sekolah123', 10);
-        
-        let photoUrl = null;
-        
-        const student = await Student.create({
-          name: s.name,
-          nis: s.nis,
-          nisn: s.nisn,
-          gender: s.gender,
-          birthPlace: s.birthPlace,
-          birthDate: s.birthDate,
-          nik: s.nik,
-          rfidUid: s.rfidUid || null,
-          schoolId: parseInt(schoolId),
-          email: finalEmail,
-          password: hashedPassword,
-          photoUrl,
-          class: s.class,
-          batch: s.batch,
-          qrCodeData: `QR-${s.nis}-${Date.now()}`
-        });
+    for (let i = 0; i < validStudents.length; i += BCRYPT_CONCURRENCY) {
+      const chunk = validStudents.slice(i, i + BCRYPT_CONCURRENCY);
+      const results = await Promise.allSettled(
+        chunk.map(async (s) => {
+          const rawEmail   = s.email?.trim();
+          const finalEmail = (rawEmail && rawEmail !== 'xxx@gmail.com')
+            ? rawEmail
+            : `${s.nis}@sekolah.sch.id`;
 
-        created.push({ nis: s.nis, name: s.name });
-      } catch (err) {
-        let reason = err.message; // default
+          const hashedPassword = await bcrypt.hash(s.password || 'sekolah123', 10);
 
-        if (err.name === 'SequelizeUniqueConstraintError') {
-          const fields = err.errors?.map(e => `${e.path} = "${e.value}"`).join(', ');
-          reason = `Duplikat pada: ${fields}`;
-        } else if (err.name === 'SequelizeValidationError') {
-          const fields = err.errors?.map(e => `${e.path}: ${e.message}`).join('; ');
-          reason = `Validasi gagal — ${fields}`;
-        } else if (err.name === 'SequelizeDatabaseError') {
-          reason = `Database error: ${err.original?.sqlMessage || err.message}`;
+          return {
+            name:       s.name,
+            nis:        s.nis,
+            nisn:       s.nisn       || null,
+            gender:     s.gender     || null,
+            birthPlace: s.birthPlace || null,
+            birthDate:  s.birthDate  || null,
+            nik:        s.nik        || null,
+            rfidUid:    s.rfidUid    || null,
+            schoolId:   sId,
+            email:      finalEmail,
+            password:   hashedPassword,
+            photoUrl:   null,
+            class:      s.class      || null,
+            batch:      s.batch      || null,
+            qrCodeData: `QR-${s.nis}-${Date.now()}`
+          };
+        })
+      );
+
+      results.forEach((result, idx) => {
+        if (result.status === 'fulfilled') {
+          preparedStudents.push(result.value);
+        } else {
+          failed.push({ nis: chunk[idx].nis, name: chunk[idx].name, reason: 'Gagal memproses data' });
         }
+      });
+    }
 
-        failed.push({ nis: s.nis, name: s.name, reason });
+    // ✅ bulkCreate dengan ignoreDuplicates sebagai safety net
+    const created = [];
+    const INSERT_CHUNK = 100; // insert 100 per query
+
+    for (let i = 0; i < preparedStudents.length; i += INSERT_CHUNK) {
+      const chunk = preparedStudents.slice(i, i + INSERT_CHUNK);
+      try {
+        const results = await Student.bulkCreate(chunk, {
+          validate: true,
+          returning: true, // ambil data yang berhasil dibuat
+        });
+        results.forEach(r => created.push({ nis: r.nis, name: r.name }));
+      } catch (err) {
+        // Kalau bulkCreate gagal, fallback create satu per satu untuk tahu mana yang error
+        for (const s of chunk) {
+          try {
+            await Student.create(s);
+            created.push({ nis: s.nis, name: s.name });
+          } catch (innerErr) {
+            let reason = innerErr.message;
+
+            if (innerErr.name === 'SequelizeUniqueConstraintError') {
+              const fieldLabels = {
+                email:              'Email',
+                nis:                'NIS',
+                nisn:               'NISN',
+                nik:                'NIK',
+                rfidUid:            'RFID',
+                unique_nisn_global: 'NISN',
+                unique_nis_school:  'NIS',
+                unique_email:       'Email',
+              };
+              const parts = innerErr.errors?.map(e => {
+                const label = fieldLabels[e.path] || e.path;
+                return `${label} "${e.value}" sudah digunakan`;
+              }).join(', ');
+              reason = parts || 'Data sudah terdaftar';
+
+            } else if (innerErr.name === 'SequelizeValidationError') {
+              const fieldLabels = {
+                name:      'Nama',
+                email:     'Email',
+                nis:       'NIS',
+                nisn:      'NISN',
+                birthDate: 'Tanggal Lahir',
+                gender:    'Gender',
+              };
+              const parts = innerErr.errors?.map(e => {
+                const label = fieldLabels[e.path] || e.path;
+                return `${label} tidak valid`;
+              }).join(', ');
+              reason = parts || 'Data tidak valid';
+
+            } else if (innerErr.name === 'SequelizeDatabaseError') {
+              reason = 'Gagal menyimpan ke database';
+            }
+
+            failed.push({ nis: s.nis, name: s.name, reason });
+          }
+        }
       }
     }
 
-    await invalidateStudentCache(parseInt(schoolId));
+    await invalidateStudentCache(sId);
 
     return res.json({
       success: true,
       summary: {
-        total: students.length,
+        total:    students.length,
         berhasil: created.length,
         dilewati: duplicateNis.length + duplicateRfid.length,
-        gagal: failed.length,
+        gagal:    failed.length,
       },
       detail: {
-        berhasil: created,
-        nisDuplikat: duplicateNis,      // [{nis, name}] — sudah ada di DB
-        rfidDuplikat: duplicateRfid,    // [{rfidUid, name}]
-        gagal: failed                   // [{nis, name, reason}]
+        berhasil:     created,
+        nisDuplikat:  duplicateNis,
+        rfidDuplikat: duplicateRfid,
+        gagal:        failed
       }
     });
 
