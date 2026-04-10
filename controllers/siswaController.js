@@ -490,7 +490,8 @@ exports.getStudentSearch = async (req, res) => {
     const students = await Student.findAll({
       where: condition,
       attributes: ['id', 'name', 'class', 'photoUrl'],
-      limit: 10
+      limit: 10,
+      raw: true
     });
 
     res.json({ success: true, data: students });
@@ -499,120 +500,6 @@ exports.getStudentSearch = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
-// exports.getAllStudents = async (req, res) => {
-//   try {
-//     const { 
-//       schoolId, 
-//       page = 1, 
-//       limit = 10, 
-//       class: studentClass, 
-//       batch, 
-//       search,
-//       isDuplicateOnly // <--- Parameter baru dari frontend
-//     } = req.query;
-
-//     if (!schoolId || isNaN(parseInt(schoolId))) {
-//       return res.status(400).json({ success: false, message: "schoolId diperlukan." });
-//     }
-
-//     const sId = parseInt(schoolId);
-//     let condition = { schoolId: sId, isActive: true };
-
-//     // --- 1. LOGIKA IDENTIFIKASI DUPLIKAT ---
-    
-//     // Cari daftar NIS yang duplikat di sekolah ini
-//     const dupNisRows = await Student.findAll({
-//       where: { schoolId: sId, isActive: true },
-//       attributes: ['nis'],
-//       group: ['nis'],
-//       having: sequelizeWhere(fn('COUNT', col('nis')), '>', 1),
-//       raw: true
-//     });
-
-//     // Cari daftar NISN yang duplikat secara global
-//     const dupNisnRows = await Student.findAll({
-//       where: { isActive: true, nisn: { [Op.ne]: null } },
-//       attributes: ['nisn'],
-//       group: ['nisn'],
-//       having: sequelizeWhere(fn('COUNT', col('nisn')), '>', 1),
-//       raw: true
-//     });
-
-//     const duplicateNisList = dupNisRows.map(d => d.nis);
-//     const duplicateNisnList = dupNisnRows.map(d => d.nisn);
-
-//     // --- 2. PENYUSUNAN FILTER QUERY ---
-
-//     if (name) condition.name = { [Op.like]: `%${name}%` };
-//     if (studentClass) condition.class = studentClass;
-//     if (batch) condition.batch = batch;
-
-//     // Jika isDuplicateOnly bernilai true, filter data agar hanya menampilkan yang bermasalah
-//     if (isDuplicateOnly === 'true') {
-//       condition[Op.or] = [
-//         { nis: { [Op.in]: duplicateNisList } },            // Kembar di sistem
-//         { nisn: { [Op.in]: duplicateNisnList } },          // NISN kembar
-//         { nis: { [Op.like]: '%-DUP-%' } },                 // Ditandai "-DUP-" oleh SQL sebelumnya
-//         { nisn: { [Op.like]: '%-DUP-%' } }                 // (Opsional) jika NISN juga ditandai
-//       ];
-//     }
-
-//     const offset = (parseInt(page) - 1) * parseInt(limit);
-
-//     // --- 3. QUERY UTAMA DATA SISWA ---
-//     const { count, rows } = await Student.findAndCountAll({
-//       where: condition,
-//       limit: parseInt(limit),
-//       offset: offset,
-//       order: [['name', 'ASC']],
-//       include: [{
-//         model: Attendance,
-//         as: 'studentAttendances',
-//         where: {
-//           createdAt: {
-//             [Op.between]: [moment().startOf('day').toDate(), moment().endOf('day').toDate()]
-//           }
-//         },
-//         required: false
-//       }]
-//     });
-
-//     // --- 4. MAPPING DATA & FLAG DUPLIKAT ---
-//     const dataWithStatus = rows.map(s => {
-//       const student = s.toJSON();
-//       const attendanceToday = student.studentAttendances?.[0];
-      
-//       student.statusKehadiran = attendanceToday ? attendanceToday.status : 'Belum Hadir';
-      
-//       // Flag untuk frontend agar bisa memberi warna merah pada baris
-//       student.isNisDuplicate = duplicateNisList.includes(student.nis) || student.nis.includes('-DUP-');
-//       student.isNisnDuplicate = student.nisn ? (duplicateNisnList.includes(student.nisn) || student.nisn.includes('-DUP-')) : false;
-
-//       delete student.studentAttendances;
-//       return student;
-//     });
-
-//     // --- 5. KIRIM RESPONSE ---
-//     res.json({
-//       success: true,
-//       summary: {
-//         uniqueNisDuplicates: duplicateNisList.length,
-//         uniqueNisnDuplicates: duplicateNisnList.length,
-//         hasIssues: duplicateNisList.length > 0 || duplicateNisnList.length > 0 || (isDuplicateOnly === 'true' && count > 0)
-//       },
-//       data: dataWithStatus,
-//       pagination: {
-//         totalItems: count,
-//         totalPages: Math.ceil(count / parseInt(limit)),
-//         currentPage: parseInt(page)
-//       }
-//     });
-
-//   } catch (err) {
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
 
 exports.getAllStudents = async (req, res) => {
   try {
@@ -837,7 +724,8 @@ exports.getAttendanceSummary = async (req, res) => {
         createdAt: { [Op.between]: [todayStart, todayEnd] }
       },
       attributes: ['status', [fn('COUNT', col('id')), 'total']],
-      group: ['status']
+      group: ['status'],
+      raw: true
     });
 
     // 3. Ambil Statistik Kehadiran Guru
@@ -848,7 +736,8 @@ exports.getAttendanceSummary = async (req, res) => {
         createdAt: { [Op.between]: [todayStart, todayEnd] }
       },
       attributes: ['status', [fn('COUNT', col('id')), 'total']],
-      group: ['status']
+      group: ['status'],
+      raw: true
     });
 
     // Helper untuk memetakan hasil query ke objek status
@@ -1150,7 +1039,8 @@ exports.exportUserAttendance = async (req, res) => {
         [isStudent ? 'studentId' : 'guruId']: id, 
         createdAt: { [Op.between]: [startDate, endDate] }
       },
-      order: [['createdAt', 'DESC']]
+      order: [['createdAt', 'DESC']],
+      raw: true
     });
 
     // Mapping data agar siap dibaca Excel
@@ -1326,131 +1216,6 @@ exports.deleteAllStudents = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
-// exports.getTodayStats = async (req, res) => {
-//   try {
-//     const { schoolId, role = 'student' } = req.query;
-
-//     // Ambil semua data kehadiran hari ini untuk sekolah & role terkait
-//     const attendanceData = await Attendance.findAll({
-//       where: {
-//         schoolId: parseInt(schoolId),
-//         userRole: role,
-//         createdAt: {
-//           [Op.between]: [
-//             moment().startOf('day').toDate(), 
-//             moment().endOf('day').toDate()
-//           ]
-//         }
-//       },
-//       raw: true 
-//     });
-
-//     // Struktur summary dengan key Terlambat yang terpisah
-//     const summary = { 
-//       Hadir: 0, 
-//       Terlambat: 0, // Key baru
-//       Sakit: 0, 
-//       Izin: 0, 
-//       Alpha: 0 
-//     };
-
-//     // Definisikan batas waktu (07:00:00)
-//     // Gunakan format string 'HH:mm:ss' agar perbandingannya mudah
-//     const deadline = "07:00:00";
-
-//     attendanceData.forEach(item => {
-//       if (item.status === 'Hadir') {
-//         // Ambil bagian jam dari createdAt (HH:mm:ss)
-//         const scanTime = moment(item.createdAt).format("HH:mm:ss");
-
-//         if (scanTime > deadline) {
-//           summary.Terlambat += 1;
-//         } else {
-//           summary.Hadir += 1;
-//         }
-//       } else {
-//         // Mapping untuk status Sakit, Izin, Alpha
-//         if (summary.hasOwnProperty(item.status)) {
-//           summary[item.status] += 1;
-//         }
-//       }
-//     });
-
-//     res.json({ 
-//       success: true, 
-//       data: { 
-//         date: moment().format('YYYY-MM-DD'),
-//         deadlineInfo: deadline,
-//         ...summary 
-//       } 
-//     });
-//   } catch (err) {
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
-
-// exports.getAttendanceReport = async (req, res) => {
-//   try {
-//     // Tambahkan 'date' ke destructuring query
-//     const { schoolId, role, year, month, date, page = 1, limit = 50 } = req.query;
-
-//     let startDate, endDate;
-
-//     if (date) {
-//       // Jika ada filter tanggal spesifik (format: YYYY-MM-DD)
-//       startDate = moment(date).startOf('day').toDate();
-//       endDate = moment(date).endOf('day').toDate();
-//     } else {
-//       // Default: Filter berdasarkan bulan dan tahun
-//       startDate = moment(`${year}-${month}-01`).startOf('month').toDate();
-//       endDate = moment(startDate).endOf('month').toDate();
-//     }
-
-//     const { count, rows } = await Attendance.findAndCountAll({
-//       where: {
-//         schoolId,
-//         userRole: role,
-//         createdAt: { [Op.between]: [startDate, endDate] }
-//       },
-//       include: [
-//         {
-//           model: role === 'student' ? Student : GuruTendik,
-//           as: role === 'student' ? 'student' : 'guru',
-//           attributes: role === 'student' ? ['name', 'nis'] : ['nama', 'role', 'mapel']
-//         }
-//       ],
-//       limit: parseInt(limit),
-//       offset: (parseInt(page) - 1) * parseInt(limit),
-//       order: [['createdAt', 'DESC']],
-//       raw: false 
-//     });
-
-//     const deadline = "07:00:00";
-
-//     const processedRows = rows.map(record => {
-//       const attendance = record.toJSON();
-//       const scanTime = moment(attendance.createdAt).format("HH:mm:ss");
-      
-//       attendance.isLate = attendance.status === 'Hadir' && scanTime > deadline;
-//       attendance.scanTime = scanTime;
-
-//       return attendance;
-//     });
-
-//     res.json({ 
-//       success: true, 
-//       data: processedRows, 
-//       pagination: {
-//         totalItems: count,
-//         totalPages: Math.ceil(count / limit),
-//         currentPage: parseInt(page)
-//       }
-//     });
-//   } catch (err) {
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
 
 exports.getTodayStats = async (req, res) => {
   try {
@@ -2023,12 +1788,8 @@ exports.processGraduation = async (req, res) => {
       isVerified: true 
     }));
 
-    // 3. MASUKKAN KE TABEL ALUMNI SECARA MASSAL (Bulk Create)
-    // Menggunakan ignoreDuplicates jika ada risiko NIS ganda (tergantung kebijakan DB)
     await Alumni.bulkCreate(alumniData, { transaction: t });
 
-    // 4. UPDATE STATUS SISWA (Menjadi Tidak Aktif / Lulus)
-    // Opsional: Anda juga bisa menghapus data siswa (Student.destroy) jika data alumni sudah cukup
     await Student.update(
       { isActive: false }, 
       { 
@@ -2145,118 +1906,6 @@ exports.getParentChildren = async (req, res) => {
   }
 };
 
-// exports.getClassRecapWithDetails = async (req, res) => {
-//   try {
-//     const { schoolId, date } = req.query;
-
-//     const targetDate = date ? moment(date) : moment();
-//     const startDate = targetDate.startOf('day').toDate();
-//     const endDate = targetDate.endOf('day').toDate();
-//     const deadline = "07:00:00";
-
-//     // 1. Ambil semua siswa di sekolah tersebut
-//     // Sertakan data absensi menggunakan alias 'studentAttendances' sesuai model Student
-//     const allStudents = await Student.findAll({
-//       where: { 
-//         schoolId,
-//         isActive: true, // Hanya hitung siswa aktif
-//         isGraduated: false // Abaikan siswa yang sudah lulus
-//       },
-//       include: [
-//         {
-//           model: Attendance,
-//           as: 'studentAttendances', // ALIAS SESUAI MODEL STUDENT
-//           where: {
-//             createdAt: { [Op.between]: [startDate, endDate] },
-//             userRole: 'student'
-//           },
-//           required: false // Agar siswa yang belum absen tetap muncul (LEFT JOIN)
-//         }
-//       ],
-//       order: [['name', 'ASC']]
-//     });
-
-//     // 2. Grouping Logic
-//     const groupedData = allStudents.reduce((acc, student) => {
-//       const className = student.class || "Tanpa Kelas";
-      
-//       if (!acc[className]) {
-//         acc[className] = {
-//           className,
-//           totalStudents: 0,
-//           stats: { onTime: 0, late: 0, izin: 0, sakit: 0, alpha: 0, belumHadir: 0 },
-//           students: []
-//         };
-//       }
-
-//       // Ambil data absensi pertama (karena hasMany mengembalikan array)
-//       const attendance = student.studentAttendances && student.studentAttendances[0];
-      
-//       let statusInfo = "Belum Hadir";
-//       let isLate = false;
-//       let scanTime = null;
-
-//       if (attendance) {
-//         scanTime = moment(attendance.createdAt).format("HH:mm:ss");
-        
-//         if (attendance.status === 'Hadir') {
-//           if (scanTime <= deadline) {
-//             acc[className].stats.onTime++;
-//             statusInfo = "Tepat Waktu";
-//           } else {
-//             acc[className].stats.late++;
-//             statusInfo = "Telat";
-//             isLate = true;
-//           }
-//         } else {
-//           // Izin, Sakit, Alpha (Status Manual)
-//           const statusKey = attendance.status.toLowerCase();
-//           if (acc[className].stats[statusKey] !== undefined) {
-//             acc[className].stats[statusKey]++;
-//           }
-//           statusInfo = attendance.status;
-//         }
-//       } else {
-//         acc[className].stats.belumHadir++;
-//       }
-
-//       acc[className].totalStudents++;
-      
-//       // Push detail siswa ke array
-//       acc[className].students.push({
-//         id: student.id,
-//         name: student.name,
-//         nis: student.nis,
-//         status: statusInfo,
-//         scanTime: scanTime,
-//         isLate: isLate,
-//         photoUrl: student.photoUrl
-//       });
-
-//       return acc;
-//     }, {});
-
-//     // Mapping ke Array untuk response
-//     const finalData = Object.values(groupedData).sort((a, b) => 
-//       a.className.localeCompare(b.className)
-//     );
-
-//     res.json({
-//       success: true,
-//       meta: {
-//         date: targetDate.format("YYYY-MM-DD"),
-//         deadline
-//       },
-//       data: finalData
-//     });
-
-//   } catch (err) {
-//     console.error("Error Detail Recap:", err);
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
-
-
 exports.getClassRecapWithDetails = async (req, res) => {
   try {
     const { schoolId, date } = req.query;
@@ -2266,11 +1915,6 @@ exports.getClassRecapWithDetails = async (req, res) => {
     const endDate = targetDate.clone().endOf('day').utc().format('YYYY-MM-DD HH:mm:ss');
 
     const deadline = "07:00:00";
-
-    // new Sequelize(db, user, pass, {
-    //   dialect: 'mysql',
-    //   timezone: '+07:00', // Sequelize otomatis handle konversi
-    // })
 
     // OPTIMASI 1: Gunakan Attributes untuk membatasi kolom yang ditarik dari DB
     const allStudents = await Student.findAll({
