@@ -23,7 +23,7 @@ const Student = sequelize.define('Student', {
   qrCodeData: { type: DataTypes.STRING, unique: true },
   rfidUid: {
     type: DataTypes.STRING,
-    unique: true,
+    // unique: true,
     allowNull: true
   },
   faceDescriptor: {

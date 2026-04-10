@@ -325,7 +325,7 @@ exports.createStudent = async (req, res) => {
 
     if (rfidUid) {
       const existingRfid = await Student.findOne({
-        where: { rfidUid }
+        where: { rfidUid, schoolId }
       });
 
       if (existingRfid) {
