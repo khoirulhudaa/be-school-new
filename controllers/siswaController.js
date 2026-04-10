@@ -1287,6 +1287,46 @@ exports.deleteStudent = async (req, res) => {
   }
 };
 
+// Hard delete semua siswa by batch
+exports.deleteStudentsByBatch = async (req, res) => {
+  try {
+    const { schoolId, batch } = req.body;
+
+    if (!schoolId || !batch) {
+      return res.status(400).json({ success: false, message: 'schoolId dan batch wajib diisi' });
+    }
+
+    const count = await Student.destroy({
+      where: { schoolId: parseInt(schoolId), batch }
+    });
+
+    await invalidateStudentCache(parseInt(schoolId));
+    res.json({ success: true, message: `${count} siswa angkatan ${batch} berhasil dihapus permanen` });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Hard delete semua siswa satu sekolah
+exports.deleteAllStudents = async (req, res) => {
+  try {
+    const { schoolId } = req.body;
+
+    if (!schoolId) {
+      return res.status(400).json({ success: false, message: 'schoolId wajib diisi' });
+    }
+
+    const count = await Student.destroy({
+      where: { schoolId: parseInt(schoolId) }
+    });
+
+    await invalidateStudentCache(parseInt(schoolId));
+    res.json({ success: true, message: `${count} siswa berhasil dihapus permanen` });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 // exports.getTodayStats = async (req, res) => {
 //   try {
 //     const { schoolId, role = 'student' } = req.query;

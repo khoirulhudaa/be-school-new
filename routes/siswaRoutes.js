@@ -49,6 +49,8 @@ router.get('/attendance-report', optionalAuth, globalLimiter, studentController.
 router.get('/export-attendance', studentController.exportAttendanceExcel);
 router.get('/recap-kelas', optionalAuth, globalLimiter, studentController.getClassRecapWithDetails);
 router.get('/global-stats', optionalAuth, globalLimiter, studentController.getGlobalAttendanceStats);
+router.delete('/batch', studentController.deleteStudentsByBatch);
+router.delete('/all', studentController.deleteAllStudents);
 
 router.post('/process-graduation', studentController.processGraduation);
 
