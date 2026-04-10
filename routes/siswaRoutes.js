@@ -20,6 +20,7 @@ router.get('/search', studentController.getStudentSearch);
 router.get('/', cache(120), studentController.getAllStudents); // Sesuai fetch di frontend tadi
 router.get('/all-no-pagination', studentController.getAllStudentsNoPagination);
 router.post('/', upload.single('photo'), studentController.createStudent);
+router.post('/bulk', studentController.bulkCreateStudents);
 router.post('/login', loginLimiter, studentController.checkStudentAuth);
 router.put('/:id', upload.single('photo'), studentController.updateStudent);
 router.delete('/:id', studentController.deleteStudent);

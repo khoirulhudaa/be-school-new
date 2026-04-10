@@ -377,6 +377,101 @@ exports.createStudent = async (req, res) => {
   }
 };
 
+exports.bulkCreateStudents = async (req, res) => {
+  try {
+    const { students, schoolId } = req.body;
+
+    if (!schoolId || !Array.isArray(students) || students.length === 0) {
+      return res.status(400).json({ success: false, message: 'Data tidak valid' });
+    }
+
+    const nisList = students.map(s => s.nis).filter(Boolean);
+
+    // Cek semua NIS sekaligus dalam 1 query
+    const existingStudents = await Student.findAll({
+      where: { nis: { [Op.in]: nisList }, schoolId: parseInt(schoolId) },
+      attributes: ['nis', 'name'],
+      raw: true
+    });
+
+    // Cek RFID duplikat sekaligus
+    const rfidList = students.map(s => s.rfidUid).filter(Boolean);
+    const existingRfids = rfidList.length > 0 ? await Student.findAll({
+      where: { rfidUid: { [Op.in]: rfidList } },
+      attributes: ['rfidUid', 'name'],
+      raw: true
+    }) : [];
+
+    const duplicateNis = existingStudents.map(s => ({ nis: s.nis, name: s.name }));
+    const duplicateRfid = existingRfids.map(s => ({ rfidUid: s.rfidUid, name: s.name }));
+
+    // Filter data yang bisa diproses
+    const existingNisSet = new Set(existingStudents.map(s => s.nis));
+    const existingRfidSet = new Set(existingRfids.map(s => s.rfidUid));
+    
+    const validStudents = students.filter(s => 
+      !existingNisSet.has(s.nis) && 
+      (!s.rfidUid || !existingRfidSet.has(s.rfidUid))
+    );
+
+    // Proses yang valid
+    const created = [];
+    const failed = [];
+
+    for (const s of validStudents) {
+      try {
+        const finalEmail = s.email || `${s.nis}@gmail.com`;
+        const hashedPassword = await bcrypt.hash(s.password || 'sekolah123', 10);
+        
+        let photoUrl = null;
+        
+        const student = await Student.create({
+          name: s.name,
+          nis: s.nis,
+          nisn: s.nisn,
+          gender: s.gender,
+          birthPlace: s.birthPlace,
+          birthDate: s.birthDate,
+          nik: s.nik,
+          rfidUid: s.rfidUid || null,
+          schoolId: parseInt(schoolId),
+          email: finalEmail,
+          password: hashedPassword,
+          photoUrl,
+          class: s.class,
+          batch: s.batch,
+          qrCodeData: `QR-${s.nis}-${Date.now()}`
+        });
+
+        created.push({ nis: s.nis, name: s.name });
+      } catch (err) {
+        failed.push({ nis: s.nis, name: s.name, reason: err.message });
+      }
+    }
+
+    await invalidateStudentCache(parseInt(schoolId));
+
+    return res.json({
+      success: true,
+      summary: {
+        total: students.length,
+        berhasil: created.length,
+        dilewati: duplicateNis.length + duplicateRfid.length,
+        gagal: failed.length,
+      },
+      detail: {
+        berhasil: created,
+        nisDuplikat: duplicateNis,      // [{nis, name}] — sudah ada di DB
+        rfidDuplikat: duplicateRfid,    // [{rfidUid, name}]
+        gagal: failed                   // [{nis, name, reason}]
+      }
+    });
+
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 exports.getStudentSearch = async (req, res) => {
   try {
     const { schoolId, name } = req.query;
