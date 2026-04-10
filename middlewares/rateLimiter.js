@@ -96,14 +96,25 @@ const strictLimiter = rateLimit({
 
 // 3. Limiter khusus untuk route berat (misal upload gambar/fasilitas)
 const uploadLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000,        // 1 jam
-  limit: 7000,      
+  windowMs: 60 * 60 * 1000,  // 1 jam (fix dari 10 menit)
+  limit: 50,                  // 50 upload per jam per user
+  skipSuccessfulRequests: false,
   store: makeRedisStore('rl:upload:'),
+  keyGenerator: (req) => {
+    // Pakai userId kalau sudah login, fallback ke IP
+    const userId = req.user?.id || req.user?.profile?.id;
+    if (userId) return `auth:${userId}`;
+    return normalizeIp(req);
+  },
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { ip: false, xForwardedForHeader: false }, // ← TAMBAH INI
-  message: { success: false, message: 'Batas upload harian tercapai (50/50).' },
-  statusCode: 429,
+  validate: { ip: false, xForwardedForHeader: false },
+  handler: (req, res) => {
+    res.status(429).json({
+      success: false,
+      message: 'Batas upload tercapai (50/jam). Coba lagi dalam beberapa saat.'
+    });
+  }
 });
 
 // Export supaya bisa dipakai per route atau global
