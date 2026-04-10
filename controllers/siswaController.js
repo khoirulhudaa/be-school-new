@@ -445,7 +445,19 @@ exports.bulkCreateStudents = async (req, res) => {
 
         created.push({ nis: s.nis, name: s.name });
       } catch (err) {
-        failed.push({ nis: s.nis, name: s.name, reason: err.message });
+        let reason = err.message; // default
+
+        if (err.name === 'SequelizeUniqueConstraintError') {
+          const fields = err.errors?.map(e => `${e.path} = "${e.value}"`).join(', ');
+          reason = `Duplikat pada: ${fields}`;
+        } else if (err.name === 'SequelizeValidationError') {
+          const fields = err.errors?.map(e => `${e.path}: ${e.message}`).join('; ');
+          reason = `Validasi gagal — ${fields}`;
+        } else if (err.name === 'SequelizeDatabaseError') {
+          reason = `Database error: ${err.original?.sqlMessage || err.message}`;
+        }
+
+        failed.push({ nis: s.nis, name: s.name, reason });
       }
     }
 

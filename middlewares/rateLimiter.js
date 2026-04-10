@@ -50,10 +50,10 @@ const loginLimiter = rateLimit({
   store: makeRedisStore('rl:login:'),
   keyGenerator: (req) => {
     const email = req.body?.email || 'no-email';
-    console.log('[email LOG]:', email)
     
     const ip = normalizeIp(req);
     const key = `${ip}:${email}`;
+    console.log('[USER LOGIN] => ', key)  
 
     return key;
   },
