@@ -12,7 +12,7 @@ const makeRedisStore = (prefix) => new RedisStore({
 
 const globalLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, 
-  limit: 500,              
+  limit: 150,              
   store: makeRedisStore('rl:global:'),
   // skip: (req) => {
   //   const ip = req.ip || req.connection.remoteAddress;
