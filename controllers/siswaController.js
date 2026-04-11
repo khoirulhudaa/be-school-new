@@ -2270,3 +2270,46 @@ exports.getGlobalAttendanceStats = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+exports.updateClassByBatch = async (req, res) => {
+  try {
+    const { schoolId, batch, newClass, studentIds } = req.body;
+
+    if (!schoolId || !newClass) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'schoolId dan newClass wajib diisi' 
+      });
+    }
+
+    // Jika ada studentIds spesifik → update by IDs
+    // Jika ada batch tapi tidak ada IDs → update semua siswa di batch itu
+    let whereCondition = { schoolId: parseInt(schoolId) };
+
+    if (studentIds && studentIds.length > 0) {
+      whereCondition.id = { [Op.in]: studentIds };
+    } else if (batch) {
+      whereCondition.batch = batch;
+    } else {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Masukkan batch atau pilih siswa terlebih dahulu' 
+      });
+    }
+
+    const [affectedCount] = await Student.update(
+      { class: newClass },
+      { where: whereCondition }
+    );
+
+    await invalidateStudentCache(parseInt(schoolId));
+
+    res.json({ 
+      success: true, 
+      message: `${affectedCount} siswa berhasil dipindahkan ke kelas ${newClass}`,
+      affectedCount
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
