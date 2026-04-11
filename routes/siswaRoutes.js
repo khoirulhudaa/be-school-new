@@ -5,6 +5,7 @@ const { protectForSiswa } = require('../middlewares/protectForSiswa');
 const cache = require('../middlewares/cache');
 const { loginLimiter, globalLimiter } = require('../middlewares/rateLimiter');
 const optionalAuth = require('../middlewares/optionalLimiter');
+const { protectMultiRole } = require('../middlewares/protectMultiRole');
 
 const router = express.Router();
 
@@ -30,7 +31,7 @@ router.put('/class/bulk-update-class', studentController.updateClassByBatch);
 // --- API ABSENSI ---
 // Endpoint: /api/siswa/scan
 router.post('/scan', studentController.scanQRCode);
-router.get('/get-attendances', protectForSiswa, studentController.getStudentAttendance);
+router.get('/get-attendances', protectMultiRole, studentController.getAttendanceHistory);
 
 router.get('/validate-qr', studentController.validateUserByQR);
 

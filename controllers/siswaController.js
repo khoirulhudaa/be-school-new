@@ -2017,34 +2017,90 @@ exports.processGraduation = async (req, res) => {
 };
 
 
-exports.getStudentAttendance = async (req, res) => {
+// exports.getStudentAttendance = async (req, res) => {
+//   try {
+//     // Ambil studentId dari token (req.user diisi oleh middleware auth)
+//     const studentId = req.user.id; 
+//     const { year } = req.query;
+
+//     // 1. Konfigurasi Rentang Waktu
+//     const startDate = year 
+//       ? moment(`${year}-01-01`).startOf('year').toDate() 
+//       : moment().startOf('month').toDate(); // Default bulan ini saja biar ringan
+//     const endDate = moment().endOf('day').toDate();
+
+//     // 2. Ambil data kehadiran
+//     const attendanceRecords = await Attendance.findAll({
+//       where: {
+//         studentId: studentId,
+//         createdAt: { [Op.between]: [startDate, endDate] }
+//       },
+//       order: [['createdAt', 'DESC']]
+//     });
+
+//     const deadline = "07:00:00";
+//     const history = attendanceRecords.map(record => {
+//       const scanTime = moment(record.createdAt).format("HH:mm:ss");
+//       return {
+//         date: moment(record.createdAt).format('DD MMM YYYY'),
+//         time: scanTime,
+//         status: record.status,
+//         isLate: record.status === 'Hadir' && scanTime > deadline
+//       };
+//     });
+
+//     res.json({
+//       success: true,
+//       data: history
+//     });
+
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
+exports.getAttendanceHistory = async (req, res) => {
   try {
-    // Ambil studentId dari token (req.user diisi oleh middleware auth)
-    const studentId = req.user.id; 
+    const userId = req.user.id;
+    const role = req.userRole;
     const { year } = req.query;
 
-    // 1. Konfigurasi Rentang Waktu
+    // 1. Rentang Waktu
     const startDate = year 
       ? moment(`${year}-01-01`).startOf('year').toDate() 
-      : moment().startOf('month').toDate(); // Default bulan ini saja biar ringan
+      : moment().startOf('month').toDate();
     const endDate = moment().endOf('day').toDate();
 
-    // 2. Ambil data kehadiran
-    const attendanceRecords = await Attendance.findAll({
-      where: {
-        studentId: studentId,
-        createdAt: { [Op.between]: [startDate, endDate] }
-      },
-      order: [['createdAt', 'DESC']]
-    });
-
+    let attendanceRecords;
     const deadline = "07:00:00";
+
+    // 2. Query Berdasarkan Role
+    if (role === 'siswa') {
+      attendanceRecords = await Attendance.findAll({
+        where: {
+          studentId: userId,
+          createdAt: { [Op.between]: [startDate, endDate] }
+        },
+        order: [['createdAt', 'DESC']]
+      });
+    } else {
+      // Role Guru/Tendik
+      attendanceRecords = await KehadiranGuru.findAll({
+        where: {
+          guruId: userId,
+          createdAt: { [Op.between]: [startDate, endDate] }
+        },
+        order: [['createdAt', 'DESC']]
+      });
+    }
+
+    // 3. Mapping Data untuk Frontend
     const history = attendanceRecords.map(record => {
       const scanTime = moment(record.createdAt).format("HH:mm:ss");
       return {
         date: moment(record.createdAt).format('DD MMM YYYY'),
         time: scanTime,
-        status: record.status,
+        status: record.status || 'Hadir',
         isLate: record.status === 'Hadir' && scanTime > deadline
       };
     });
@@ -2055,7 +2111,8 @@ exports.getStudentAttendance = async (req, res) => {
     });
 
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    console.error("Fetch Attendance Error:", err.message);
+    res.status(500).json({ success: false, message: 'Gagal memuat riwayat' });
   }
 };
 
