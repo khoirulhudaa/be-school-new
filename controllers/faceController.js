@@ -228,6 +228,7 @@ const Student         = require('../models/siswa');
 const GuruTendik      = require('../models/guruTendik');
 const redis           = require('../config/redis');
 const moment          = require('moment');
+const moment2 = require('moment-timezone'); // Pastikan import ini ada
 const attendanceQueue = require('../queues/attendanceQueue');
 const SchoolProfile   = require('../models/profileSekolah');
 
@@ -431,6 +432,7 @@ exports.faceAbsen = async (req, res) => {
 
         // ── Masukkan ke attendance queue ──────────────────────────────────
         const jobId = `${schoolId}-${guruMode ? 'guru' : 'student'}-${id}-${today}-face`;
+        const scanTime = moment2().tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss");
 
         await attendanceQueue.add('create-attendance', {
             id,
@@ -444,6 +446,8 @@ exports.faceAbsen = async (req, res) => {
             method:       'face',
             qrPosition:   null,
             faceDistance,
+            createdAt: scanTime, // Terkunci di WIB jam scan asli
+            updatedAt: scanTime,
             // flag untuk worker agar tahu tabel tujuan
             targetTable:  guruMode ? 'kehadiran_guru' : 'kehadiran',
         }, {

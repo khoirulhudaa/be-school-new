@@ -2,6 +2,7 @@ const Student = require('../models/siswa');
 const Attendance = require('../models/kehadiran');
 const { Op } = require('sequelize');
 const moment = require('moment');
+const moment2 = require('moment-timezone'); // Pastikan import ini ada
 const jwt = require('jsonwebtoken');
 const GuruTendik = require('../models/guruTendik');
 const sequelize = require('../config/database');
@@ -296,6 +297,8 @@ exports.scanSelfDoubleQr = async (req, res) => {
             await redis.set(profileCacheKey, JSON.stringify(userProfile), 'EX', 3600);
         }
 
+        const scanTime = moment2().tz("Asia/Jakarta").format("YYYY-MM-DD HH:mm:ss");
+
         // Queue untuk simpan ke database
         await attendanceQueue.add('create-attendance', {
             id,
@@ -309,7 +312,9 @@ exports.scanSelfDoubleQr = async (req, res) => {
             latitude: userLat,
             longitude: userLon,
             qrPosition,
-            method:       'qr',
+            createdAt: scanTime, // Terkunci di WIB jam scan asli
+            updatedAt: scanTime,
+            method: 'qr',
             targetTable:  isStudent ? 'kehadiran' : 'kehadiran_guru', // ← tambah ini
         }, {
             attempts: 3,

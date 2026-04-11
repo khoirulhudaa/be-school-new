@@ -17,6 +17,7 @@ const worker = new Worker(
   
     // UTAMAKAN CEK targetTable YANG DIKIRIM CONTROLLER
     const saveToGuruTable = data.targetTable === 'kehadiran_guru' || data.userRole === 'teacher';
+    const originalTime = data.createdAt;
 
     console.log(`[WORKER] Memproses Job: ${job.id}`);
     console.log(`[WORKER] Role: ${data.userRole} | Target: ${data.targetTable} | Decision: ${saveToGuruTable ? 'GURU' : 'SISWA'}`);
@@ -32,6 +33,8 @@ const worker = new Worker(
         latitude:     data.latitude,
         longitude:    data.longitude,
         method:       data.method || null,
+        createdAt:    originalTime, // <-- MASUKKAN DISINI
+        updatedAt:    originalTime
       });
 
     } else {
@@ -45,6 +48,8 @@ const worker = new Worker(
         status:       'Hadir',
         latitude:     data.latitude,
         longitude:    data.longitude,
+        createdAt:    originalTime, // <-- MASUKKAN DISINI
+        updatedAt:    originalTime
       });
 
     }
