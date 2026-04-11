@@ -2275,10 +2275,10 @@ exports.updateClassByBatch = async (req, res) => {
   try {
     const { schoolId, batch, newClass, studentIds } = req.body;
 
-    if (!schoolId || !newClass) {
+    if (!newClass) {
       return res.status(400).json({ 
         success: false, 
-        message: 'schoolId dan newClass wajib diisi' 
+        message: 'Kelas tujuan wajib diisi' 
       });
     }
 
