@@ -1,8 +1,6 @@
 const express = require('express');
 const multer = require('multer');
 const studentController = require('../controllers/siswaController');
-const { protectForSiswa } = require('../middlewares/protectForSiswa');
-const cache = require('../middlewares/cache');
 const { loginLimiter, globalLimiter } = require('../middlewares/rateLimiter');
 const optionalAuth = require('../middlewares/optionalLimiter');
 const { protectMultiRole } = require('../middlewares/protectMultiRole');
@@ -18,7 +16,7 @@ const upload = multer({
 // --- API SISWA ---
 // Endpoint: /api/siswa
 router.get('/search', studentController.getStudentSearch);
-router.get('/', cache(120), studentController.getAllStudents); // Sesuai fetch di frontend tadi
+router.get('/', studentController.getAllStudents); // Sesuai fetch di frontend tadi
 router.get('/all-no-pagination', studentController.getAllStudentsNoPagination);
 router.post('/', upload.single('photo'), studentController.createStudent);
 router.post('/bulk', studentController.bulkCreateStudents);
@@ -41,10 +39,10 @@ router.get('/detail/:id', studentController.getUserDetail);
 // --- 3. API STATISTIK & LAPORAN ---
 
 // Statistik Dashboard (Hadir, Sakit, Izin, Alpha hari ini)
-router.get('/today-stats', cache(90), studentController.getTodayStats);
-router.get('/summary-attendances', cache(60), studentController.getAttendanceSummary);
+router.get('/today-stats', studentController.getTodayStats);
+router.get('/summary-attendances', studentController.getAttendanceSummary);
 router.get('/early-warning', studentController.getEarlyWarningReport);
-router.get('/hall-of-fame', cache(300), studentController.getPublicHallOfFame);
+router.get('/hall-of-fame', studentController.getPublicHallOfFame);
 
 // Endpoint Laporan & Export (Perbaikan ejaan: attendance)
 router.get('/attendance-report', optionalAuth, globalLimiter, studentController.getAttendanceReport);
