@@ -2374,16 +2374,11 @@ exports.updateClassByBatch = async (req, res) => {
 
 exports.getConsecutiveAbsent = async (req, res) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(100, parseInt(req.query.limit) || 10); // Batasi limit maksimal
-    const offset = (page - 1) * limit;
     const { schoolId, minDays = 3 } = req.query;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, parseInt(req.query.limit) || 10);
+    const offset = (page - 1) * limit;
 
-    if (!schoolId) {
-      return res.status(400).json({ success: false, message: 'schoolId diperlukan' });
-    }
-
-    // 1. Dapatkan checkDays
     const checkDays = [];
     let current = moment().startOf('day');
     while (checkDays.length < parseInt(minDays)) {
@@ -2393,48 +2388,34 @@ exports.getConsecutiveAbsent = async (req, res) => {
       current.subtract(1, 'day');
     }
 
-    // Ubah array tanggal menjadi string untuk SQL: '2026-04-10','2026-04-09'
     const formattedDates = checkDays.map(d => `'${d}'`).join(',');
 
-    // 2. Query dengan findAndCountAll
     const { count, rows: students } = await Student.findAndCountAll({
       where: {
         schoolId: parseInt(schoolId),
         isActive: true,
         isGraduated: false,
-        // Gunakan NOT EXISTS untuk performa lebih stabil pada dataset besar
         [Op.and]: [
+          // Ganti 'Attendances' menjadi 'kehadiran'
           literal(`NOT EXISTS (
-            SELECT 1 FROM Attendances AS a 
-            WHERE a.studentId = Student.id 
-            AND a.status = 'Hadir'
-            AND DATE(a.createdAt) IN (${formattedDates})
-            GROUP BY DATE(a.createdAt)
-            HAVING COUNT(DISTINCT DATE(a.createdAt)) = ${checkDays.length}
+            SELECT 1 FROM kehadiran 
+            WHERE studentId = Student.id 
+            AND status = 'Hadir'
+            AND DATE(createdAt) IN (${formattedDates})
           )`)
         ]
       },
       attributes: ['id', 'name', 'nis', 'class', 'photoUrl'],
-      limit,
-      offset,
+      limit, offset,
       order: [['name', 'ASC']],
-      // Penting: subQuery false sering mempercepat query yang melibatkan limit + join/subquery
-      subQuery: false, 
+      subQuery: false,
       raw: true
     });
 
     res.json({
       success: true,
-      data: students.map(s => ({
-        ...s,
-        isAlert: true,
-        absentDates: checkDays
-      })),
-      pagination: {
-        totalData: count,
-        totalPages: Math.ceil(count / limit),
-        currentPage: page
-      }
+      data: students.map(s => ({ ...s, isAlert: true, absentDates: checkDays })),
+      pagination: { totalData: count, totalPages: Math.ceil(count / limit), currentPage: page }
     });
   } catch (err) {
     console.error('[getConsecutiveAbsent]', err);
@@ -2449,32 +2430,22 @@ exports.getLowAttendance = async (req, res) => {
     const limit = Math.min(100, parseInt(req.query.limit) || 10);
     const offset = (page - 1) * limit;
 
-    if (!schoolId) {
-      return res.status(400).json({ success: false, message: 'schoolId diperlukan' });
-    }
+    if (!schoolId) return res.status(400).json({ success: false, message: 'schoolId diperlukan' });
 
-    const startDate = month && year
-      ? moment(`${year}-${month}-01`).startOf('month')
-      : moment().startOf('month');
+    const startDate = month && year ? moment(`${year}-${month}-01`).startOf('month') : moment().startOf('month');
     const endDate = moment().subtract(1, 'day').endOf('day');
+    const totalWorkdays = getWorkdaysInRange(startDate, endDate).length;
 
-    const workdays = getWorkdaysInRange(startDate, endDate);
-    const totalWorkdays = workdays.length;
+    if (totalWorkdays === 0) return res.json({ success: true, count: 0, totalWorkdays: 0, data: [] });
 
-    if (totalWorkdays === 0) {
-      return res.json({ success: true, count: 0, totalWorkdays: 0, data: [] });
-    }
-
-    // Query Siswa dengan filter persentase di level DB
     const { count, rows: students } = await Student.findAndCountAll({
       where: {
         schoolId: parseInt(schoolId),
         isActive: true,
         isGraduated: false,
-        // Filter: (Jumlah Hadir / Total Hari Kerja) * 100 < Threshold
         [Op.and]: [
           literal(`(
-            SELECT COUNT(id) FROM Attendances 
+            SELECT COUNT(id) FROM kehadiran 
             WHERE studentId = Student.id 
             AND status = 'Hadir'
             AND createdAt BETWEEN '${startDate.format('YYYY-MM-DD HH:mm:ss')}' AND '${endDate.format('YYYY-MM-DD HH:mm:ss')}'
@@ -2486,7 +2457,7 @@ exports.getLowAttendance = async (req, res) => {
         'id', 'name', 'nis', 'class', 'photoUrl',
         [
           literal(`(
-            SELECT COUNT(id) FROM Attendances 
+            SELECT COUNT(id) FROM kehadiran 
             WHERE studentId = Student.id 
             AND status = 'Hadir'
             AND createdAt BETWEEN '${startDate.format('YYYY-MM-DD HH:mm:ss')}' AND '${endDate.format('YYYY-MM-DD HH:mm:ss')}'
@@ -2495,9 +2466,9 @@ exports.getLowAttendance = async (req, res) => {
           'hadirCount'
         ]
       ],
-      limit,
-      offset,
+      limit, offset,
       order: [[literal('hadirCount'), 'ASC']],
+      subQuery: false, // Tambahkan ini untuk performa
       raw: true
     });
 
@@ -2509,11 +2480,7 @@ exports.getLowAttendance = async (req, res) => {
         totalWorkdays,
         percentage: Math.round((parseInt(s.hadirCount) / totalWorkdays) * 100)
       })),
-      pagination: {
-        totalData: count,
-        totalPages: Math.ceil(count / limit),
-        currentPage: page
-      }
+      pagination: { totalData: count, totalPages: Math.ceil(count / limit), currentPage: page }
     });
   } catch (err) {
     console.error('[getLowAttendance]', err);
