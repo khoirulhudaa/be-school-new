@@ -4,6 +4,7 @@ const cloudinary = require('cloudinary').v2;
 const streamifier = require('streamifier');
 const { fn, col, Op, literal, where: sequelizeWhere } = require('sequelize');
 const moment = require('moment');
+const moment2 = require('moment-timezone');
 const ExcelJS = require('exceljs');
 const GuruTendik = require('../models/guruTendik');
 const sequelize = require('../config/database');
@@ -2157,17 +2158,26 @@ exports.getParentChildren = async (req, res) => {
 exports.getClassRecapWithDetails = async (req, res) => {
   try {
     const { schoolId, date } = req.query;
-    const targetDate = date ? moment(date) : moment();
 
-    const startDate = targetDate.clone().startOf('day').utc().format('YYYY-MM-DD HH:mm:ss');
-    const endDate = targetDate.clone().endOf('day').utc().format('YYYY-MM-DD HH:mm:ss');
+     // pastikan sudah di-install
+    const targetDate = date 
+      ? moment2.tz(date, 'Asia/Jakarta') 
+      : moment2().tz('Asia/Jakarta');
+
+    // Rentang tanggal dalam WIB (format string yang aman untuk MySQL)
+    const startDate = targetDate.clone().startOf('day').format('YYYY-MM-DD HH:mm:ss');
+    const endDate   = targetDate.clone().endOf('day').format('YYYY-MM-DD HH:mm:ss');
 
     const deadline = "07:00:00";
 
-    // OPTIMASI 1: Gunakan Attributes untuk membatasi kolom yang ditarik dari DB
+    // Query utama
     const allStudents = await Student.findAll({
-      where: { schoolId, isActive: true, isGraduated: false },
-      attributes: ['id', 'name', 'nis', 'class', 'photoUrl'], // Hanya ambil yang perlu
+      where: { 
+        schoolId: parseInt(schoolId), 
+        isActive: true, 
+        isGraduated: false 
+      },
+      attributes: ['id', 'name', 'nis', 'class', 'photoUrl'],
       include: [{
         model: Attendance,
         as: 'studentAttendances',
@@ -2175,23 +2185,23 @@ exports.getClassRecapWithDetails = async (req, res) => {
           createdAt: { [Op.between]: [startDate, endDate] },
           userRole: 'student'
         },
-        attributes: ['status', 'createdAt'], // Batasi kolom attendance
-        required: false 
+        attributes: ['status', 'createdAt'],
+        required: false,
+        limit: 1,                     // Hanya ambil 1 record
+        order: [['createdAt', 'ASC']] // Paling awal (scan pertama hari itu)
       }],
-      // OPTIMASI 2: Hilangkan sorting di DB jika data sangat besar, sorting di memori JS lebih cepat
-      raw: false, 
+      raw: false,
     });
 
     let totalAllStudents = 0;
     let totalAllHadir = 0;
     let totalAllBelumHadir = 0;
 
-    // OPTIMASI 3: Gunakan Map untuk pengelompokan (lebih cepat dari reduce Object untuk data masif)
     const acc = new Map();
 
     for (const student of allStudents) {
       const className = student.class || "Tanpa Kelas";
-      
+
       if (!acc.has(className)) {
         acc.set(className, {
           className,
@@ -2203,7 +2213,7 @@ exports.getClassRecapWithDetails = async (req, res) => {
 
       const classObj = acc.get(className);
       const attendance = student.studentAttendances?.[0];
-      
+
       let statusInfo = "Belum Hadir";
       let isLate = false;
       let scanTime = null;
@@ -2211,9 +2221,11 @@ exports.getClassRecapWithDetails = async (req, res) => {
       totalAllStudents++;
 
       if (attendance) {
-        scanTime = moment(attendance.createdAt).format("HH:mm:ss");
+        scanTime = moment2(attendance.createdAt).tz('Asia/Jakarta').format("HH:mm:ss");
+
         if (attendance.status === 'Hadir') {
           totalAllHadir++;
+
           if (scanTime <= deadline) {
             classObj.stats.onTime++;
             statusInfo = "Tepat Waktu";
@@ -2224,7 +2236,9 @@ exports.getClassRecapWithDetails = async (req, res) => {
           }
         } else {
           const statusKey = attendance.status.toLowerCase();
-          if (classObj.stats[statusKey] !== undefined) classObj.stats[statusKey]++;
+          if (classObj.stats[statusKey] !== undefined) {
+            classObj.stats[statusKey]++;
+          }
           statusInfo = attendance.status;
         }
       } else {
@@ -2234,18 +2248,29 @@ exports.getClassRecapWithDetails = async (req, res) => {
 
       classObj.totalStudents++;
       classObj.students.push({
-        id: student.id, name: student.name, nis: student.nis,
-        status: statusInfo, scanTime, isLate, photoUrl: student.photoUrl
+        id: student.id,
+        name: student.name,
+        nis: student.nis,
+        status: statusInfo,
+        scanTime,
+        isLate,
+        photoUrl: student.photoUrl
       });
     }
 
     res.json({
       success: true,
-      summary: { totalAllStudents, totalAllHadir, totalAllBelumHadir },
+      summary: { 
+        totalAllStudents, 
+        totalAllHadir, 
+        totalAllBelumHadir,
+        date: targetDate.format('YYYY-MM-DD')
+      },
       data: Array.from(acc.values()).sort((a, b) => a.className.localeCompare(b.className))
     });
 
   } catch (err) {
+    console.error('[getClassRecapWithDetails] Error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 };

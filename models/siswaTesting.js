@@ -11,6 +11,7 @@ const StudentTesting = sequelize.define('StudentTesting', {
     allowNull: true,
     references: { model: 'orangTua', key: 'id' }
   },
+  
   nis: { type: DataTypes.STRING, allowNull: false },
   nisn: { type: DataTypes.STRING, allowNull: true },
   nik: { type: DataTypes.STRING, allowNull: true },
