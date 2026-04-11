@@ -109,7 +109,12 @@ const allowedOrigins = [
   "http://localhost:5222",
   "http://localhost:5333",
   "http://localhost:5444",
-  "http://localhost:5555"
+  "http://localhost:5555",
+  "http://localhost:5666",
+  "http://localhost:5777",
+  "http://localhost:5888",
+  "http://localhost:5999",
+  "http://localhost:6000",
 ];
 
 app.use(cors({
