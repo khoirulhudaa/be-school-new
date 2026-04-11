@@ -43,6 +43,14 @@ const Attendance = sequelize.define('Attendance', {
 }, {
   tableName: 'kehadiran',
   timestamps: true,
+  hooks: {
+    beforeCreate: (instance) => {
+      // Mengambil waktu saat ini di server Node.js (pastikan jam server sudah WIB)
+      const sekarang = new Date();
+      instance.createdAt = sekarang;
+      instance.updatedAt = sekarang;
+    }
+  },
   indexes: [
     { name: 'idx_school_role_date', fields: ['schoolId', 'userRole', 'createdAt'] },
     { name: 'idx_school_class_date', fields: ['schoolId', 'currentClass', 'createdAt'] },

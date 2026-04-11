@@ -42,6 +42,14 @@ const KehadiranGuru = sequelize.define('KehadiranGuru', {
 }, {
     tableName: 'kehadiran_guru',
     timestamps: true,
+    hooks: {
+    beforeCreate: (instance) => {
+        // Mengambil waktu saat ini di server Node.js (pastikan jam server sudah WIB)
+        const sekarang = new Date();
+        instance.createdAt = sekarang;
+        instance.updatedAt = sekarang;
+        }
+    },
     indexes: [
         { name: 'idx_guru_school_date', fields: ['schoolId', 'createdAt'] },
         { name: 'idx_guru_daily',       fields: ['guruId', 'createdAt']   },

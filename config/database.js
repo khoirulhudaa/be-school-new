@@ -19,6 +19,9 @@ const sequelize = new Sequelize(
     },
     dialectOptions: {
       connectTimeout: 60000,
+      prependSearchPath: true,
+      // Memaksa session MySQL ke +07:00 setiap kali koneksi dibuka
+      initialAfterConnect: "SET time_zone = '+07:00';",
       // Membantu performa pada query besar
       decimalNumbers: true ,
       useUTC: false, // Agar tidak dikonversi kembali ke UTC
