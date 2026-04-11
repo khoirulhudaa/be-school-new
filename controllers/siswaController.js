@@ -2536,32 +2536,35 @@ exports.getFrequentLate = async (req, res) => {
       return res.status(400).json({ success: false, message: 'schoolId diperlukan' });
     }
 
-    // Subquery untuk menghitung minggu-minggu yang melanggar
     const { count, rows: students } = await Student.findAndCountAll({
       where: {
         schoolId: parseInt(schoolId),
         isActive: true,
-        id: {
-          [Op.in]: literal(`(
-            SELECT studentId FROM (
-              SELECT studentId, YEARWEEK(createdAt, 1) as weekKey, COUNT(id) as lateCount
-              FROM Attendances
+        isGraduated: false,
+        [Op.and]: [
+          // Gunakan EXISTS dengan nama tabel asli 'kehadiran'
+          literal(`EXISTS (
+            SELECT 1 FROM (
+              SELECT studentId, YEARWEEK(createdAt, 1) as weekKey
+              FROM kehadiran
               WHERE status = 'Hadir'
+              AND schoolId = ${parseInt(schoolId)}
               AND TIME(createdAt) > '${deadline}'
               AND createdAt BETWEEN '${startDate.format('YYYY-MM-DD HH:mm:ss')}' AND '${endDate.format('YYYY-MM-DD HH:mm:ss')}'
               AND DAYOFWEEK(createdAt) NOT IN (1, 7)
               GROUP BY studentId, weekKey
-              HAVING lateCount >= ${parseInt(minPerWeek)}
-            ) as violating_weeks
-            GROUP BY studentId
+              HAVING COUNT(id) >= ${parseInt(minPerWeek)}
+            ) AS v_weeks
+            WHERE v_weeks.studentId = Student.id
           )`)
-        }
+        ]
       },
       attributes: [
         'id', 'name', 'nis', 'class', 'photoUrl',
+        // Hitung total telat untuk ditampilkan di UI
         [
           literal(`(
-            SELECT COUNT(id) FROM Attendances 
+            SELECT COUNT(id) FROM kehadiran 
             WHERE studentId = Student.id 
             AND status = 'Hadir' 
             AND TIME(createdAt) > '${deadline}'
@@ -2573,6 +2576,7 @@ exports.getFrequentLate = async (req, res) => {
       limit,
       offset,
       order: [[literal('totalLate'), 'DESC']],
+      subQuery: false, // Menghindari masalah LIMIT pada dataset besar
       raw: true
     });
 
@@ -2580,7 +2584,7 @@ exports.getFrequentLate = async (req, res) => {
       success: true,
       data: students.map(s => ({
         ...s,
-        totalLate: parseInt(s.totalLate),
+        totalLate: parseInt(s.totalLate || 0),
         weeksAnalyzed: parseInt(weeksBack)
       })),
       pagination: {
@@ -2591,6 +2595,6 @@ exports.getFrequentLate = async (req, res) => {
     });
   } catch (err) {
     console.error('[getFrequentLate]', err);
-    res.status(500).json({ success: false, message: 'Internal Server Error' });
+    res.status(500).json({ success: false, message: err.message });
   }
 };
