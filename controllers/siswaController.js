@@ -2583,7 +2583,8 @@ exports.getLowAttendance = async (req, res) => {
         hadirCount: hadirCount,
         totalWorkdays: totalWorkdays,
         percentage: Math.round((hadirCount / totalWorkdays) * 100),
-        period: "Minggu Ini (Senin - Jumat)"
+        period: "Minggu Ini (Senin - Jumat)",
+        rangeLabel: `${startDate.format('DD MMM')} - ${endDate.format('DD MMM YYYY')}`
       };
     });
 
