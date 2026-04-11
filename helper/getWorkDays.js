@@ -1,3 +1,5 @@
+const moment = require('moment');
+
 const getWorkdaysInRange = (startDate, endDate) => {
   const days = [];
   let current = moment(startDate).startOf('day');
