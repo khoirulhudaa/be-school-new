@@ -2406,10 +2406,14 @@ exports.getConsecutiveAbsent = async (req, res) => {
 
     const checkDays = [];
     let current = moment().startOf('day');
+    // while (checkDays.length < parseInt(minDays)) {
+    //   if (current.day() !== 0 && current.day() !== 6) {
+    //     checkDays.push(current.format('YYYY-MM-DD'));
+    //   }
+    //   current.subtract(1, 'day');
+    // }
     while (checkDays.length < parseInt(minDays)) {
-      if (current.day() !== 0 && current.day() !== 6) {
-        checkDays.push(current.format('YYYY-MM-DD'));
-      }
+      checkDays.push(current.format('YYYY-MM-DD'));
       current.subtract(1, 'day');
     }
 
@@ -2457,12 +2461,46 @@ exports.getLowAttendance = async (req, res) => {
 
     if (!schoolId) return res.status(400).json({ success: false, message: 'schoolId diperlukan' });
 
+    // const startDate = month && year ? moment(`${year}-${month}-01`).startOf('month') : moment().startOf('month');
+    // const endDate = moment().subtract(1, 'day').endOf('day');
+    // const totalWorkdays = getWorkdaysInRange(startDate, endDate).length;
+
     const startDate = month && year ? moment(`${year}-${month}-01`).startOf('month') : moment().startOf('month');
-    const endDate = moment().subtract(1, 'day').endOf('day');
-    const totalWorkdays = getWorkdaysInRange(startDate, endDate).length;
+    const endDate = moment().endOf('day'); 
+    
+    // Pastikan fungsi getWorkdaysInRange juga menghitung Sabtu/Minggu atau gunakan diff
+    const totalWorkdays = endDate.diff(startDate, 'days') + 1;
 
     if (totalWorkdays === 0) return res.json({ success: true, count: 0, totalWorkdays: 0, data: [] });
 
+    // const { count, rows: students } = await Student.findAndCountAll({
+    //   where: {
+    //     schoolId: parseInt(schoolId),
+    //     isActive: true,
+    //     isGraduated: false,
+    //     [Op.and]: [
+    //       literal(`(
+    //         SELECT COUNT(id) FROM kehadiran 
+    //         WHERE studentId = Student.id 
+    //         AND status = 'Hadir'
+    //         AND createdAt BETWEEN '${startDate.format('YYYY-MM-DD HH:mm:ss')}' AND '${endDate.format('YYYY-MM-DD HH:mm:ss')}'
+    //         AND DAYOFWEEK(createdAt) NOT IN (1, 7)
+    //       ) * 100 / ${totalWorkdays} < ${parseInt(threshold)}`)
+    //     ]
+    //   },
+    //   attributes: [
+    //     'id', 'name', 'nis', 'class', 'photoUrl',
+    //     [
+    //       literal(`(
+    //         SELECT COUNT(id) FROM kehadiran 
+    //         WHERE studentId = Student.id 
+    //         AND status = 'Hadir'
+    //         AND createdAt BETWEEN '${startDate.format('YYYY-MM-DD HH:mm:ss')}' AND '${endDate.format('YYYY-MM-DD HH:mm:ss')}'
+    //         AND DAYOFWEEK(createdAt) NOT IN (1, 7)
+    //       )`), 
+    //       'hadirCount'
+    //     ]
+    //   ],
     const { count, rows: students } = await Student.findAndCountAll({
       where: {
         schoolId: parseInt(schoolId),
@@ -2474,7 +2512,7 @@ exports.getLowAttendance = async (req, res) => {
             WHERE studentId = Student.id 
             AND status = 'Hadir'
             AND createdAt BETWEEN '${startDate.format('YYYY-MM-DD HH:mm:ss')}' AND '${endDate.format('YYYY-MM-DD HH:mm:ss')}'
-            AND DAYOFWEEK(createdAt) NOT IN (1, 7)
+            /* FILTER HARI DIHAPUS AGAR SEMUA HARI TERHITUNG */
           ) * 100 / ${totalWorkdays} < ${parseInt(threshold)}`)
         ]
       },
@@ -2486,7 +2524,6 @@ exports.getLowAttendance = async (req, res) => {
             WHERE studentId = Student.id 
             AND status = 'Hadir'
             AND createdAt BETWEEN '${startDate.format('YYYY-MM-DD HH:mm:ss')}' AND '${endDate.format('YYYY-MM-DD HH:mm:ss')}'
-            AND DAYOFWEEK(createdAt) NOT IN (1, 7)
           )`), 
           'hadirCount'
         ]
@@ -2528,13 +2565,35 @@ exports.getFrequentLate = async (req, res) => {
       return res.status(400).json({ success: false, message: 'schoolId diperlukan' });
     }
 
+    // const { count, rows: students } = await Student.findAndCountAll({
+    //   where: {
+    //     schoolId: parseInt(schoolId),
+    //     isActive: true,
+    //     isGraduated: false,
+    //     [Op.and]: [
+    //       // Gunakan EXISTS dengan nama tabel asli 'kehadiran'
+    //       literal(`EXISTS (
+    //         SELECT 1 FROM (
+    //           SELECT studentId, YEARWEEK(createdAt, 1) as weekKey
+    //           FROM kehadiran
+    //           WHERE status = 'Hadir'
+    //           AND schoolId = ${parseInt(schoolId)}
+    //           AND TIME(createdAt) > '${deadline}'
+    //           AND createdAt BETWEEN '${startDate.format('YYYY-MM-DD HH:mm:ss')}' AND '${endDate.format('YYYY-MM-DD HH:mm:ss')}'
+    //           AND DAYOFWEEK(createdAt) NOT IN (1, 7)
+    //           GROUP BY studentId, weekKey
+    //           HAVING COUNT(id) >= ${parseInt(minPerWeek)}
+    //         ) AS v_weeks
+    //         WHERE v_weeks.studentId = Student.id
+    //       )`)
+    //     ]
+    //   },
     const { count, rows: students } = await Student.findAndCountAll({
       where: {
         schoolId: parseInt(schoolId),
         isActive: true,
         isGraduated: false,
         [Op.and]: [
-          // Gunakan EXISTS dengan nama tabel asli 'kehadiran'
           literal(`EXISTS (
             SELECT 1 FROM (
               SELECT studentId, YEARWEEK(createdAt, 1) as weekKey
@@ -2543,7 +2602,7 @@ exports.getFrequentLate = async (req, res) => {
               AND schoolId = ${parseInt(schoolId)}
               AND TIME(createdAt) > '${deadline}'
               AND createdAt BETWEEN '${startDate.format('YYYY-MM-DD HH:mm:ss')}' AND '${endDate.format('YYYY-MM-DD HH:mm:ss')}'
-              AND DAYOFWEEK(createdAt) NOT IN (1, 7)
+              /* DAYOFWEEK NOT IN (1, 7) DIHAPUS */
               GROUP BY studentId, weekKey
               HAVING COUNT(id) >= ${parseInt(minPerWeek)}
             ) AS v_weeks
