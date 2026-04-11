@@ -53,6 +53,9 @@ router.get('/recap-kelas', optionalAuth, globalLimiter, studentController.getCla
 router.get('/global-stats', optionalAuth, globalLimiter, studentController.getGlobalAttendanceStats);
 router.delete('/batch/remove', studentController.deleteStudentsByBatch);
 router.delete('/all/remove', studentController.deleteAllStudents);
+router.get('/early-warning/consecutive-absent', optionalAuth, globalLimiter, studentController.getConsecutiveAbsent);
+router.get('/early-warning/low-attendance', optionalAuth, globalLimiter, studentController.getLowAttendance);
+router.get('/early-warning/frequent-late', optionalAuth, globalLimiter, studentController.getFrequentLate);
 
 router.post('/process-graduation', studentController.processGraduation);
 

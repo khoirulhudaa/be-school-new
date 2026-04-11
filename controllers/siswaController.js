@@ -22,6 +22,7 @@ cloudinary.config({
 
 // === REDIS + INVALIDATE CACHE ===
 const redisClient = require('../config/redis');
+const { getWorkdaysInRange } = require('../helper/getWorkDays');
 
 const invalidateStudentCache = async (schoolId) => {
   if (!schoolId) return;
@@ -2367,6 +2368,299 @@ exports.updateClassByBatch = async (req, res) => {
       affectedCount
     });
   } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getConsecutiveAbsent = async (req, res) => {
+  try {
+    const { schoolId, minDays = 3 } = req.query;
+
+    if (!schoolId) {
+      return res.status(400).json({ success: false, message: 'schoolId diperlukan' });
+    }
+
+    // Ambil 14 hari ke belakang (exclude hari ini karena belum tentu selesai)
+    const endDate   = moment().subtract(1, 'day').endOf('day');
+    const startDate = moment().subtract(20, 'days').startOf('day');
+
+    // Hari kerja dalam rentang
+    const workdays = getWorkdaysInRange(startDate, endDate);
+
+    // Ambil semua record kehadiran (status apapun = hadir/izin/sakit/alpha)
+    const attendances = await Attendance.findAll({
+      where: {
+        schoolId: parseInt(schoolId),
+        userRole: 'student',
+        createdAt: { [Op.between]: [startDate.toDate(), endDate.toDate()] }
+      },
+      attributes: ['studentId', 'status', 'createdAt'],
+      raw: true
+    });
+
+    // Map: studentId -> Set<tanggal hadir>
+    const presentMap = new Map();
+    attendances.forEach(rec => {
+      const date = moment(rec.createdAt).format('YYYY-MM-DD');
+      if (!presentMap.has(rec.studentId)) presentMap.set(rec.studentId, new Set());
+      presentMap.get(rec.studentId).add(date);
+    });
+
+    // Ambil semua siswa aktif
+    const students = await Student.findAll({
+      where: { schoolId: parseInt(schoolId), isActive: true, isGraduated: false },
+      attributes: ['id', 'name', 'nis', 'class', 'photoUrl'],
+      raw: true
+    });
+
+    const result = [];
+
+    students.forEach(student => {
+      const presentDates = presentMap.get(student.id) || new Set();
+
+      // Hitung streak absen berturut-turut (mundur dari hari terakhir workday)
+      let streak = 0;
+      let maxStreak = 0;
+      let streakStartDate = null;
+      let currentStreakStart = null;
+
+      // Iterasi workdays dari terbaru ke terlama
+      for (let i = workdays.length - 1; i >= 0; i--) {
+        const day = workdays[i];
+        if (!presentDates.has(day)) {
+          streak++;
+          currentStreakStart = day;
+          if (streak > maxStreak) {
+            maxStreak = streak;
+            streakStartDate = currentStreakStart;
+          }
+        } else {
+          // Reset streak saat ketemu hari hadir
+          streak = 0;
+          currentStreakStart = null;
+        }
+      }
+
+      if (maxStreak >= parseInt(minDays)) {
+        result.push({
+          ...student,
+          consecutiveDays: maxStreak,
+          absentSince: streakStartDate,
+          lastWorkday: workdays[workdays.length - 1]
+        });
+      }
+    });
+
+    // Sort terbanyak dulu
+    result.sort((a, b) => b.consecutiveDays - a.consecutiveDays);
+
+    res.json({
+      success: true,
+      count: result.length,
+      minDays: parseInt(minDays),
+      data: result
+    });
+
+  } catch (err) {
+    console.error('[getConsecutiveAbsent]', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getLowAttendance = async (req, res) => {
+  try {
+    const { schoolId, threshold = 80, month, year } = req.query;
+
+    if (!schoolId) {
+      return res.status(400).json({ success: false, message: 'schoolId diperlukan' });
+    }
+
+    // Default: dari awal bulan ini sampai kemarin
+    const startDate = month && year
+      ? moment(`${year}-${month}-01`).startOf('month')
+      : moment().startOf('month');
+    const endDate = moment().subtract(1, 'day').endOf('day');
+
+    // Hitung workdays dalam rentang
+    const workdays = getWorkdaysInRange(startDate, endDate);
+    const totalWorkdays = workdays.length;
+
+    if (totalWorkdays === 0) {
+      return res.json({ success: true, count: 0, totalWorkdays: 0, data: [] });
+    }
+
+    // Ambil semua record kehadiran (status 'Hadir' saja)
+    const attendances = await Attendance.findAll({
+      where: {
+        schoolId: parseInt(schoolId),
+        userRole: 'student',
+        status: { [Op.in]: ['Hadir'] },
+        createdAt: { [Op.between]: [startDate.toDate(), endDate.toDate()] },
+        // Exclude Sabtu & Minggu via DAYOFWEEK (1=Min, 7=Sab)
+        [Op.and]: [
+          literal('DAYOFWEEK(createdAt) NOT IN (1, 7)')
+        ]
+      },
+      attributes: ['studentId', [fn('COUNT', col('id')), 'hadirCount']],
+      group: ['studentId'],
+      raw: true
+    });
+
+    // Map: studentId -> jumlah hari hadir
+    const hadirMap = new Map(
+      attendances.map(a => [a.studentId, parseInt(a.hadirCount)])
+    );
+
+    // Ambil semua siswa aktif
+    const students = await Student.findAll({
+      where: { schoolId: parseInt(schoolId), isActive: true, isGraduated: false },
+      attributes: ['id', 'name', 'nis', 'class', 'photoUrl'],
+      raw: true
+    });
+
+    const result = [];
+    const thresholdNum = parseInt(threshold);
+
+    students.forEach(student => {
+      const hadirCount  = hadirMap.get(student.id) || 0;
+      const percentage  = Math.round((hadirCount / totalWorkdays) * 100);
+
+      if (percentage < thresholdNum) {
+        result.push({
+          ...student,
+          hadirCount,
+          totalWorkdays,
+          percentage,
+          missingDays: totalWorkdays - hadirCount
+        });
+      }
+    });
+
+    // Sort persentase terendah dulu
+    result.sort((a, b) => a.percentage - b.percentage);
+
+    res.json({
+      success: true,
+      count: result.length,
+      totalWorkdays,
+      threshold: thresholdNum,
+      period: {
+        start: startDate.format('YYYY-MM-DD'),
+        end: endDate.format('YYYY-MM-DD')
+      },
+      data: result
+    });
+
+  } catch (err) {
+    console.error('[getLowAttendance]', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getFrequentLate = async (req, res) => {
+  try {
+    const { schoolId, minPerWeek = 2, weeksBack = 2 } = req.query;
+
+    if (!schoolId) {
+      return res.status(400).json({ success: false, message: 'schoolId diperlukan' });
+    }
+
+    const deadline   = '07:00:00';
+    const endDate    = moment().endOf('day');
+    const startDate  = moment().subtract(parseInt(weeksBack), 'weeks').startOf('isoWeek');
+
+    // Ambil semua scan 'Hadir' dalam rentang, exclude weekend
+    const attendances = await Attendance.findAll({
+      where: {
+        schoolId: parseInt(schoolId),
+        userRole: 'student',
+        status: 'Hadir',
+        createdAt: {
+          [Op.between]: [startDate.toDate(), endDate.toDate()],
+        },
+        [Op.and]: [
+          literal('DAYOFWEEK(createdAt) NOT IN (1, 7)'),      // exclude weekend
+          literal(`TIME(createdAt) > "${deadline}"`)           // hanya yang terlambat
+        ]
+      },
+      attributes: ['studentId', 'createdAt'],
+      raw: true
+    });
+
+    if (attendances.length === 0) {
+      return res.json({ success: true, count: 0, data: [] });
+    }
+
+    // Group per studentId per minggu (ISO week: YYYY-WW)
+    const weeklyLateMap = new Map(); // studentId -> Map<weekKey, count>
+
+    attendances.forEach(rec => {
+      const weekKey = moment(rec.createdAt).format('YYYY-WW');
+      if (!weeklyLateMap.has(rec.studentId)) {
+        weeklyLateMap.set(rec.studentId, new Map());
+      }
+      const studentWeeks = weeklyLateMap.get(rec.studentId);
+      studentWeeks.set(weekKey, (studentWeeks.get(weekKey) || 0) + 1);
+    });
+
+    // Filter siswa yang >= minPerWeek di setidaknya 1 minggu
+    const minPerWeekNum = parseInt(minPerWeek);
+    const flaggedStudentIds = [];
+    const lateDetailMap = new Map();
+
+    weeklyLateMap.forEach((weekMap, studentId) => {
+      let maxInWeek = 0;
+      let totalLate = 0;
+      let violatingWeeks = 0;
+
+      weekMap.forEach((count, weekKey) => {
+        totalLate += count;
+        if (count >= minPerWeekNum) {
+          violatingWeeks++;
+          if (count > maxInWeek) maxInWeek = count;
+        }
+      });
+
+      if (violatingWeeks > 0) {
+        flaggedStudentIds.push(studentId);
+        lateDetailMap.set(studentId, { totalLate, maxInWeek, violatingWeeks });
+      }
+    });
+
+    if (flaggedStudentIds.length === 0) {
+      return res.json({ success: true, count: 0, data: [] });
+    }
+
+    // Ambil data siswa yang terflag
+    const students = await Student.findAll({
+      where: {
+        id: { [Op.in]: flaggedStudentIds },
+        isActive: true
+      },
+      attributes: ['id', 'name', 'nis', 'class', 'photoUrl'],
+      raw: true
+    });
+
+    const result = students.map(student => ({
+      ...student,
+      ...lateDetailMap.get(student.id),
+      weeksAnalyzed: parseInt(weeksBack)
+    }));
+
+    // Sort terbanyak violatingWeeks & totalLate
+    result.sort((a, b) => b.violatingWeeks - a.violatingWeeks || b.totalLate - a.totalLate);
+
+    res.json({
+      success: true,
+      count: result.length,
+      minPerWeek: minPerWeekNum,
+      weeksBack: parseInt(weeksBack),
+      deadline,
+      data: result
+    });
+
+  } catch (err) {
+    console.error('[getFrequentLate]', err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
