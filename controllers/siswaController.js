@@ -2374,99 +2374,90 @@ exports.updateClassByBatch = async (req, res) => {
 
 exports.getConsecutiveAbsent = async (req, res) => {
   try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, parseInt(req.query.limit) || 10); // Batasi limit maksimal
+    const offset = (page - 1) * limit;
     const { schoolId, minDays = 3 } = req.query;
 
     if (!schoolId) {
       return res.status(400).json({ success: false, message: 'schoolId diperlukan' });
     }
 
-    // Ambil rentang 14 hari ke belakang agar cukup untuk mengecek streak
-    const endDate = moment().subtract(1, 'day').endOf('day');
-    const startDate = moment().subtract(14, 'days').startOf('day');
+    // 1. Dapatkan checkDays
+    const checkDays = [];
+    let current = moment().startOf('day');
+    while (checkDays.length < parseInt(minDays)) {
+      if (current.day() !== 0 && current.day() !== 6) {
+        checkDays.push(current.format('YYYY-MM-DD'));
+      }
+      current.subtract(1, 'day');
+    }
 
-    const workdays = getWorkdaysInRange(startDate, endDate);
+    // Ubah array tanggal menjadi string untuk SQL: '2026-04-10','2026-04-09'
+    const formattedDates = checkDays.map(d => `'${d}'`).join(',');
 
-    const attendances = await Attendance.findAll({
+    // 2. Query dengan findAndCountAll
+    const { count, rows: students } = await Student.findAndCountAll({
       where: {
         schoolId: parseInt(schoolId),
-        userRole: 'student',
-        createdAt: { [Op.between]: [startDate.toDate(), endDate.toDate()] }
+        isActive: true,
+        isGraduated: false,
+        // Gunakan NOT EXISTS untuk performa lebih stabil pada dataset besar
+        [Op.and]: [
+          literal(`NOT EXISTS (
+            SELECT 1 FROM Attendances AS a 
+            WHERE a.studentId = Student.id 
+            AND a.status = 'Hadir'
+            AND DATE(a.createdAt) IN (${formattedDates})
+            GROUP BY DATE(a.createdAt)
+            HAVING COUNT(DISTINCT DATE(a.createdAt)) = ${checkDays.length}
+          )`)
+        ]
       },
-      attributes: ['studentId', 'status', 'createdAt'],
-      raw: true
-    });
-
-    const presentMap = new Map();
-    attendances.forEach(rec => {
-      const date = moment(rec.createdAt).format('YYYY-MM-DD');
-      if (!presentMap.has(rec.studentId)) presentMap.set(rec.studentId, new Set());
-      presentMap.get(rec.studentId).add(date);
-    });
-
-    const students = await Student.findAll({
-      where: { schoolId: parseInt(schoolId), isActive: true, isGraduated: false },
       attributes: ['id', 'name', 'nis', 'class', 'photoUrl'],
+      limit,
+      offset,
+      order: [['name', 'ASC']],
+      // Penting: subQuery false sering mempercepat query yang melibatkan limit + join/subquery
+      subQuery: false, 
       raw: true
     });
-
-    const result = [];
-
-    students.forEach(student => {
-      const presentDates = presentMap.get(student.id) || new Set();
-      let currentStreak = 0;
-      let streakStartDate = null;
-
-      // Logika: Hitung mundur dari hari kerja terakhir
-      for (let i = workdays.length - 1; i >= 0; i--) {
-        const day = workdays[i];
-        if (!presentDates.has(day)) {
-          currentStreak++;
-          streakStartDate = day; 
-        } else {
-          // Jika ketemu hari hadir, hentikan hitungan (streak terputus)
-          break;
-        }
-      }
-
-      if (currentStreak >= parseInt(minDays)) {
-        result.push({
-          ...student,
-          consecutiveDays: currentStreak,
-          absentSince: streakStartDate,
-          lastWorkday: workdays[workdays.length - 1]
-        });
-      }
-    });
-
-    result.sort((a, b) => b.consecutiveDays - a.consecutiveDays);
 
     res.json({
       success: true,
-      count: result.length,
-      minDays: parseInt(minDays),
-      data: result
+      data: students.map(s => ({
+        ...s,
+        isAlert: true,
+        absentDates: checkDays
+      })),
+      pagination: {
+        totalData: count,
+        totalPages: Math.ceil(count / limit),
+        currentPage: page
+      }
     });
   } catch (err) {
     console.error('[getConsecutiveAbsent]', err);
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, message: 'Internal Server Error' });
   }
 };
 
 exports.getLowAttendance = async (req, res) => {
   try {
     const { schoolId, threshold = 80, month, year } = req.query;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, parseInt(req.query.limit) || 10);
+    const offset = (page - 1) * limit;
 
     if (!schoolId) {
       return res.status(400).json({ success: false, message: 'schoolId diperlukan' });
     }
 
-    // Default: dari awal bulan ini sampai kemarin
     const startDate = month && year
       ? moment(`${year}-${month}-01`).startOf('month')
       : moment().startOf('month');
     const endDate = moment().subtract(1, 'day').endOf('day');
 
-    // Hitung workdays dalam rentang
     const workdays = getWorkdaysInRange(startDate, endDate);
     const totalWorkdays = workdays.length;
 
@@ -2474,178 +2465,132 @@ exports.getLowAttendance = async (req, res) => {
       return res.json({ success: true, count: 0, totalWorkdays: 0, data: [] });
     }
 
-    // Ambil semua record kehadiran (status 'Hadir' saja)
-    const attendances = await Attendance.findAll({
+    // Query Siswa dengan filter persentase di level DB
+    const { count, rows: students } = await Student.findAndCountAll({
       where: {
         schoolId: parseInt(schoolId),
-        userRole: 'student',
-        status: { [Op.in]: ['Hadir'] },
-        createdAt: { [Op.between]: [startDate.toDate(), endDate.toDate()] },
-        // Exclude Sabtu & Minggu via DAYOFWEEK (1=Min, 7=Sab)
+        isActive: true,
+        isGraduated: false,
+        // Filter: (Jumlah Hadir / Total Hari Kerja) * 100 < Threshold
         [Op.and]: [
-          literal('DAYOFWEEK(createdAt) NOT IN (1, 7)')
+          literal(`(
+            SELECT COUNT(id) FROM Attendances 
+            WHERE studentId = Student.id 
+            AND status = 'Hadir'
+            AND createdAt BETWEEN '${startDate.format('YYYY-MM-DD HH:mm:ss')}' AND '${endDate.format('YYYY-MM-DD HH:mm:ss')}'
+            AND DAYOFWEEK(createdAt) NOT IN (1, 7)
+          ) * 100 / ${totalWorkdays} < ${parseInt(threshold)}`)
         ]
       },
-      attributes: ['studentId', [fn('COUNT', col('id')), 'hadirCount']],
-      group: ['studentId'],
+      attributes: [
+        'id', 'name', 'nis', 'class', 'photoUrl',
+        [
+          literal(`(
+            SELECT COUNT(id) FROM Attendances 
+            WHERE studentId = Student.id 
+            AND status = 'Hadir'
+            AND createdAt BETWEEN '${startDate.format('YYYY-MM-DD HH:mm:ss')}' AND '${endDate.format('YYYY-MM-DD HH:mm:ss')}'
+            AND DAYOFWEEK(createdAt) NOT IN (1, 7)
+          )`), 
+          'hadirCount'
+        ]
+      ],
+      limit,
+      offset,
+      order: [[literal('hadirCount'), 'ASC']],
       raw: true
     });
-
-    // Map: studentId -> jumlah hari hadir
-    const hadirMap = new Map(
-      attendances.map(a => [a.studentId, parseInt(a.hadirCount)])
-    );
-
-    // Ambil semua siswa aktif
-    const students = await Student.findAll({
-      where: { schoolId: parseInt(schoolId), isActive: true, isGraduated: false },
-      attributes: ['id', 'name', 'nis', 'class', 'photoUrl'],
-      raw: true
-    });
-
-    const result = [];
-    const thresholdNum = parseInt(threshold);
-
-    students.forEach(student => {
-      const hadirCount  = hadirMap.get(student.id) || 0;
-      const percentage  = Math.round((hadirCount / totalWorkdays) * 100);
-
-      if (percentage < thresholdNum) {
-        result.push({
-          ...student,
-          hadirCount,
-          totalWorkdays,
-          percentage,
-          missingDays: totalWorkdays - hadirCount
-        });
-      }
-    });
-
-    // Sort persentase terendah dulu
-    result.sort((a, b) => a.percentage - b.percentage);
 
     res.json({
       success: true,
-      count: result.length,
-      totalWorkdays,
-      threshold: thresholdNum,
-      period: {
-        start: startDate.format('YYYY-MM-DD'),
-        end: endDate.format('YYYY-MM-DD')
-      },
-      data: result
+      data: students.map(s => ({
+        ...s,
+        hadirCount: parseInt(s.hadirCount),
+        totalWorkdays,
+        percentage: Math.round((parseInt(s.hadirCount) / totalWorkdays) * 100)
+      })),
+      pagination: {
+        totalData: count,
+        totalPages: Math.ceil(count / limit),
+        currentPage: page
+      }
     });
-
   } catch (err) {
     console.error('[getLowAttendance]', err);
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, message: 'Internal Server Error' });
   }
 };
 
 exports.getFrequentLate = async (req, res) => {
   try {
     const { schoolId, minPerWeek = 2, weeksBack = 2 } = req.query;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, parseInt(req.query.limit) || 10);
+    const offset = (page - 1) * limit;
+
+    const deadline = '07:00:00';
+    const endDate = moment().endOf('day');
+    const startDate = moment().subtract(parseInt(weeksBack), 'weeks').startOf('isoWeek');
 
     if (!schoolId) {
       return res.status(400).json({ success: false, message: 'schoolId diperlukan' });
     }
 
-    const deadline   = '07:00:00';
-    const endDate    = moment().endOf('day');
-    const startDate  = moment().subtract(parseInt(weeksBack), 'weeks').startOf('isoWeek');
-
-    // Ambil semua scan 'Hadir' dalam rentang, exclude weekend
-    const attendances = await Attendance.findAll({
+    // Subquery untuk menghitung minggu-minggu yang melanggar
+    const { count, rows: students } = await Student.findAndCountAll({
       where: {
         schoolId: parseInt(schoolId),
-        userRole: 'student',
-        status: 'Hadir',
-        createdAt: {
-          [Op.between]: [startDate.toDate(), endDate.toDate()],
-        },
-        [Op.and]: [
-          literal('DAYOFWEEK(createdAt) NOT IN (1, 7)'),      // exclude weekend
-          literal(`TIME(createdAt) > "${deadline}"`)           // hanya yang terlambat
-        ]
-      },
-      attributes: ['studentId', 'createdAt'],
-      raw: true
-    });
-
-    if (attendances.length === 0) {
-      return res.json({ success: true, count: 0, data: [] });
-    }
-
-    // Group per studentId per minggu (ISO week: YYYY-WW)
-    const weeklyLateMap = new Map(); // studentId -> Map<weekKey, count>
-
-    attendances.forEach(rec => {
-      const weekKey = moment(rec.createdAt).format('YYYY-WW');
-      if (!weeklyLateMap.has(rec.studentId)) {
-        weeklyLateMap.set(rec.studentId, new Map());
-      }
-      const studentWeeks = weeklyLateMap.get(rec.studentId);
-      studentWeeks.set(weekKey, (studentWeeks.get(weekKey) || 0) + 1);
-    });
-
-    // Filter siswa yang >= minPerWeek di setidaknya 1 minggu
-    const minPerWeekNum = parseInt(minPerWeek);
-    const flaggedStudentIds = [];
-    const lateDetailMap = new Map();
-
-    weeklyLateMap.forEach((weekMap, studentId) => {
-      let maxInWeek = 0;
-      let totalLate = 0;
-      let violatingWeeks = 0;
-
-      weekMap.forEach((count, weekKey) => {
-        totalLate += count;
-        if (count >= minPerWeekNum) {
-          violatingWeeks++;
-          if (count > maxInWeek) maxInWeek = count;
+        isActive: true,
+        id: {
+          [Op.in]: literal(`(
+            SELECT studentId FROM (
+              SELECT studentId, YEARWEEK(createdAt, 1) as weekKey, COUNT(id) as lateCount
+              FROM Attendances
+              WHERE status = 'Hadir'
+              AND TIME(createdAt) > '${deadline}'
+              AND createdAt BETWEEN '${startDate.format('YYYY-MM-DD HH:mm:ss')}' AND '${endDate.format('YYYY-MM-DD HH:mm:ss')}'
+              AND DAYOFWEEK(createdAt) NOT IN (1, 7)
+              GROUP BY studentId, weekKey
+              HAVING lateCount >= ${parseInt(minPerWeek)}
+            ) as violating_weeks
+            GROUP BY studentId
+          )`)
         }
-      });
-
-      if (violatingWeeks > 0) {
-        flaggedStudentIds.push(studentId);
-        lateDetailMap.set(studentId, { totalLate, maxInWeek, violatingWeeks });
-      }
-    });
-
-    if (flaggedStudentIds.length === 0) {
-      return res.json({ success: true, count: 0, data: [] });
-    }
-
-    // Ambil data siswa yang terflag
-    const students = await Student.findAll({
-      where: {
-        id: { [Op.in]: flaggedStudentIds },
-        isActive: true
       },
-      attributes: ['id', 'name', 'nis', 'class', 'photoUrl'],
+      attributes: [
+        'id', 'name', 'nis', 'class', 'photoUrl',
+        [
+          literal(`(
+            SELECT COUNT(id) FROM Attendances 
+            WHERE studentId = Student.id 
+            AND status = 'Hadir' 
+            AND TIME(createdAt) > '${deadline}'
+            AND createdAt BETWEEN '${startDate.format('YYYY-MM-DD HH:mm:ss')}' AND '${endDate.format('YYYY-MM-DD HH:mm:ss')}'
+          )`),
+          'totalLate'
+        ]
+      ],
+      limit,
+      offset,
+      order: [[literal('totalLate'), 'DESC']],
       raw: true
     });
-
-    const result = students.map(student => ({
-      ...student,
-      ...lateDetailMap.get(student.id),
-      weeksAnalyzed: parseInt(weeksBack)
-    }));
-
-    // Sort terbanyak violatingWeeks & totalLate
-    result.sort((a, b) => b.violatingWeeks - a.violatingWeeks || b.totalLate - a.totalLate);
 
     res.json({
       success: true,
-      count: result.length,
-      minPerWeek: minPerWeekNum,
-      weeksBack: parseInt(weeksBack),
-      deadline,
-      data: result
+      data: students.map(s => ({
+        ...s,
+        totalLate: parseInt(s.totalLate),
+        weeksAnalyzed: parseInt(weeksBack)
+      })),
+      pagination: {
+        totalData: count,
+        totalPages: Math.ceil(count / limit),
+        currentPage: page
+      }
     });
-
   } catch (err) {
     console.error('[getFrequentLate]', err);
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, message: 'Internal Server Error' });
   }
 };
