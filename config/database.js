@@ -20,8 +20,12 @@ const sequelize = new Sequelize(
     dialectOptions: {
       connectTimeout: 60000,
       // Membantu performa pada query besar
-      decimalNumbers: true 
+      decimalNumbers: true ,
+      useUTC: false, // Agar tidak dikonversi kembali ke UTC
+      dateStrings: true,
+      typeCast: true
     },
+    timezone: '+07:00', 
   }
 );
 
