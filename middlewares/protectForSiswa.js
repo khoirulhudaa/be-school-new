@@ -30,11 +30,11 @@ const protectForSiswa = async (req, res, next) => {
     });
 
     if (!student) {
-      return res.status(401).json({ success: false, message: 'Siswa sudah tidak terdaftar' });
+      return res.status(404).json({ success: false, message: 'Siswa sudah tidak terdaftar' });
     }
 
     if (!student.isActive) {
-      return res.status(401).json({ success: false, message: 'Akun siswa tidak aktif' });
+      return res.status(403).json({ success: false, message: 'Akun siswa tidak aktif' });
     }
 
     // 4. Simpan data siswa ke object req

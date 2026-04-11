@@ -77,7 +77,7 @@ exports.checkGuruAuth = async (req, res) => {
     const token = jwt.sign(
       { profile },
       process.env.JWT_SECRET || 'secret_key_anda',
-      { expiresIn: '7d' }
+      { expiresIn: '365d' }
     );
 
     res.json({ 
