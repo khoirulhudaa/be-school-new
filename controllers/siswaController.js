@@ -2380,14 +2380,12 @@ exports.getConsecutiveAbsent = async (req, res) => {
       return res.status(400).json({ success: false, message: 'schoolId diperlukan' });
     }
 
-    // Ambil 14 hari ke belakang (exclude hari ini karena belum tentu selesai)
-    const endDate   = moment().subtract(1, 'day').endOf('day');
-    const startDate = moment().subtract(20, 'days').startOf('day');
+    // Ambil rentang 14 hari ke belakang agar cukup untuk mengecek streak
+    const endDate = moment().subtract(1, 'day').endOf('day');
+    const startDate = moment().subtract(14, 'days').startOf('day');
 
-    // Hari kerja dalam rentang
     const workdays = getWorkdaysInRange(startDate, endDate);
 
-    // Ambil semua record kehadiran (status apapun = hadir/izin/sakit/alpha)
     const attendances = await Attendance.findAll({
       where: {
         schoolId: parseInt(schoolId),
@@ -2398,7 +2396,6 @@ exports.getConsecutiveAbsent = async (req, res) => {
       raw: true
     });
 
-    // Map: studentId -> Set<tanggal hadir>
     const presentMap = new Map();
     attendances.forEach(rec => {
       const date = moment(rec.createdAt).format('YYYY-MM-DD');
@@ -2406,7 +2403,6 @@ exports.getConsecutiveAbsent = async (req, res) => {
       presentMap.get(rec.studentId).add(date);
     });
 
-    // Ambil semua siswa aktif
     const students = await Student.findAll({
       where: { schoolId: parseInt(schoolId), isActive: true, isGraduated: false },
       attributes: ['id', 'name', 'nis', 'class', 'photoUrl'],
@@ -2417,41 +2413,31 @@ exports.getConsecutiveAbsent = async (req, res) => {
 
     students.forEach(student => {
       const presentDates = presentMap.get(student.id) || new Set();
-
-      // Hitung streak absen berturut-turut (mundur dari hari terakhir workday)
-      let streak = 0;
-      let maxStreak = 0;
+      let currentStreak = 0;
       let streakStartDate = null;
-      let currentStreakStart = null;
 
-      // Iterasi workdays dari terbaru ke terlama
+      // Logika: Hitung mundur dari hari kerja terakhir
       for (let i = workdays.length - 1; i >= 0; i--) {
         const day = workdays[i];
         if (!presentDates.has(day)) {
-          streak++;
-          currentStreakStart = day;
-          if (streak > maxStreak) {
-            maxStreak = streak;
-            streakStartDate = currentStreakStart;
-          }
+          currentStreak++;
+          streakStartDate = day; 
         } else {
-          // Reset streak saat ketemu hari hadir
-          streak = 0;
-          currentStreakStart = null;
+          // Jika ketemu hari hadir, hentikan hitungan (streak terputus)
+          break;
         }
       }
 
-      if (maxStreak >= parseInt(minDays)) {
+      if (currentStreak >= parseInt(minDays)) {
         result.push({
           ...student,
-          consecutiveDays: maxStreak,
+          consecutiveDays: currentStreak,
           absentSince: streakStartDate,
           lastWorkday: workdays[workdays.length - 1]
         });
       }
     });
 
-    // Sort terbanyak dulu
     result.sort((a, b) => b.consecutiveDays - a.consecutiveDays);
 
     res.json({
@@ -2460,7 +2446,6 @@ exports.getConsecutiveAbsent = async (req, res) => {
       minDays: parseInt(minDays),
       data: result
     });
-
   } catch (err) {
     console.error('[getConsecutiveAbsent]', err);
     res.status(500).json({ success: false, message: err.message });
