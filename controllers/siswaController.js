@@ -2450,7 +2450,7 @@ exports.getConsecutiveAbsent = async (req, res) => {
 
 exports.getLowAttendance = async (req, res) => {
   try {
-    const { schoolId, threshold = 80 } = req.query;
+    const { schoolId, threshold = 75 } = req.query;
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, parseInt(req.query.limit) || 10);
     const offset = (page - 1) * limit;
@@ -2459,12 +2459,12 @@ exports.getLowAttendance = async (req, res) => {
       return res.status(400).json({ success: false, message: 'schoolId diperlukan' });
     }
 
-    // --- LOGIKA MINGGU BERJALAN (FIXED 5 HARI KERJA) ---
-    // startOf('isoWeek') akan selalu mengambil hari Senin di minggu ini
-    const startDate = moment2().tz('Asia/Jakarta').startOf('isoWeek');
-    const endDate = moment2().tz('Asia/Jakarta').startOf('isoWeek').add(4, 'days').endOf('day');
+    // --- LOGIKA BULAN BERJALAN ---
+    const startDate = moment2().tz('Asia/Jakarta').startOf('month');
+    const endDate = moment2().tz('Asia/Jakarta').endOf('month');
     const today = moment2().tz('Asia/Jakarta');
-    
+
+    // Hitung hari kerja yang sudah lewat bulan ini (inklusif hari ini)
     let passedWorkdays = 0;
     let cursor = startDate.clone();
     while (cursor.isSameOrBefore(today, 'day')) {
@@ -2472,10 +2472,7 @@ exports.getLowAttendance = async (req, res) => {
       cursor.add(1, 'day');
     }
     passedWorkdays = Math.max(1, passedWorkdays);
-    // Karena sekolah Senin-Jumat, maka pembagi selalu 5
-    const totalWorkdays = 5;
 
-    // Format tanggal untuk query SQL agar presisi
     const sDateStr = startDate.format('YYYY-MM-DD HH:mm:ss');
     const eDateStr = endDate.format('YYYY-MM-DD HH:mm:ss');
 
@@ -2485,67 +2482,63 @@ exports.getLowAttendance = async (req, res) => {
         isActive: true,
         isGraduated: false,
         [Op.and]: [
-          // Subquery untuk menghitung hadir dan memfilter berdasarkan threshold
           literal(`(
             SELECT COUNT(id) FROM kehadiran 
             WHERE studentId = Student.id 
             AND status = 'Hadir'
             AND CONVERT_TZ(createdAt, '+00:00', '+07:00') BETWEEN '${sDateStr}' AND '${eDateStr}'
             AND DAYOFWEEK(CONVERT_TZ(createdAt, '+00:00', '+07:00')) NOT IN (1, 7)
-          ) * 100 / ${totalWorkdays} < ${parseInt(threshold)}`)
+          ) * 100 / ${passedWorkdays} < ${parseInt(threshold)}`)
         ]
       },
       attributes: [
         'id', 'name', 'nis', 'class', 'photoUrl',
         [
-          // Hitung jumlah hadir untuk ditampilkan di UI
           literal(`(
             SELECT COUNT(id) FROM kehadiran 
             WHERE studentId = Student.id 
             AND status = 'Hadir'
             AND CONVERT_TZ(createdAt, '+00:00', '+07:00') BETWEEN '${sDateStr}' AND '${eDateStr}'
             AND DAYOFWEEK(CONVERT_TZ(createdAt, '+00:00', '+07:00')) NOT IN (1, 7)
-          )`), 
+          )`),
           'hadirCount'
         ]
       ],
-      limit, 
+      limit,
       offset,
-      order: [[literal('hadirCount'), 'ASC']], // Tampilkan yang paling jarang hadir di atas
-      subQuery: false, 
+      order: [[literal('hadirCount'), 'ASC']],
+      subQuery: false,
       raw: true
     });
 
-    // Mapping hasil untuk menambahkan persentase
     const dataWithPercentage = students.map(s => {
       const hadirCount = parseInt(s.hadirCount || 0);
       return {
         ...s,
-        hadirCount: hadirCount,
-        totalWorkdays: 5,
+        hadirCount,
         passedWorkdays,
-        percentage: Math.round((hadirCount / 5) * 100),
-        period: "Minggu Ini (Senin - Jumat)",
-        rangeLabel: `${startDate.format('DD MMM')} - ${endDate.format('DD MMM YYYY')}`
+        percentage: Math.round((hadirCount / passedWorkdays) * 100),
+        period: `Bulan ${today.format('MMMM YYYY')}`,
+        rangeLabel: `${startDate.format('DD MMM')} - ${today.format('DD MMM YYYY')}`
       };
     });
 
     res.json({
       success: true,
       data: dataWithPercentage,
-      pagination: { 
-        totalData: count, 
-        totalPages: Math.ceil(count / limit), 
-        currentPage: page 
+      pagination: {
+        totalData: count,
+        totalPages: Math.ceil(count / limit),
+        currentPage: page
       }
     });
 
   } catch (err) {
     console.error('[getLowAttendance Error]:', err);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       message: 'Gagal mengambil data kehadiran rendah',
-      error: err.message 
+      error: err.message
     });
   }
 };
