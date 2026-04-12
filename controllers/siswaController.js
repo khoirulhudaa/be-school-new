@@ -2464,7 +2464,15 @@ exports.getLowAttendance = async (req, res) => {
     const endDate = moment2().tz('Asia/Jakarta').endOf('month');
     const today = moment2().tz('Asia/Jakarta');
 
-    // Hitung hari kerja yang sudah lewat bulan ini (inklusif hari ini)
+    // Hitung total hari kerja bulan ini (penuh)
+    let totalWorkdaysInMonth = 0;
+    let dayCursor = startDate.clone();
+    while (dayCursor.isSameOrBefore(endDate, 'day')) {
+      if (dayCursor.day() !== 0 && dayCursor.day() !== 6) totalWorkdaysInMonth++;
+      dayCursor.add(1, 'day');
+    }
+
+    // Tetap hitung passedWorkdays untuk info di UI
     let passedWorkdays = 0;
     let cursor = startDate.clone();
     while (cursor.isSameOrBefore(today, 'day')) {
@@ -2488,7 +2496,7 @@ exports.getLowAttendance = async (req, res) => {
             AND status = 'Hadir'
             AND CONVERT_TZ(createdAt, '+00:00', '+07:00') BETWEEN '${sDateStr}' AND '${eDateStr}'
             AND DAYOFWEEK(CONVERT_TZ(createdAt, '+00:00', '+07:00')) NOT IN (1, 7)
-          ) * 100 / ${passedWorkdays} < ${parseInt(threshold)}`)
+          ) * 100 / ${totalWorkdaysInMonth} < ${parseInt(threshold)}`)
         ]
       },
       attributes: [
@@ -2516,8 +2524,9 @@ exports.getLowAttendance = async (req, res) => {
       return {
         ...s,
         hadirCount,
+        totalWorkdays: totalWorkdaysInMonth,
         passedWorkdays,
-        percentage: Math.round((hadirCount / passedWorkdays) * 100),
+        percentage: Math.round((hadirCount / totalWorkdaysInMonth) * 100),
         period: `Bulan ${today.format('MMMM YYYY')}`,
         rangeLabel: `${startDate.format('DD MMM')} - ${endDate.format('DD MMM YYYY')}`
       };
