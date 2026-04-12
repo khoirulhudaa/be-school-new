@@ -240,6 +240,13 @@ exports.getProfile = async (req, res) => {
       schoolData = user;
     }
 
+    const visionMission = userData.schoolId
+    ? await VisionMission.findOne({
+        where: { schoolId: userData.schoolId, isActive: true },
+        attributes: ['id', 'vision', 'missions', 'pillars', 'kpis'],
+      })
+    : null;
+
     // 3. Susun Response
     res.json({
       success: true,
@@ -256,7 +263,8 @@ exports.getProfile = async (req, res) => {
           address: schoolData.address,
           nameProvince: 'DKI Jakarta', // Bisa kamu tambahkan kolom province di model jika perlu
           file: schoolData.logoUrl // Logo konsisten dari tabel akunSekolah
-        } : null
+        } : null,
+        visionMission: visionMission || null, // ← tambahkan di sini
       }
     });
 
