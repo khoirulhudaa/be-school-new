@@ -9,6 +9,7 @@ const Siswa = require('../models/siswa');
 const GuruTendik = require('../models/guruTendik'); 
 const ExcelJS = require('exceljs');
 const SchoolProfile = require('../models/profileSekolah');
+const VisionMission = require('../models/visiMisi'); // pastikan import
 const InstagramPost = require('../models/feed');
 const KegiatanPramuka = require('../models/kegiatanPramuka');
 const News = require('../models/berita');
@@ -267,6 +268,55 @@ exports.getProfile = async (req, res) => {
 };
 
 // --- LOGIN ---
+// exports.login = async (req, res) => {
+//   try {
+//     const { email, password } = req.body;
+
+//     if (!email || !password) {
+//       return res.status(400).json({ success: false, message: 'Email dan password wajib diisi' });
+//     }
+
+//     const user = await SchoolAccount.findOne({ where: { email } });
+    
+//     // Gunakan method validPassword dari model
+//     if (!user || !(await user.validPassword(password))) {
+//       return res.status(401).json({ success: false, message: 'Email atau password salah' });
+//     }
+
+//     if (!user.isActive) {
+//       return res.status(403).json({ success: false, message: 'Akun dinonaktifkan' });
+//     }
+
+//     // Update lastLogin
+//     user.lastLogin = new Date();
+//     await user.save();
+
+//     const token = jwt.sign(
+//       { id: user.id, schoolId: user.id },
+//       process.env.JWT_SECRET,
+//       { expiresIn: '365d' }
+//     );
+
+//     res.json({
+//       success: true,
+//       message: 'Login berhasil',
+//       token,
+//       user: {
+//         id: user.id,
+//         username: user.adminName,
+//         email: user.email,
+//         schoolName: user.schoolName,
+//         logoUrl: user.logoUrl,
+//         lat: user.latitude,
+//         long: user.longitude,
+//         role: user.role
+//       },
+//     });
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -277,7 +327,6 @@ exports.login = async (req, res) => {
 
     const user = await SchoolAccount.findOne({ where: { email } });
     
-    // Gunakan method validPassword dari model
     if (!user || !(await user.validPassword(password))) {
       return res.status(401).json({ success: false, message: 'Email atau password salah' });
     }
@@ -286,9 +335,14 @@ exports.login = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Akun dinonaktifkan' });
     }
 
-    // Update lastLogin
     user.lastLogin = new Date();
     await user.save();
+
+    // Ambil visi misi aktif sekolah ini
+    const visionMission = await VisionMission.findOne({
+      where: { schoolId: user.id, isActive: true },
+      attributes: ['vision', 'missions'],
+    });
 
     const token = jwt.sign(
       { id: user.id, schoolId: user.id },
@@ -308,14 +362,14 @@ exports.login = async (req, res) => {
         logoUrl: user.logoUrl,
         lat: user.latitude,
         long: user.longitude,
-        role: user.role
+        role: user.role,
+        visionMission: visionMission || null, // null jika belum diisi
       },
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
 
 // --- FORGOT PASSWORD ---
 exports.forgotPassword = async (req, res) => {
