@@ -2448,71 +2448,6 @@ exports.getConsecutiveAbsent = async (req, res) => {
   }
 };
 
-// exports.getLowAttendance = async (req, res) => {
-//   try {
-//     const { schoolId, threshold = 80, month, year } = req.query;
-//     const page = Math.max(1, parseInt(req.query.page) || 1);
-//     const limit = Math.min(100, parseInt(req.query.limit) || 10);
-//     const offset = (page - 1) * limit;
-
-//     if (!schoolId) return res.status(400).json({ success: false, message: 'schoolId diperlukan' });
-
-//     const startDate = month && year ? moment(`${year}-${month}-01`).startOf('month') : moment().startOf('month');
-//     const endDate = moment().subtract(1, 'day').endOf('day');
-//     const totalWorkdays = getWorkdaysInRange(startDate, endDate).length;
-
-//     if (totalWorkdays === 0) return res.json({ success: true, count: 0, totalWorkdays: 0, data: [] });
-
-//     const { count, rows: students } = await Student.findAndCountAll({
-//       where: {
-//         schoolId: parseInt(schoolId),
-//         isActive: true,
-//         isGraduated: false,
-//         [Op.and]: [
-//           literal(`(
-//             SELECT COUNT(id) FROM kehadiran 
-//             WHERE studentId = Student.id 
-//             AND status = 'Hadir'
-//             AND createdAt BETWEEN '${startDate.format('YYYY-MM-DD HH:mm:ss')}' AND '${endDate.format('YYYY-MM-DD HH:mm:ss')}'
-//             AND DAYOFWEEK(createdAt) NOT IN (1, 7)
-//           ) * 100 / ${totalWorkdays} < ${parseInt(threshold)}`)
-//         ]
-//       },
-//       attributes: [
-//         'id', 'name', 'nis', 'class', 'photoUrl',
-//         [
-//           literal(`(
-//             SELECT COUNT(id) FROM kehadiran 
-//             WHERE studentId = Student.id 
-//             AND status = 'Hadir'
-//             AND createdAt BETWEEN '${startDate.format('YYYY-MM-DD HH:mm:ss')}' AND '${endDate.format('YYYY-MM-DD HH:mm:ss')}'
-//             AND DAYOFWEEK(createdAt) NOT IN (1, 7)
-//           )`), 
-//           'hadirCount'
-//         ]
-//       ],
-//       limit, offset,
-//       order: [[literal('hadirCount'), 'ASC']],
-//       subQuery: false, // Tambahkan ini untuk performa
-//       raw: true
-//     });
-
-//     res.json({
-//       success: true,
-//       data: students.map(s => ({
-//         ...s,
-//         hadirCount: parseInt(s.hadirCount),
-//         totalWorkdays,
-//         percentage: Math.round((parseInt(s.hadirCount) / totalWorkdays) * 100)
-//       })),
-//       pagination: { totalData: count, totalPages: Math.ceil(count / limit), currentPage: page }
-//     });
-//   } catch (err) {
-//     console.error('[getLowAttendance]', err);
-//     res.status(500).json({ success: false, message: 'Internal Server Error' });
-//   }
-// };
-
 exports.getLowAttendance = async (req, res) => {
   try {
     const { schoolId, threshold = 80 } = req.query;
@@ -2526,13 +2461,19 @@ exports.getLowAttendance = async (req, res) => {
 
     // --- LOGIKA MINGGU BERJALAN (FIXED 5 HARI KERJA) ---
     // startOf('isoWeek') akan selalu mengambil hari Senin di minggu ini
+    const today = moment();
     const startDate = moment().startOf('isoWeek'); 
-    
-    // Mengambil hari Jumat di minggu yang sama
     const endDate = moment().startOf('isoWeek').add(4, 'days').endOf('day');
-
+    
+    let passedWorkdays = 0;
+    let cursor = startDate.clone();
+    while (cursor.isSameOrBefore(today, 'day')) {
+      if (cursor.day() !== 0 && cursor.day() !== 6) passedWorkdays++;
+      cursor.add(1, 'day');
+    }
+    passedWorkdays = Math.max(1, passedWorkdays);
     // Karena sekolah Senin-Jumat, maka pembagi selalu 5
-    const totalWorkdays = 5;
+    const totalWorkdays = passedWorkdays;
 
     // Format tanggal untuk query SQL agar presisi
     const sDateStr = startDate.format('YYYY-MM-DD HH:mm:ss');
@@ -2581,7 +2522,8 @@ exports.getLowAttendance = async (req, res) => {
       return {
         ...s,
         hadirCount: hadirCount,
-        totalWorkdays: totalWorkdays,
+        totalWorkdays: 5,
+        passedWorkdays,
         percentage: Math.round((hadirCount / totalWorkdays) * 100),
         period: "Minggu Ini (Senin - Jumat)",
         rangeLabel: `${startDate.format('DD MMM')} - ${endDate.format('DD MMM YYYY')}`
