@@ -18,7 +18,6 @@ const PpidDocument = require('../models/ppid');
 const Announcement = require('../models/pengumuman');
 const Partner = require('../models/partner');
 const Ppdb = require('../models/ppdb');
-const VisionMission = require('../models/visiMisi');
 const SejarahSekolah = require('../models/sejarahSekolah');
 const Service = require('../models/layanan');
 const Parent = require('../models/orangTua');
