@@ -240,10 +240,12 @@ exports.getProfile = async (req, res) => {
       schoolData = user;
     }
 
-    const visionMission = userData.schoolId
+    const schoolId = schoolData?.id;
+
+    const visionMission = schoolId
     ? await VisionMission.findOne({
-        where: { schoolId: userData.schoolId, isActive: true },
-        attributes: ['id', 'vision', 'missions', 'pillars', 'kpis'],
+        where: { schoolId, isActive: true },
+        attributes: ['vision', 'missions'],
       })
     : null;
 
