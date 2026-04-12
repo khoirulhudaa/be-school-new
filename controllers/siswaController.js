@@ -2405,7 +2405,7 @@ exports.getConsecutiveAbsent = async (req, res) => {
     const offset = (page - 1) * limit;
 
     const checkDays = [];
-    let current = moment().startOf('day');
+    let current = moment2().tz('Asia/Jakarta').startOf('day');
     while (checkDays.length < parseInt(minDays)) {
       if (current.day() !== 0 && current.day() !== 6) {
         checkDays.push(current.format('YYYY-MM-DD'));
@@ -2426,7 +2426,7 @@ exports.getConsecutiveAbsent = async (req, res) => {
             SELECT 1 FROM kehadiran 
             WHERE studentId = Student.id 
             AND status = 'Hadir'
-            AND DATE(createdAt) IN (${formattedDates})
+            AND DATE(CONVERT_TZ(createdAt, '+00:00', '+07:00')) IN (${formattedDates})
           )`)
         ]
       },
@@ -2461,9 +2461,9 @@ exports.getLowAttendance = async (req, res) => {
 
     // --- LOGIKA MINGGU BERJALAN (FIXED 5 HARI KERJA) ---
     // startOf('isoWeek') akan selalu mengambil hari Senin di minggu ini
-    const today = moment();
-    const startDate = moment().startOf('isoWeek'); 
-    const endDate = moment().startOf('isoWeek').add(4, 'days').endOf('day');
+    const startDate = moment2().tz('Asia/Jakarta').startOf('isoWeek');
+    const endDate = moment2().tz('Asia/Jakarta').startOf('isoWeek').add(4, 'days').endOf('day');
+    const today = moment2().tz('Asia/Jakarta');
     
     let passedWorkdays = 0;
     let cursor = startDate.clone();
@@ -2490,8 +2490,8 @@ exports.getLowAttendance = async (req, res) => {
             SELECT COUNT(id) FROM kehadiran 
             WHERE studentId = Student.id 
             AND status = 'Hadir'
-            AND createdAt BETWEEN '${sDateStr}' AND '${eDateStr}'
-            AND DAYOFWEEK(createdAt) NOT IN (1, 7)
+            AND CONVERT_TZ(createdAt, '+00:00', '+07:00') BETWEEN '${sDateStr}' AND '${eDateStr}'
+            AND DAYOFWEEK(CONVERT_TZ(createdAt, '+00:00', '+07:00')) NOT IN (1, 7)
           ) * 100 / ${totalWorkdays} < ${parseInt(threshold)}`)
         ]
       },
@@ -2503,8 +2503,8 @@ exports.getLowAttendance = async (req, res) => {
             SELECT COUNT(id) FROM kehadiran 
             WHERE studentId = Student.id 
             AND status = 'Hadir'
-            AND createdAt BETWEEN '${sDateStr}' AND '${eDateStr}'
-            AND DAYOFWEEK(createdAt) NOT IN (1, 7)
+            AND CONVERT_TZ(createdAt, '+00:00', '+07:00') BETWEEN '${sDateStr}' AND '${eDateStr}'
+            AND DAYOFWEEK(CONVERT_TZ(createdAt, '+00:00', '+07:00')) NOT IN (1, 7)
           )`), 
           'hadirCount'
         ]
@@ -2558,8 +2558,8 @@ exports.getFrequentLate = async (req, res) => {
     const offset = (page - 1) * limit;
 
     const deadline = '07:00:00';
-    const endDate = moment().endOf('day');
-    const startDate = moment().subtract(parseInt(weeksBack), 'weeks').startOf('isoWeek');
+    const endDate = moment2().tz('Asia/Jakarta').endOf('day');
+    const startDate = moment2().tz('Asia/Jakarta').subtract(parseInt(weeksBack), 'weeks').startOf('isoWeek');
 
     if (!schoolId) {
       return res.status(400).json({ success: false, message: 'schoolId diperlukan' });
@@ -2574,13 +2574,15 @@ exports.getFrequentLate = async (req, res) => {
           // Gunakan EXISTS dengan nama tabel asli 'kehadiran'
           literal(`EXISTS (
             SELECT 1 FROM (
-              SELECT studentId, YEARWEEK(createdAt, 1) as weekKey
+              SELECT studentId, YEARWEEK(CONVERT_TZ(createdAt,'+00:00','+07:00'), 1) as weekKey
               FROM kehadiran
               WHERE status = 'Hadir'
               AND schoolId = ${parseInt(schoolId)}
-              AND TIME(createdAt) > '${deadline}'
-              AND createdAt BETWEEN '${startDate.format('YYYY-MM-DD HH:mm:ss')}' AND '${endDate.format('YYYY-MM-DD HH:mm:ss')}'
-              AND DAYOFWEEK(createdAt) NOT IN (1, 7)
+              AND TIME(CONVERT_TZ(createdAt,'+00:00','+07:00')) > '${deadline}'
+              AND CONVERT_TZ(createdAt,'+00:00','+07:00') 
+                  BETWEEN '${startDate.format('YYYY-MM-DD HH:mm:ss')}' 
+                  AND '${endDate.format('YYYY-MM-DD HH:mm:ss')}'
+              AND DAYOFWEEK(CONVERT_TZ(createdAt,'+00:00','+07:00')) NOT IN (1, 7)
               GROUP BY studentId, weekKey
               HAVING COUNT(id) >= ${parseInt(minPerWeek)}
             ) AS v_weeks
@@ -2596,8 +2598,10 @@ exports.getFrequentLate = async (req, res) => {
             SELECT COUNT(id) FROM kehadiran 
             WHERE studentId = Student.id 
             AND status = 'Hadir' 
-            AND TIME(createdAt) > '${deadline}'
-            AND createdAt BETWEEN '${startDate.format('YYYY-MM-DD HH:mm:ss')}' AND '${endDate.format('YYYY-MM-DD HH:mm:ss')}'
+            AND TIME(CONVERT_TZ(createdAt,'+00:00','+07:00')) > '${deadline}'
+            AND CONVERT_TZ(createdAt,'+00:00','+07:00') 
+            BETWEEN '${startDate.format('YYYY-MM-DD HH:mm:ss')}' 
+            AND '${endDate.format('YYYY-MM-DD HH:mm:ss')}'
           )`),
           'totalLate'
         ]
