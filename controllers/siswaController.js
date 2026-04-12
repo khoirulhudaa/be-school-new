@@ -2473,7 +2473,7 @@ exports.getLowAttendance = async (req, res) => {
     }
     passedWorkdays = Math.max(1, passedWorkdays);
     // Karena sekolah Senin-Jumat, maka pembagi selalu 5
-    const totalWorkdays = passedWorkdays;
+    const totalWorkdays = 5;
 
     // Format tanggal untuk query SQL agar presisi
     const sDateStr = startDate.format('YYYY-MM-DD HH:mm:ss');
@@ -2524,7 +2524,7 @@ exports.getLowAttendance = async (req, res) => {
         hadirCount: hadirCount,
         totalWorkdays: 5,
         passedWorkdays,
-        percentage: Math.round((hadirCount / totalWorkdays) * 100),
+        percentage: Math.round((hadirCount / 5) * 100),
         period: "Minggu Ini (Senin - Jumat)",
         rangeLabel: `${startDate.format('DD MMM')} - ${endDate.format('DD MMM YYYY')}`
       };
