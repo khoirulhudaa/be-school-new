@@ -2519,7 +2519,7 @@ exports.getLowAttendance = async (req, res) => {
         passedWorkdays,
         percentage: Math.round((hadirCount / passedWorkdays) * 100),
         period: `Bulan ${today.format('MMMM YYYY')}`,
-        rangeLabel: `${startDate.format('DD MMM')} - ${today.format('DD MMM YYYY')}`
+        rangeLabel: `${startDate.format('DD MMM')} - ${endDate.format('DD MMM YYYY')}`
       };
     });
 
