@@ -143,7 +143,21 @@ exports.createClass = async (req, res) => {
 exports.updateClass = async (req, res) => {
   try {
     const { id } = req.params;
-    await Class.update(req.body, { where: { id } });
+    const kelas = await Class.findByPk(id);
+
+    if (!kelas) {
+      return res.status(404).json({ success: false, message: "Kelas tidak ditemukan" });
+    }
+
+    // Update field secara spesifik untuk memastikan data masuk
+    await kelas.update({
+      className: req.body.className,
+      schoolId: req.body.schoolId,
+      waliKelas: req.body.waliKelas,
+      waliKelasPhone: req.body.waliKelasPhone,
+      waliKelasEmail: req.body.waliKelasEmail
+    });
+
     res.json({ success: true, message: "Kelas diperbarui" });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
