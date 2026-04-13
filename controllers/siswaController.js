@@ -936,13 +936,15 @@ exports.getAttendanceSummary = async (req, res) => {
     const formatStats = (stats) => {
       const summary = { Hadir: 0, Izin: 0, Sakit: 0, Alpha: 0 };
       let totalSudahAbsen = 0;
-      
+
       stats.forEach(item => {
-        const data = item.toJSON();
-        summary[data.status] = parseInt(data.total);
-        totalSudahAbsen += parseInt(data.total);
+        // raw: true → item sudah plain object, tidak perlu .toJSON()
+        if (summary.hasOwnProperty(item.status)) {
+          summary[item.status] = parseInt(item.total);
+        }
+        totalSudahAbsen += parseInt(item.total);
       });
-      
+
       return { summary, totalSudahAbsen };
     };
 
