@@ -42,13 +42,20 @@ exports.createSchoolProfile = async (req, res) => {
     const { 
       schoolId, heroTitle, heroSubTitle, linkYoutube, headmasterWelcome, headmasterName, schoolName,
       studentCount, teacherCount, roomCount, achievementCount, latitude, longitude,
-      address, phoneNumber, email  
+      address, phoneNumber, email, kepalaSekolahPhone, kepalaSekolahEmail  
     } = req.body;
 
     if (!schoolId || !heroTitle || !headmasterWelcome || !headmasterName || !schoolName) {
       return res.status(400).json({ 
         success: false, 
         message: 'schoolId, heroTitle, headmasterWelcome, headmasterName, dan schoolName wajib diisi' 
+      });
+    }
+
+    if (!kepalaSekolahPhone || !kepalaSekolahEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'No. WA dan Email Kepala Sekolah wajib diisi'
       });
     }
 
@@ -101,7 +108,9 @@ exports.createSchoolProfile = async (req, res) => {
       address: address || null,
       phoneNumber: phoneNumber || null,
       email: email || null,
-      logoUrl
+      logoUrl,
+      kepalaSekolahPhone: kepalaSekolahPhone || null, // ← tambah ini
+      kepalaSekolahEmail: kepalaSekolahEmail || null,
     });
 
     res.status(201).json({ success: true, data: newProfile });
@@ -124,7 +133,7 @@ exports.updateSchoolProfile = async (req, res) => {
     const { 
       heroTitle, heroSubTitle, linkYoutube, headmasterWelcome, headmasterName, schoolName,
       studentCount, teacherCount, roomCount, achievementCount, latitude, longitude,
-      address, phoneNumber, email
+      address, phoneNumber, email, kepalaSekolahPhone, kepalaSekolahEmail
     } = req.body;
 
     // Update fields yang dikirim
@@ -145,6 +154,10 @@ exports.updateSchoolProfile = async (req, res) => {
     if (address !== undefined) profile.address = address || null;
     if (phoneNumber !== undefined) profile.phoneNumber = phoneNumber || null;
     if (email !== undefined) profile.email = email || null;
+
+    if (kepalaSekolahPhone !== undefined) profile.kepalaSekolahPhone = kepalaSekolahPhone || null;
+    if (kepalaSekolahEmail !== undefined) profile.kepalaSekolahEmail = kepalaSekolahEmail || null;
+
 
     // Ganti foto kepala sekolah jika dikirim file baru
     if (req.files?.photoHeadmasterUrl?.[0]) {
