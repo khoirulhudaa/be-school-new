@@ -2581,30 +2581,31 @@ exports.shareRekapHarian = async (req, res) => {
     }
 
     const targetDate = date || moment().format('YYYY-MM-DD');
-
-    // 1. Ambil data rekap (reuse logic getClassRecapWithDetails)
     const moment2 = require('moment-timezone');
     const dateMoment = moment2.tz(targetDate, 'Asia/Jakarta');
     const startDate = dateMoment.clone().startOf('day').format('YYYY-MM-DD HH:mm:ss');
-    const endDate   = dateMoment.clone().endOf('day').format('YYYY-MM-DD HH:mm:ss');
-    const deadline  = "07:00:00";
+    const endDate = dateMoment.clone().endOf('day').format('YYYY-MM-DD HH:mm:ss');
+    const deadline = "07:00:00";
 
+    // Ambil semua siswa + attendance (reuse logic kamu)
     const allStudents = await Student.findAll({
       where: { schoolId: parseInt(schoolId), isActive: true, isGraduated: false },
       attributes: ['id', 'name', 'nis', 'class', 'photoUrl'],
       include: [{
         model: Attendance,
         as: 'studentAttendances',
-        where: { createdAt: { [Op.between]: [startDate, endDate] }, userRole: 'student' },
+        where: { 
+          createdAt: { [Op.between]: [startDate, endDate] },
+          userRole: 'student' 
+        },
         attributes: ['status', 'createdAt'],
         required: false,
         limit: 1,
         order: [['createdAt', 'ASC']]
       }],
-      raw: false
     });
 
-    // 2. Susun summary per kelas (sama seperti getClassRecapWithDetails)
+    // === Build recap data (sama seperti sebelumnya) ===
     let totalAllStudents = 0, totalAllHadir = 0, totalAllBelumHadir = 0;
     const acc = new Map();
 
@@ -2614,13 +2615,15 @@ exports.shareRekapHarian = async (req, res) => {
         acc.set(className, {
           className,
           totalStudents: 0,
-          walikelas: null,  // akan diisi dari tabel Kelas
+          walikelas: null,
           stats: { onTime: 0, late: 0, izin: 0, sakit: 0, alpha: 0, belumHadir: 0 },
         });
       }
       const classObj = acc.get(className);
       const attendance = student.studentAttendances?.[0];
+
       totalAllStudents++;
+      classObj.totalStudents++;
 
       if (attendance) {
         const scanTime = moment2(attendance.createdAt).tz('Asia/Jakarta').format("HH:mm:ss");
@@ -2635,23 +2638,21 @@ exports.shareRekapHarian = async (req, res) => {
         classObj.stats.belumHadir++;
         totalAllBelumHadir++;
       }
-      classObj.totalStudents++;
     }
 
-    // 3. Ambil data wali kelas & kepsek dari tabel Kelas/SchoolProfile
+    // Ambil walikelas & kepsek
     const Class = require('../models/kelas');
     const SchoolProfile = require('../models/profileSekolah');
 
     const classes = await Class.findAll({ where: { schoolId: parseInt(schoolId) } });
-    const school  = await SchoolProfile.findOne({ where: { schoolId: parseInt(schoolId) } });
+    const school = await SchoolProfile.findOne({ where: { schoolId: parseInt(schoolId) } });
 
-    // Map walikelas phone/email ke masing-masing kelas
     classes.forEach(cls => {
       if (acc.has(cls.className)) {
         acc.get(cls.className).walikelas = {
           phone: cls.waliKelasPhone || null,
           email: cls.waliKelasEmail || null,
-          name:  cls.waliKelas     || null,
+          name: cls.waliKelas || null,
         };
       }
     });
@@ -2661,29 +2662,28 @@ exports.shareRekapHarian = async (req, res) => {
       data: Array.from(acc.values())
     };
 
-    const rekapText = generateRekapText(rekapData, targetDate);
+    const rekapText = generateRekapText(rekapData, targetDate); // fungsi kamu
 
     const results = { wa: [], email: [], errors: [] };
 
-    // 4. Kirim via WhatsApp (Fonnte / WA Business API)
-    // Ganti FONNTE_API_KEY dengan env var Anda
+    // ====================== WHATSAPP (Fonnte) ======================
     if ((via === 'wa' || via === 'all') && process.env.FONNTE_API_KEY) {
-      const recipients = [];
+      const waRecipients = [];
 
-      // Tambah kepsek
+      // Kepsek
       if (school?.kepalaSekolahPhone) {
-        recipients.push({
+        waRecipients.push({
           target: school.kepalaSekolahPhone,
           message: `🏫 *LAPORAN KEPSEK*\n${rekapText}`,
           label: 'Kepala Sekolah'
         });
       }
 
-      // Tambah setiap wali kelas
+      // Walikelas
       for (const cls of acc.values()) {
         if (cls.walikelas?.phone) {
           const classText = generateClassSpecificText(cls, targetDate);
-          recipients.push({
+          waRecipients.push({
             target: cls.walikelas.phone,
             message: classText,
             label: `Walikelas ${cls.className}`
@@ -2691,9 +2691,13 @@ exports.shareRekapHarian = async (req, res) => {
         }
       }
 
-      // Kirim semua (Fonnte support bulk)
-      for (const r of recipients) {
-        try {
+      // Bulk send dengan Fonnte (lebih efisien)
+      try {
+        const targets = waRecipients.map(r => r.target).join('|');
+        const messages = waRecipients.map(r => r.message); // jika pesan berbeda, Fonnte punya cara lain (delay atau loop)
+
+        // Kalau pesan berbeda per orang → tetap pakai loop sequential + delay kecil
+        for (const r of waRecipients) {
           await axios.post('https://api.fonnte.com/send', {
             target: r.target,
             message: r.message,
@@ -2702,13 +2706,17 @@ exports.shareRekapHarian = async (req, res) => {
             headers: { Authorization: process.env.FONNTE_API_KEY }
           });
           results.wa.push({ to: r.label, status: 'sent' });
-        } catch (err) {
-          results.errors.push({ to: r.label, via: 'wa', error: err.message });
+          
+          // Hindari rate limit (rekomendasi: 1-2 detik delay jika > 20 pesan)
+          await new Promise(resolve => setTimeout(resolve, 800));
         }
+      } catch (err) {
+        results.errors.push({ via: 'wa', error: err.message });
+        console.error('Fonnte error:', err.response?.data || err.message);
       }
     }
 
-    // 5. Kirim via Email (Nodemailer)
+    // ====================== EMAIL ======================
     if ((via === 'email' || via === 'all') && process.env.SMTP_USER) {
       const transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -2737,7 +2745,9 @@ exports.shareRekapHarian = async (req, res) => {
             to: cls.walikelas.email,
             subject: `📚 Rekap Kelas ${cls.className} — ${targetDate}`,
             label: `Walikelas ${cls.className}`,
-            body: generateClassSpecificText(cls, targetDate).replace(/\*/g, '').replace(/━/g, '—')
+            body: generateClassSpecificText(cls, targetDate)
+              .replace(/\*/g, '')
+              .replace(/━/g, '—')
           });
         }
       }
@@ -2761,11 +2771,14 @@ exports.shareRekapHarian = async (req, res) => {
       success: true,
       message: `Rekap dikirim: ${results.wa.length} WA, ${results.email.length} email`,
       results,
-      rekapText // preview text untuk frontend
+      rekapText // untuk preview di frontend
     });
 
   } catch (err) {
     console.error('[shareRekapHarian] Error:', err);
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Terjadi kesalahan internal saat mengirim rekap' 
+    });
   }
 };
