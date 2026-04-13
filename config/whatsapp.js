@@ -108,8 +108,26 @@ const initWhatsApp = () => {
   return client;
 };
 
+const waitUntilReady = (timeoutMs = 30000) => {
+  return new Promise((resolve, reject) => {
+    if (isReady) return resolve(true);
+    
+    const timer = setTimeout(() => {
+      reject(new Error('WA timeout'));
+    }, timeoutMs);
+
+    const interval = setInterval(() => {
+      if (isReady) {
+        clearTimeout(timer);
+        clearInterval(interval);
+        resolve(true);
+      }
+    }, 500);
+  });
+};
+
 const getClient = () => client;
 const getIsReady = () => isReady;
 const getQRCode = () => qrCodeData;
 
-module.exports = { initWhatsApp, getClient, getIsReady, getQRCode };
+module.exports = { initWhatsApp, getClient, getIsReady, getQRCode, waitUntilReady };

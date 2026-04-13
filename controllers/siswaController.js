@@ -16,7 +16,7 @@ const SchoolProfile = require('../models/profileSekolah');
 const KehadiranGuru = require('../models/kehadiranGuru');
 const nodemailer = require('nodemailer'); // npm i nodemailer
 const axios = require('axios');
-const { getClient, getIsReady } = require('../config/whatsapp');
+const { getClient, getIsReady, waitUntilReady } = require('../config/whatsapp');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -2586,11 +2586,17 @@ exports.shareRekapHarian = async (req, res) => {
     }
 
     // Cek status WA jika via wa
-    if ((via === 'wa' || via === 'all') && !getIsReady()) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'WhatsApp belum terhubung. Silakan scan QR di halaman pengaturan WA.' 
-      });
+    if (via === 'wa' || via === 'all') {
+      if (!getIsReady()) {
+        try {
+          await waitUntilReady(30000);
+        } catch {
+          return res.status(400).json({ 
+            success: false, 
+            message: 'WhatsApp belum terhubung. Silakan scan QR di halaman pengaturan WA.' 
+          });
+        }
+      }
     }
 
     const targetDate = date || moment().format('YYYY-MM-DD');

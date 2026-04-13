@@ -30,7 +30,6 @@ const { initWhatsApp } = require('./config/whatsapp');
 
 const app = express();
 const port = process.env.PORT || 5005;
-initWhatsApp();
 
 // --- 2. BUAT HTTP SERVER ---
 const server = http.createServer(app);
@@ -185,7 +184,11 @@ sequelize.authenticate()
   })
   .then(() => {
     server.listen(port, '0.0.0.0', () => {
+      
       console.log(`Server with Socket.io running on port ${port}`);
+      initWhatsApp();
+      console.log('WhatsApp initialization started...');
+
     });
   })
   .catch(err => {
