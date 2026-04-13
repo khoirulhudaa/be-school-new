@@ -2673,28 +2673,59 @@ exports.shareRekapHarian = async (req, res) => {
 
     // Map walikelas ke data rekap
     // Normalisasi className agar trimmed sebelum compare
+    // classes.forEach(cls => {
+    //   const normalizedClassName = cls.className?.trim();
+    //   if (acc.has(normalizedClassName)) {
+    //     acc.get(normalizedClassName).walikelas = {
+    //       phone: normalizePhone(cls.waliKelasPhone),
+    //       email: cls.waliKelasEmail || null,
+    //       name:  cls.waliKelas      || null,
+    //     };
+    //   } else {
+    //     // Coba case-insensitive match sebagai fallback
+    //     for (const [key] of acc) {
+    //       if (key.trim().toLowerCase() === normalizedClassName?.toLowerCase()) {
+    //         acc.get(key).walikelas = {
+    //           phone: normalizePhone(cls.waliKelasPhone),
+    //           email: cls.waliKelasEmail || null,
+    //           name:  cls.waliKelas      || null,
+    //         };
+    //         console.log(`[shareRekap] Matched class via case-insensitive: "${key}" ↔ "${normalizedClassName}"`);
+    //         break;
+    //       }
+    //     }
+    //   }
+    // });
+
     classes.forEach(cls => {
       const normalizedClassName = cls.className?.trim();
-      if (acc.has(normalizedClassName)) {
-        acc.get(normalizedClassName).walikelas = {
-          phone: normalizePhone(cls.waliKelasPhone),
-          email: cls.waliKelasEmail || null,
-          name:  cls.waliKelas      || null,
-        };
-      } else {
-        // Coba case-insensitive match sebagai fallback
-        for (const [key] of acc) {
-          if (key.trim().toLowerCase() === normalizedClassName?.toLowerCase()) {
-            acc.get(key).walikelas = {
-              phone: normalizePhone(cls.waliKelasPhone),
-              email: cls.waliKelasEmail || null,
-              name:  cls.waliKelas      || null,
-            };
-            console.log(`[shareRekap] Matched class via case-insensitive: "${key}" ↔ "${normalizedClassName}"`);
-            break;
-          }
+      
+      // Cari key di acc (case-insensitive)
+      let matchedKey = null;
+      for (const [key] of acc) {
+        if (key.trim().toLowerCase() === normalizedClassName?.toLowerCase()) {
+          matchedKey = key;
+          break;
         }
       }
+
+      // Kalau kelas tidak ada di acc (tidak ada siswa), buat entry kosong
+      if (!matchedKey) {
+        acc.set(normalizedClassName, {
+          className: normalizedClassName,
+          totalStudents: 0,
+          stats: { onTime: 0, late: 0, izin: 0, sakit: 0, alpha: 0, belumHadir: 0 },
+        });
+        matchedKey = normalizedClassName;
+        console.log(`[shareRekap] Kelas "${normalizedClassName}" tidak ada siswanya, entry kosong dibuat`);
+      }
+
+      // Set walikelas
+      acc.get(matchedKey).walikelas = {
+        phone: normalizePhone(cls.waliKelasPhone),
+        email: cls.waliKelasEmail || null,
+        name:  cls.waliKelas      || null,
+      };
     });
 
     // Log hasil mapping walikelas
