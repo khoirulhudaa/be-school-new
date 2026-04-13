@@ -28,9 +28,9 @@ Student.belongsTo(Parent, { foreignKey: 'parentId', as: 'parent' });
 const apiRoutes = require('./routes');  // → routes/index.js
 const { initWhatsApp } = require('./config/whatsapp');
 
-
 const app = express();
 const port = process.env.PORT || 5005;
+initWhatsApp();
 
 // --- 2. BUAT HTTP SERVER ---
 const server = http.createServer(app);
@@ -185,7 +185,6 @@ sequelize.authenticate()
   })
   .then(() => {
     server.listen(port, '0.0.0.0', () => {
-      initWhatsApp();
       console.log(`Server with Socket.io running on port ${port}`);
     });
   })
