@@ -14,8 +14,8 @@ const Parent = require('../models/orangTua');
 const bcrypt = require('bcrypt');
 const SchoolProfile = require('../models/profileSekolah');
 const KehadiranGuru = require('../models/kehadiranGuru');
-const nodemailer = require('nodemailer'); // npm i nodemailer
-const axios = require('axios');
+// const nodemailer = require('nodemailer'); // npm i nodemailer
+// const axios = require('axios');
 const { 
   getIsReady, 
   getClient, 
@@ -32,24 +32,24 @@ cloudinary.config({
 });
 
 // === REDIS + INVALIDATE CACHE ===
-const redisClient = require('../config/redis');
-const { getWorkdaysInRange } = require('../helper/getWorkDays');
+// const redisClient = require('../config/redis');
+// const { getWorkdaysInRange } = require('../helper/getWorkDays');
 const { generateRekapText } = require('../helper/generateRecapText');
 const { generateClassSpecificText } = require('../helper/generateClassSpecificText');
 
-const invalidateStudentCache = async (schoolId) => {
-  if (!schoolId) return;
-  try {
-    const pattern = `cache:/siswa*schoolId=${schoolId}*`;
-    const keys = await redisClient.keys(pattern);
-    if (keys.length > 0) {
-      await redisClient.del(...keys); // Spread karena ioredis
-      console.log(`✅ Cache invalidated: ${keys.length} keys for schoolId ${schoolId}`);
-    }
-  } catch (err) {
-    console.error('❌ Invalidate cache error:', err.message);
-  }
-};
+// const invalidateStudentCache = async (schoolId) => {
+//   if (!schoolId) return;
+//   try {
+//     const pattern = `cache:/siswa*schoolId=${schoolId}*`;
+//     const keys = await redisClient.keys(pattern);
+//     if (keys.length > 0) {
+//       await redisClient.del(...keys); // Spread karena ioredis
+//       console.log(`✅ Cache invalidated: ${keys.length} keys for schoolId ${schoolId}`);
+//     }
+//   } catch (err) {
+//     console.error('❌ Invalidate cache error:', err.message);
+//   }
+// };
 
 // Helper: Optimasi Gambar Jangka Panjang
 const processPhotoUpload = (buffer, schoolId, nis) => {
@@ -276,7 +276,7 @@ exports.updateStudent = async (req, res) => {
     responseData.role = 'siswa';
     delete responseData.password;
 
-    await invalidateStudentCache(student.schoolId);
+    // await invalidateStudentCache(student.schoolId);
 
     res.json({ success: true, message: 'Data siswa diperbarui', data: responseData });
 
@@ -357,7 +357,7 @@ exports.createStudent = async (req, res) => {
       qrCodeData: `QR-${nis}-${Date.now()}`
     });
 
-    await invalidateStudentCache(parseInt(req.body.schoolId));   // ← TAMBAHAN
+    // await invalidateStudentCache(parseInt(req.body.schoolId));   // ← TAMBAHAN
     res.json({ success: true, data: newStudent });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -626,7 +626,7 @@ exports.bulkCreateStudents = async (req, res) => {
       }
     }
 
-    await invalidateStudentCache(sId);
+    // await invalidateStudentCache(sId);
 
     return res.json({
       success: true,
@@ -1317,7 +1317,7 @@ exports.scanQRCode = async (req, res) => {
 
     await t.commit();
 
-    await invalidateStudentCache(updateFields.schoolId);
+    // await invalidateStudentCache(updateFields.schoolId);
 
      res.json({ 
       success: true, 
@@ -1351,7 +1351,7 @@ exports.deleteStudent = async (req, res) => {
     student.isActive = false;
     await student.save();
 
-    await invalidateStudentCache(student.schoolId);
+    // await invalidateStudentCache(student.schoolId);
     res.json({ success: true, message: 'Siswa berhasil dinonaktifkan' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -1371,7 +1371,7 @@ exports.deleteStudentsByBatch = async (req, res) => {
       where: { schoolId: parseInt(schoolId), batch }
     });
 
-    await invalidateStudentCache(parseInt(schoolId));
+    // await invalidateStudentCache(parseInt(schoolId));
     res.json({ success: true, message: `${count} siswa angkatan ${batch} berhasil dihapus permanen` });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -1391,7 +1391,7 @@ exports.deleteAllStudents = async (req, res) => {
       where: { schoolId: parseInt(schoolId) }
     });
 
-    await invalidateStudentCache(parseInt(schoolId));
+    // await invalidateStudentCache(parseInt(schoolId));
     res.json({ success: true, message: `${count} siswa berhasil dihapus permanen` });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -1764,7 +1764,7 @@ exports.markAbsence = async (req, res) => {
     });
 
     const records = await Promise.all(operations);
-    await invalidateStudentCache(schoolId);
+    // await invalidateStudentCache(schoolId);
 
     res.json({
       success: true,
@@ -1982,7 +1982,7 @@ exports.processGraduation = async (req, res) => {
     // SELESAIKAN TRANSAKSI
     await t.commit();
 
-    await invalidateStudentCache(parseInt(req.body.schoolId));
+    // await invalidateStudentCache(parseInt(req.body.schoolId));
 
     res.json({ 
       success: true, 
@@ -2331,7 +2331,7 @@ exports.updateClassByBatch = async (req, res) => {
       { where: whereCondition }
     );
 
-    await invalidateStudentCache(parseInt(schoolId));
+    // await invalidateStudentCache(parseInt(schoolId));
 
     res.json({ 
       success: true, 
