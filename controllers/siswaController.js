@@ -2101,22 +2101,139 @@ exports.getParentChildren = async (req, res) => {
   }
 };
 
+// exports.getClassRecapWithDetails = async (req, res) => {
+//   try {
+//     const { schoolId, date } = req.query;
+
+//      // pastikan sudah di-install
+//     const targetDate = date 
+//       ? moment2.tz(date, 'Asia/Jakarta') 
+//       : moment2().tz('Asia/Jakarta');
+
+//     // Rentang tanggal dalam WIB (format string yang aman untuk MySQL)
+//     const startDate = targetDate.clone().startOf('day').format('YYYY-MM-DD HH:mm:ss');
+//     const endDate   = targetDate.clone().endOf('day').format('YYYY-MM-DD HH:mm:ss');
+
+//     const deadline = "07:00:00";
+
+//     // Query utama
+//     const allStudents = await Student.findAll({
+//       where: { 
+//         schoolId: parseInt(schoolId), 
+//         isActive: true, 
+//         isGraduated: false 
+//       },
+//       attributes: ['id', 'name', 'nis', 'class', 'photoUrl'],
+//       include: [{
+//         model: Attendance,
+//         as: 'studentAttendances',
+//         where: {
+//           createdAt: { [Op.between]: [startDate, endDate] },
+//           userRole: 'student'
+//         },
+//         attributes: ['status', 'createdAt'],
+//         required: false,
+//         limit: 1,                     // Hanya ambil 1 record
+//         order: [['createdAt', 'ASC']] // Paling awal (scan pertama hari itu)
+//       }],
+//       raw: false,
+//     });
+
+//     let totalAllStudents = 0;
+//     let totalAllHadir = 0;
+//     let totalAllBelumHadir = 0;
+
+//     const acc = new Map();
+
+//     for (const student of allStudents) {
+//       const className = student.class || "Tanpa Kelas";
+
+//       if (!acc.has(className)) {
+//         acc.set(className, {
+//           className,
+//           totalStudents: 0,
+//           stats: { onTime: 0, late: 0, izin: 0, sakit: 0, alpha: 0, belumHadir: 0 },
+//           students: []
+//         });
+//       }
+
+//       const classObj = acc.get(className);
+//       const attendance = student.studentAttendances?.[0];
+
+//       let statusInfo = "Belum Hadir";
+//       let isLate = false;
+//       let scanTime = null;
+
+//       totalAllStudents++;
+
+//       if (attendance) {
+//         scanTime = moment2(attendance.createdAt).tz('Asia/Jakarta').format("HH:mm:ss");
+
+//         if (attendance.status === 'Hadir') {
+//           totalAllHadir++;
+
+//           if (scanTime <= deadline) {
+//             classObj.stats.onTime++;
+//             statusInfo = "Tepat Waktu";
+//           } else {
+//             classObj.stats.late++;
+//             statusInfo = "Telat";
+//             isLate = true;
+//           }
+//         } else {
+//           const statusKey = attendance.status.toLowerCase();
+//           if (classObj.stats[statusKey] !== undefined) {
+//             classObj.stats[statusKey]++;
+//           }
+//           statusInfo = attendance.status;
+//         }
+//       } else {
+//         classObj.stats.belumHadir++;
+//         totalAllBelumHadir++;
+//       }
+
+//       classObj.totalStudents++;
+//       classObj.students.push({
+//         id: student.id,
+//         name: student.name,
+//         nis: student.nis,
+//         status: statusInfo,
+//         scanTime,
+//         isLate,
+//         photoUrl: student.photoUrl
+//       });
+//     }
+
+//     res.json({
+//       success: true,
+//       summary: { 
+//         totalAllStudents, 
+//         totalAllHadir, 
+//         totalAllBelumHadir,
+//         date: targetDate.format('YYYY-MM-DD')
+//       },
+//       data: Array.from(acc.values()).sort((a, b) => a.className.localeCompare(b.className))
+//     });
+
+//   } catch (err) {
+//     console.error('[getClassRecapWithDetails] Error:', err);
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// };
+
 exports.getClassRecapWithDetails = async (req, res) => {
   try {
     const { schoolId, date } = req.query;
 
-     // pastikan sudah di-install
     const targetDate = date 
-      ? moment2.tz(date, 'Asia/Jakarta') 
-      : moment2().tz('Asia/Jakarta');
+      ? moment.tz(date, 'Asia/Jakarta') 
+      : moment.tz('Asia/Jakarta');
 
-    // Rentang tanggal dalam WIB (format string yang aman untuk MySQL)
-    const startDate = targetDate.clone().startOf('day').format('YYYY-MM-DD HH:mm:ss');
-    const endDate   = targetDate.clone().endOf('day').format('YYYY-MM-DD HH:mm:ss');
+    const startDate = targetDate.clone().startOf('day').toDate();
+    const endDate   = targetDate.clone().endOf('day').toDate();
 
     const deadline = "07:00:00";
 
-    // Query utama
     const allStudents = await Student.findAll({
       where: { 
         schoolId: parseInt(schoolId), 
@@ -2133,14 +2250,17 @@ exports.getClassRecapWithDetails = async (req, res) => {
         },
         attributes: ['status', 'createdAt'],
         required: false,
-        limit: 1,                     // Hanya ambil 1 record
-        order: [['createdAt', 'ASC']] // Paling awal (scan pertama hari itu)
+        limit: 1,
+        order: [['createdAt', 'ASC']]
       }],
-      raw: false,
     });
 
+    // --- RINGKASAN GLOBAL (DIPISAH) ---
     let totalAllStudents = 0;
     let totalAllHadir = 0;
+    let totalAllIzin = 0;
+    let totalAllSakit = 0;
+    let totalAllAlpha = 0;
     let totalAllBelumHadir = 0;
 
     const acc = new Map();
@@ -2152,7 +2272,14 @@ exports.getClassRecapWithDetails = async (req, res) => {
         acc.set(className, {
           className,
           totalStudents: 0,
-          stats: { onTime: 0, late: 0, izin: 0, sakit: 0, alpha: 0, belumHadir: 0 },
+          stats: { 
+            onTime: 0, 
+            late: 0, 
+            izin: 0, 
+            sakit: 0, 
+            alpha: 0, 
+            belumHadir: 0 
+          },
           students: []
         });
       }
@@ -2165,34 +2292,41 @@ exports.getClassRecapWithDetails = async (req, res) => {
       let scanTime = null;
 
       totalAllStudents++;
+      classObj.totalStudents++;
 
       if (attendance) {
-        scanTime = moment2(attendance.createdAt).tz('Asia/Jakarta').format("HH:mm:ss");
+        scanTime = moment.tz(attendance.createdAt, 'Asia/Jakarta').format("HH:mm:ss");
+        const normalizedStatus = (attendance.status || '').toLowerCase().trim();
 
-        if (attendance.status === 'Hadir') {
+        if (normalizedStatus === 'hadir') {
           totalAllHadir++;
-
           if (scanTime <= deadline) {
             classObj.stats.onTime++;
-            statusInfo = "Tepat Waktu";
+            statusInfo = "Hadir";
           } else {
             classObj.stats.late++;
-            statusInfo = "Telat";
+            statusInfo = "Hadir";
             isLate = true;
           }
-        } else {
-          const statusKey = attendance.status.toLowerCase();
-          if (classObj.stats[statusKey] !== undefined) {
-            classObj.stats[statusKey]++;
-          }
-          statusInfo = attendance.status;
+        } else if (normalizedStatus === 'izin') {
+          totalAllIzin++;
+          classObj.stats.izin++;
+          statusInfo = "Izin";
+        } else if (normalizedStatus === 'sakit') {
+          totalAllSakit++;
+          classObj.stats.sakit++;
+          statusInfo = "Sakit";
+        } else if (normalizedStatus === 'alpha') {
+          totalAllAlpha++;
+          classObj.stats.alpha++;
+          statusInfo = "Alpha";
         }
       } else {
-        classObj.stats.belumHadir++;
         totalAllBelumHadir++;
+        classObj.stats.belumHadir++;
+        statusInfo = "Belum Hadir";
       }
 
-      classObj.totalStudents++;
       classObj.students.push({
         id: student.id,
         name: student.name,
@@ -2204,20 +2338,27 @@ exports.getClassRecapWithDetails = async (req, res) => {
       });
     }
 
+    const sortedData = Array.from(acc.values()).sort((a, b) => 
+      a.className.localeCompare(b.className, undefined, { numeric: true })
+    );
+
     res.json({
       success: true,
       summary: { 
         totalAllStudents, 
         totalAllHadir, 
+        totalAllIzin,    // Terpisah
+        totalAllSakit,   // Terpisah
+        totalAllAlpha,   // Terpisah
         totalAllBelumHadir,
         date: targetDate.format('YYYY-MM-DD')
       },
-      data: Array.from(acc.values()).sort((a, b) => a.className.localeCompare(b.className))
+      data: sortedData
     });
 
   } catch (err) {
     console.error('[getClassRecapWithDetails] Error:', err);
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };
 
