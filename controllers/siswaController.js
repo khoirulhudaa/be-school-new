@@ -1711,132 +1711,64 @@ exports.exportAttendanceExcel = async (req, res) => {
   }
 };
 
-// exports.markAbsence = async (req, res) => {
-//   try {
-//     let data = req.body;
-//     if (!Array.isArray(data)) data = [data];
-
-//     if (data.length === 0) {
-//       return res.status(400).json({ success: false, message: "Data kosong." });
-//     }
-
-//     const startOfDay = moment().startOf('day').toDate();
-//     const endOfDay = moment().endOf('day').toDate();
-
-//     const operations = data.map(async (item) => {
-//       // Ambil guruId, studentId, dan userRole dari body
-//       const { studentId, guruId, schoolId, status, currentClass, userRole } = item;
-
-//       // 1. Tentukan kondisi pencarian (Cari berdasarkan ID yang ada)
-//       let searchCondition = {
-//         schoolId,
-//         createdAt: { [Op.between]: [startOfDay, endOfDay] }
-//       };
-
-//       if (userRole === 'teacher' || guruId) {
-//         searchCondition.guruId = guruId;
-//         searchCondition.userRole = 'teacher';
-//       } else {
-//         searchCondition.studentId = studentId;
-//         searchCondition.userRole = 'student';
-//       }
-
-//       // 2. Cari data existing
-//       const existing = await Attendance.findOne({ where: searchCondition });
-
-//       if (existing) {
-//         // Update data jika sudah ada
-//         return existing.update({ 
-//           status, 
-//           currentClass: userRole === 'student' ? currentClass : null // Guru biasanya tidak punya currentClass
-//         });
-//       } else {
-//         // Buat data baru jika belum ada
-//         return Attendance.create({
-//           studentId: userRole === 'student' ? studentId : null,
-//           guruId: (userRole === 'teacher' || guruId) ? guruId : null,
-//           schoolId,
-//           status,
-//           userRole: userRole || (guruId ? 'teacher' : 'student'),
-//           currentClass: userRole === 'student' ? currentClass : null
-//         });
-//       }
-//     });
-
-//     const records = await Promise.all(operations);
-//     // await invalidateStudentCache(schoolId);
-
-//     res.json({
-//       success: true,
-//       message: `Berhasil memproses ${records.length} data absensi (Guru/Siswa).`,
-//       data: records
-//     });
-//   } catch (err) {
-//     console.error("Error markAbsence:", err);
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
-
 exports.markAbsence = async (req, res) => {
   try {
     let data = req.body;
-    // Jika yang dikirim bukan array (satuan), bungkus jadi array
     if (!Array.isArray(data)) data = [data];
 
     if (data.length === 0) {
       return res.status(400).json({ success: false, message: "Data kosong." });
     }
 
-    // Gunakan timezone Jakarta agar konsisten dengan Recap
-    const startOfDay = moment().tz('Asia/Jakarta').startOf('day').toDate();
-    const endOfDay   = moment().tz('Asia/Jakarta').endOf('day').toDate();
+    const startOfDay = moment().startOf('day').toDate();
+    const endOfDay = moment().endOf('day').toDate();
 
     const operations = data.map(async (item) => {
+      // Ambil guruId, studentId, dan userRole dari body
       const { studentId, guruId, schoolId, status, currentClass, userRole } = item;
 
-      // Logic penentuan Role & ID
-      const isTeacher = userRole === 'teacher' || !!guruId;
-      const targetId = isTeacher ? guruId : studentId;
-      const finalRole = isTeacher ? 'teacher' : 'student';
-
-      // 1. Kondisi pencarian yang lebih ketat
+      // 1. Tentukan kondisi pencarian (Cari berdasarkan ID yang ada)
       let searchCondition = {
-        schoolId: parseInt(schoolId),
-        userRole: finalRole,
+        schoolId,
         createdAt: { [Op.between]: [startOfDay, endOfDay] }
       };
 
-      if (isTeacher) {
-        searchCondition.guruId = targetId;
+      if (userRole === 'teacher' || guruId) {
+        searchCondition.guruId = guruId;
+        searchCondition.userRole = 'teacher';
       } else {
-        searchCondition.studentId = targetId;
+        searchCondition.studentId = studentId;
+        searchCondition.userRole = 'student';
       }
 
-      // 2. Find or Create/Update
+      // 2. Cari data existing
       const existing = await Attendance.findOne({ where: searchCondition });
 
       if (existing) {
+        // Update data jika sudah ada
         return existing.update({ 
           status, 
-          currentClass: finalRole === 'student' ? currentClass : null 
+          currentClass: userRole === 'student' ? currentClass : null // Guru biasanya tidak punya currentClass
         });
       } else {
+        // Buat data baru jika belum ada
         return Attendance.create({
-          studentId: finalRole === 'student' ? targetId : null,
-          guruId: finalRole === 'teacher' ? targetId : null,
-          schoolId: parseInt(schoolId),
+          studentId: userRole === 'student' ? studentId : null,
+          guruId: (userRole === 'teacher' || guruId) ? guruId : null,
+          schoolId,
           status,
-          userRole: finalRole,
-          currentClass: finalRole === 'student' ? currentClass : null
+          userRole: userRole || (guruId ? 'teacher' : 'student'),
+          currentClass: userRole === 'student' ? currentClass : null
         });
       }
     });
 
     const records = await Promise.all(operations);
+    // await invalidateStudentCache(schoolId);
 
     res.json({
       success: true,
-      message: `Berhasil memproses ${records.length} data absensi.`,
+      message: `Berhasil memproses ${records.length} data absensi (Guru/Siswa).`,
       data: records
     });
   } catch (err) {
