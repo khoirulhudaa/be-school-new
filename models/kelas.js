@@ -14,6 +14,20 @@ const Class = sequelize.define('Class', {
   className: {
     type: DataTypes.STRING,
     allowNull: false
+  },
+   waliKelas: {
+    type: DataTypes.STRING(100),
+    allowNull: true
+  },
+  waliKelasPhone: {
+    type: DataTypes.STRING(20),
+    allowNull: true,
+    comment: 'Format: 628xxxxxxxxxx (tanpa + atau 0)'
+  },
+  waliKelasEmail: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    validate: { isEmail: true }
   }
 }, {
   tableName: 'kelas', // Nama tabel di database

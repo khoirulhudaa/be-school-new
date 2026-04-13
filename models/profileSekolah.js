@@ -72,6 +72,16 @@ const SchoolProfile = sequelize.define('SchoolProfile', {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
   },
+  kepalaSekolahPhone: {
+    type: DataTypes.STRING(20),
+    allowNull: true,
+    comment: 'Format: 628xxxxxxxxxx (tanpa + atau 0)'
+  },
+  kepalaSekolahEmail: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    validate: { isEmail: true }
+  },
 }, {
   timestamps: true,
   createdAt: 'createdAt',
