@@ -2577,6 +2577,10 @@ exports.shareRekapHarian = async (req, res) => {
   try {
     const { schoolId, date, via = 'wa' } = req.query;
 
+    console.log('[WA Debug] via:', via);
+    console.log('[WA Debug] isReady:', getIsReady());
+    console.log('[WA Debug] client:', getClient() ? 'ADA' : 'NULL');
+
     if (!schoolId) {
       return res.status(400).json({ success: false, message: 'schoolId diperlukan' });
     }
@@ -2665,6 +2669,8 @@ exports.shareRekapHarian = async (req, res) => {
     console.log(`[shareRekap] school.kepalaSekolahPhone (raw): ${school?.kepalaSekolahPhone}`);
     console.log(`[shareRekap] school.kepalaSekolahPhone (normalized): ${normalizePhone(school?.kepalaSekolahPhone)}`);
     console.log(`[shareRekap] acc keys:`, Array.from(acc.keys()));
+    console.log('[WA Debug] getIsReady():', getIsReady());
+    console.log('[WA Debug] getClient():', getClient());
     console.log(`[shareRekap] classes dari DB:`, classes.map(c => ({
       className: c.className,
       waliKelasPhone: c.waliKelasPhone,
