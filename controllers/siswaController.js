@@ -16,6 +16,7 @@ const SchoolProfile = require('../models/profileSekolah');
 const KehadiranGuru = require('../models/kehadiranGuru');
 const nodemailer = require('nodemailer'); // npm i nodemailer
 const axios = require('axios');
+const { getClient, getIsReady } = require('../config/whatsapp');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -2574,38 +2575,43 @@ exports.getFrequentLate = async (req, res) => {
 
 exports.shareRekapHarian = async (req, res) => {
   try {
-    const { schoolId, date, via = 'all' } = req.query;
+    const { schoolId, date, via = 'wa' } = req.query;
 
     if (!schoolId) {
       return res.status(400).json({ success: false, message: 'schoolId diperlukan' });
     }
 
+    // Cek status WA jika via wa
+    if ((via === 'wa' || via === 'all') && !getIsReady()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'WhatsApp belum terhubung. Silakan scan QR di halaman pengaturan WA.' 
+      });
+    }
+
     const targetDate = date || moment().format('YYYY-MM-DD');
-    const moment2 = require('moment-timezone');
     const dateMoment = moment2.tz(targetDate, 'Asia/Jakarta');
     const startDate = dateMoment.clone().startOf('day').format('YYYY-MM-DD HH:mm:ss');
-    const endDate = dateMoment.clone().endOf('day').format('YYYY-MM-DD HH:mm:ss');
-    const deadline = "07:00:00";
+    const endDate   = dateMoment.clone().endOf('day').format('YYYY-MM-DD HH:mm:ss');
+    const deadline  = "07:00:00";
 
-    // Ambil semua siswa + attendance (reuse logic kamu)
+    // Ambil data siswa + rekap kelas
     const allStudents = await Student.findAll({
       where: { schoolId: parseInt(schoolId), isActive: true, isGraduated: false },
-      attributes: ['id', 'name', 'nis', 'class', 'photoUrl'],
+      attributes: ['id', 'name', 'nis', 'class'],
       include: [{
         model: Attendance,
         as: 'studentAttendances',
-        where: { 
-          createdAt: { [Op.between]: [startDate, endDate] },
-          userRole: 'student' 
-        },
+        where: { createdAt: { [Op.between]: [startDate, endDate] }, userRole: 'student' },
         attributes: ['status', 'createdAt'],
         required: false,
         limit: 1,
         order: [['createdAt', 'ASC']]
       }],
+      raw: false
     });
 
-    // === Build recap data (sama seperti sebelumnya) ===
+    // Susun rekap per kelas
     let totalAllStudents = 0, totalAllHadir = 0, totalAllBelumHadir = 0;
     const acc = new Map();
 
@@ -2615,15 +2621,12 @@ exports.shareRekapHarian = async (req, res) => {
         acc.set(className, {
           className,
           totalStudents: 0,
-          walikelas: null,
-          stats: { onTime: 0, late: 0, izin: 0, sakit: 0, alpha: 0, belumHadir: 0 },
+          stats: { onTime: 0, late: 0, izin: 0, sakit: 0, alpha: 0, belumHadir: 0 }
         });
       }
       const classObj = acc.get(className);
       const attendance = student.studentAttendances?.[0];
-
       totalAllStudents++;
-      classObj.totalStudents++;
 
       if (attendance) {
         const scanTime = moment2(attendance.createdAt).tz('Asia/Jakarta').format("HH:mm:ss");
@@ -2638,147 +2641,116 @@ exports.shareRekapHarian = async (req, res) => {
         classObj.stats.belumHadir++;
         totalAllBelumHadir++;
       }
+      classObj.totalStudents++;
     }
 
-    // Ambil walikelas & kepsek
+    // Ambil data kelas (dengan wali kelas) dan profil sekolah
     const Class = require('../models/kelas');
-    const SchoolProfile = require('../models/profileSekolah');
+    const classes    = await Class.findAll({ where: { schoolId: parseInt(schoolId) } });
+    const school     = await SchoolProfile.findOne({ where: { schoolId: parseInt(schoolId) } });
 
-    const classes = await Class.findAll({ where: { schoolId: parseInt(schoolId) } });
-    const school = await SchoolProfile.findOne({ where: { schoolId: parseInt(schoolId) } });
-
+    // Map walikelas ke data rekap
     classes.forEach(cls => {
       if (acc.has(cls.className)) {
         acc.get(cls.className).walikelas = {
           phone: cls.waliKelasPhone || null,
           email: cls.waliKelasEmail || null,
-          name: cls.waliKelas || null,
+          name:  cls.waliKelas      || null,
         };
       }
     });
 
     const rekapData = {
-      summary: { totalAllStudents, totalAllHadir, totalAllBelumHadir, date: targetDate },
+      summary: { totalAllStudents, totalAllHadir, totalAllBelumHadir },
       data: Array.from(acc.values())
     };
 
-    const rekapText = generateRekapText(rekapData, targetDate); // fungsi kamu
-
     const results = { wa: [], email: [], errors: [] };
 
-    // ====================== WHATSAPP (Fonnte) ======================
-    if ((via === 'wa' || via === 'all') && process.env.FONNTE_API_KEY) {
-      const waRecipients = [];
+    // ─── KIRIM WA ───────────────────────────────────────────────
+    if (via === 'wa' || via === 'all') {
+      const waClient = getClient();
 
-      // Kepsek
+      // Helper kirim dengan delay agar tidak spam
+      const sendWA = async (phone, message, label) => {
+        try {
+          const chatId = `${phone}@c.us`;
+          await waClient.sendMessage(chatId, message);
+          results.wa.push({ to: label, phone, status: 'sent' });
+          // Delay 1.5 detik antar pesan agar tidak di-banned
+          await new Promise(r => setTimeout(r, 1500));
+        } catch (err) {
+          results.errors.push({ to: label, via: 'wa', error: err.message });
+        }
+      };
+
+      // Kirim ke kepsek (rekap keseluruhan)
       if (school?.kepalaSekolahPhone) {
-        waRecipients.push({
-          target: school.kepalaSekolahPhone,
-          message: `🏫 *LAPORAN KEPSEK*\n${rekapText}`,
-          label: 'Kepala Sekolah'
-        });
+        const rekapText = generateRekapText(rekapData, targetDate);
+        await sendWA(school.kepalaSekolahPhone, rekapText, 'Kepala Sekolah');
       }
 
-      // Walikelas
+      // Kirim ke setiap wali kelas (rekap per kelas masing-masing)
       for (const cls of acc.values()) {
         if (cls.walikelas?.phone) {
           const classText = generateClassSpecificText(cls, targetDate);
-          waRecipients.push({
-            target: cls.walikelas.phone,
-            message: classText,
-            label: `Walikelas ${cls.className}`
-          });
+          await sendWA(cls.walikelas.phone, classText, `Walikelas ${cls.className}`);
         }
-      }
-
-      // Bulk send dengan Fonnte (lebih efisien)
-      try {
-        const targets = waRecipients.map(r => r.target).join('|');
-        const messages = waRecipients.map(r => r.message); // jika pesan berbeda, Fonnte punya cara lain (delay atau loop)
-
-        // Kalau pesan berbeda per orang → tetap pakai loop sequential + delay kecil
-        for (const r of waRecipients) {
-          await axios.post('https://api.fonnte.com/send', {
-            target: r.target,
-            message: r.message,
-            countryCode: '62',
-          }, {
-            headers: { Authorization: process.env.FONNTE_API_KEY }
-          });
-          results.wa.push({ to: r.label, status: 'sent' });
-          
-          // Hindari rate limit (rekomendasi: 1-2 detik delay jika > 20 pesan)
-          await new Promise(resolve => setTimeout(resolve, 800));
-        }
-      } catch (err) {
-        results.errors.push({ via: 'wa', error: err.message });
-        console.error('Fonnte error:', err.response?.data || err.message);
       }
     }
 
-    // ====================== EMAIL ======================
+    // ─── KIRIM EMAIL ─────────────────────────────────────────────
     if ((via === 'email' || via === 'all') && process.env.SMTP_USER) {
+      const nodemailer = require('nodemailer');
       const transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST || 'smtp.gmail.com',
         port: 587,
         secure: false,
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        }
+        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
       });
 
-      const emailTargets = [];
+      const sendEmail = async (to, subject, text, label) => {
+        try {
+          await transporter.sendMail({
+            from: `"KiraProject" <${process.env.SMTP_USER}>`,
+            to, subject,
+            text: text.replace(/\*/g, '').replace(/━/g, '—')
+          });
+          results.email.push({ to: label, status: 'sent' });
+        } catch (err) {
+          results.errors.push({ to: label, via: 'email', error: err.message });
+        }
+      };
 
       if (school?.kepalaSekolahEmail) {
-        emailTargets.push({
-          to: school.kepalaSekolahEmail,
-          subject: `📊 Rekap Kehadiran Harian ${targetDate}`,
-          label: 'Kepala Sekolah',
-          body: rekapText.replace(/\*/g, '').replace(/━/g, '—')
-        });
+        await sendEmail(
+          school.kepalaSekolahEmail,
+          `📊 Rekap Kehadiran Harian ${targetDate}`,
+          generateRekapText(rekapData, targetDate),
+          'Kepala Sekolah'
+        );
       }
 
       for (const cls of acc.values()) {
         if (cls.walikelas?.email) {
-          emailTargets.push({
-            to: cls.walikelas.email,
-            subject: `📚 Rekap Kelas ${cls.className} — ${targetDate}`,
-            label: `Walikelas ${cls.className}`,
-            body: generateClassSpecificText(cls, targetDate)
-              .replace(/\*/g, '')
-              .replace(/━/g, '—')
-          });
-        }
-      }
-
-      for (const e of emailTargets) {
-        try {
-          await transporter.sendMail({
-            from: `"KiraProject" <${process.env.SMTP_USER}>`,
-            to: e.to,
-            subject: e.subject,
-            text: e.body,
-          });
-          results.email.push({ to: e.label, status: 'sent' });
-        } catch (err) {
-          results.errors.push({ to: e.label, via: 'email', error: err.message });
+          await sendEmail(
+            cls.walikelas.email,
+            `📚 Rekap Kelas ${cls.className} — ${targetDate}`,
+            generateClassSpecificText(cls, targetDate),
+            `Walikelas ${cls.className}`
+          );
         }
       }
     }
 
     res.json({
       success: true,
-      message: `Rekap dikirim: ${results.wa.length} WA, ${results.email.length} email`,
-      results,
-      rekapText // untuk preview di frontend
+      message: `Rekap dikirim: ${results.wa.length} WA, ${results.email.length} email, ${results.errors.length} gagal`,
+      results
     });
 
   } catch (err) {
     console.error('[shareRekapHarian] Error:', err);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Terjadi kesalahan internal saat mengirim rekap' 
-    });
+    res.status(500).json({ success: false, message: err.message });
   }
 };

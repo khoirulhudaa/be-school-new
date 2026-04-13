@@ -26,6 +26,7 @@ Student.belongsTo(Parent, { foreignKey: 'parentId', as: 'parent' });
 
 // Import semua routes dari satu file
 const apiRoutes = require('./routes');  // → routes/index.js
+const { initWhatsApp } = require('./config/whatsapp');
 
 
 const app = express();
@@ -184,6 +185,7 @@ sequelize.authenticate()
   })
   .then(() => {
     server.listen(port, '0.0.0.0', () => {
+      initWhatsApp();
       console.log(`Server with Socket.io running on port ${port}`);
     });
   })

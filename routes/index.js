@@ -26,6 +26,7 @@
     const ratingRouter = require('./komentarRoutes');
     const organisasiRouter = require('./organisasiRoutes');
     const partnerRouter = require('./partnerRoutes');
+    const waRouter = require('./waRouter');
     const votingRouter = require('./votingRoutes');
     const faqRouter = require('./faqRoutes');
     const ruleRouter = require('./ruleRoutes');
@@ -61,6 +62,7 @@
     router.use('/guruTendik', guruTendikRouter); 
     router.use('/ppdb', ppdbRouter); 
     router.use('/osis', osisRouter); 
+    router.use('/wa', waRouter); 
     router.use('/kalender', kalenderRouter); 
     router.use('/jadwal', jadwalRouter); 
     router.use('/kurikulum', kurikulumRouter); 
