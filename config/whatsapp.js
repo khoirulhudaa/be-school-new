@@ -126,8 +126,42 @@ const waitUntilReady = (timeoutMs = 30000) => {
   });
 };
 
+// Rate limit tracker
+const sendTracker = {
+  date: null,
+  count: 0,
+  MAX_PER_DAY: 50, // maksimal 50 pesan per hari
+};
+
+const canSendMessage = () => {
+  const today = new Date().toISOString().split('T')[0];
+  
+  // Reset counter kalau hari baru
+  if (sendTracker.date !== today) {
+    sendTracker.date = today;
+    sendTracker.count = 0;
+  }
+
+  return sendTracker.count < sendTracker.MAX_PER_DAY;
+};
+
+const incrementSendCount = () => {
+  sendTracker.count++;
+  console.log(`[WA RateLimit] Pesan terkirim hari ini: ${sendTracker.count}/${sendTracker.MAX_PER_DAY}`);
+};
+
+const getSendStats = () => ({
+  date: sendTracker.date,
+  sent: sendTracker.count,
+  remaining: sendTracker.MAX_PER_DAY - sendTracker.count,
+  max: sendTracker.MAX_PER_DAY,
+});
+
 const getClient = () => client;
 const getIsReady = () => isReady;
 const getQRCode = () => qrCodeData;
 
-module.exports = { initWhatsApp, getClient, getIsReady, getQRCode, waitUntilReady };
+module.exports = { 
+  initWhatsApp, getClient, getIsReady, getQRCode, waitUntilReady,
+  canSendMessage, incrementSendCount, getSendStats
+};

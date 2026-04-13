@@ -16,7 +16,14 @@ const SchoolProfile = require('../models/profileSekolah');
 const KehadiranGuru = require('../models/kehadiranGuru');
 const nodemailer = require('nodemailer'); // npm i nodemailer
 const axios = require('axios');
-const { getClient, getIsReady, waitUntilReady } = require('../config/whatsapp');
+const { 
+  getIsReady, 
+  getClient, 
+  waitUntilReady,
+  canSendMessage,      // ← tambah
+  incrementSendCount,  // ← tambah
+  getSendStats         // ← tambah
+} = require('../config/whatsapp');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -2577,10 +2584,6 @@ exports.shareRekapHarian = async (req, res) => {
   try {
     const { schoolId, date, via = 'wa' } = req.query;
 
-    console.log('[WA Debug] via:', via);
-    console.log('[WA Debug] isReady:', getIsReady());
-    console.log('[WA Debug] client:', getClient() ? 'ADA' : 'NULL');
-
     if (!schoolId) {
       return res.status(400).json({ success: false, message: 'schoolId diperlukan' });
     }
@@ -2597,6 +2600,18 @@ exports.shareRekapHarian = async (req, res) => {
           });
         }
       }
+
+      // Cek rate limit sebelum mulai
+      const stats = getSendStats();
+      if (!canSendMessage()) {
+        return res.status(429).json({
+          success: false,
+          message: `Batas pengiriman WA hari ini sudah tercapai (${stats.max} pesan). Coba lagi besok.`,
+          stats
+        });
+      }
+
+      console.log(`[WA RateLimit] Sisa kuota hari ini: ${stats.remaining}/${stats.max}`);
     }
 
     const targetDate = date || moment().format('YYYY-MM-DD');
@@ -2608,11 +2623,15 @@ exports.shareRekapHarian = async (req, res) => {
     // ─── HELPER NORMALISASI NOMOR ────────────────────────────────
     const normalizePhone = (phone) => {
       if (!phone) return null;
-      let p = String(phone).replace(/\D/g, ''); // hapus semua non-digit
+      let p = String(phone).replace(/\D/g, '');
       if (p.startsWith('0')) p = '62' + p.slice(1);
       if (p.startsWith('+')) p = p.slice(1);
       if (!p.startsWith('62')) p = '62' + p;
-      return p.length >= 10 ? p : null; // validasi minimal panjang
+      if (p.length < 10 || p.length > 15) {
+        console.warn(`[normalizePhone] Nomor mencurigakan (${p.length} digit): ${p}`);
+        return null;
+      }
+      return p;
     };
 
     // Ambil data siswa + rekap kelas
@@ -2666,53 +2685,22 @@ exports.shareRekapHarian = async (req, res) => {
       classObj.totalStudents++;
     }
 
-    // Ambil data kelas (dengan wali kelas) dan profil sekolah
+    // Ambil data kelas dan profil sekolah
     const Class = require('../models/kelas');
     const classes = await Class.findAll({ where: { schoolId: parseInt(schoolId) } });
     const school  = await SchoolProfile.findOne({ where: { schoolId: parseInt(schoolId) } });
 
-    // ─── DEBUG LOG ───────────────────────────────────────────────
     console.log(`[shareRekap] school.kepalaSekolahPhone (raw): ${school?.kepalaSekolahPhone}`);
-    console.log(`[shareRekap] school.kepalaSekolahPhone (normalized): ${normalizePhone(school?.kepalaSekolahPhone)}`);
-    console.log(`[shareRekap] acc keys:`, Array.from(acc.keys()));
-    console.log('[WA Debug] getIsReady():', getIsReady());
-    console.log('[WA Debug] getClient():', getClient());
     console.log(`[shareRekap] classes dari DB:`, classes.map(c => ({
       className: c.className,
       waliKelasPhone: c.waliKelasPhone,
       waliKelasEmail: c.waliKelasEmail
     })));
 
-    // Map walikelas ke data rekap
-    // Normalisasi className agar trimmed sebelum compare
-    // classes.forEach(cls => {
-    //   const normalizedClassName = cls.className?.trim();
-    //   if (acc.has(normalizedClassName)) {
-    //     acc.get(normalizedClassName).walikelas = {
-    //       phone: normalizePhone(cls.waliKelasPhone),
-    //       email: cls.waliKelasEmail || null,
-    //       name:  cls.waliKelas      || null,
-    //     };
-    //   } else {
-    //     // Coba case-insensitive match sebagai fallback
-    //     for (const [key] of acc) {
-    //       if (key.trim().toLowerCase() === normalizedClassName?.toLowerCase()) {
-    //         acc.get(key).walikelas = {
-    //           phone: normalizePhone(cls.waliKelasPhone),
-    //           email: cls.waliKelasEmail || null,
-    //           name:  cls.waliKelas      || null,
-    //         };
-    //         console.log(`[shareRekap] Matched class via case-insensitive: "${key}" ↔ "${normalizedClassName}"`);
-    //         break;
-    //       }
-    //     }
-    //   }
-    // });
-
+    // Map walikelas ke data rekap + buat entry kosong untuk kelas tanpa siswa
     classes.forEach(cls => {
       const normalizedClassName = cls.className?.trim();
       
-      // Cari key di acc (case-insensitive)
       let matchedKey = null;
       for (const [key] of acc) {
         if (key.trim().toLowerCase() === normalizedClassName?.toLowerCase()) {
@@ -2721,7 +2709,6 @@ exports.shareRekapHarian = async (req, res) => {
         }
       }
 
-      // Kalau kelas tidak ada di acc (tidak ada siswa), buat entry kosong
       if (!matchedKey) {
         acc.set(normalizedClassName, {
           className: normalizedClassName,
@@ -2732,7 +2719,6 @@ exports.shareRekapHarian = async (req, res) => {
         console.log(`[shareRekap] Kelas "${normalizedClassName}" tidak ada siswanya, entry kosong dibuat`);
       }
 
-      // Set walikelas
       acc.get(matchedKey).walikelas = {
         phone: normalizePhone(cls.waliKelasPhone),
         email: cls.waliKelasEmail || null,
@@ -2740,8 +2726,7 @@ exports.shareRekapHarian = async (req, res) => {
       };
     });
 
-    // Log hasil mapping walikelas
-    console.log(`[shareRekap] acc after walikelas mapping:`, Array.from(acc.values()).map(c => ({
+    console.log(`[shareRekap] acc after mapping:`, Array.from(acc.values()).map(c => ({
       className: c.className,
       walikelasPhone: c.walikelas?.phone,
       walikelasEmail: c.walikelas?.email,
@@ -2766,6 +2751,13 @@ exports.shareRekapHarian = async (req, res) => {
       }
 
       const sendWA = async (rawPhone, message, label) => {
+        // Cek rate limit per pesan
+        if (!canSendMessage()) {
+          console.warn(`[WA RateLimit] Limit harian tercapai, skip ${label}`);
+          results.errors.push({ to: label, via: 'wa', error: 'Batas kirim harian tercapai' });
+          return;
+        }
+
         const phone = normalizePhone(rawPhone);
         if (!phone) {
           console.warn(`[shareRekap] Skip ${label}: nomor tidak valid (${rawPhone})`);
@@ -2777,9 +2769,14 @@ exports.shareRekapHarian = async (req, res) => {
           const chatId = `${phone}@c.us`;
           console.log(`[shareRekap] Mengirim WA ke ${label} (${chatId})...`);
           await waClient.sendMessage(chatId, message);
+          
+          incrementSendCount();
           results.wa.push({ to: label, phone, status: 'sent' });
           console.log(`[shareRekap] ✅ WA terkirim ke ${label} (${phone})`);
-          await new Promise(r => setTimeout(r, 1500));
+
+          // Delay makin panjang setelah 10 pesan agar lebih aman
+          const delay = results.wa.length > 10 ? 3000 : 1500;
+          await new Promise(r => setTimeout(r, delay));
         } catch (err) {
           console.error(`[shareRekap] ❌ Gagal kirim WA ke ${label} (${phone}):`, err.message);
           results.errors.push({ to: label, via: 'wa', error: err.message });
@@ -2803,6 +2800,9 @@ exports.shareRekapHarian = async (req, res) => {
           console.warn(`[shareRekap] Walikelas ${cls.className} tidak punya nomor WA, dilewati`);
         }
       }
+
+      // Log sisa kuota setelah kirim
+      console.log(`[WA RateLimit] Setelah kirim:`, getSendStats());
     }
 
     // ─── KIRIM EMAIL ─────────────────────────────────────────────
@@ -2862,12 +2862,12 @@ exports.shareRekapHarian = async (req, res) => {
     }
 
     console.log(`[shareRekap] Selesai. WA: ${results.wa.length}, Email: ${results.email.length}, Gagal: ${results.errors.length}`);
-    console.log(`[shareRekap] Detail results:`, JSON.stringify(results, null, 2));
 
     res.json({
       success: true,
       message: `Rekap dikirim: ${results.wa.length} WA, ${results.email.length} email, ${results.errors.length} gagal`,
-      results
+      results,
+      rateLimit: getSendStats() // info sisa kuota di response
     });
 
   } catch (err) {

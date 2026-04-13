@@ -11,8 +11,14 @@ const generateRekapText = (data, date) => {
   text += `📚 *REKAP PER KELAS*\n\n`;
 
   classes?.forEach(cls => {
-    const pct = Math.round(((cls.stats.onTime + cls.stats.late) / cls.totalStudents) * 100);
-    text += `🏫 *${cls.className}* (${cls.totalStudents} siswa)\n`;
+    const totalHadir = cls.stats.onTime + cls.stats.late;
+    const pct = cls.totalStudents > 0 
+      ? Math.round((totalHadir / cls.totalStudents) * 100) 
+      : 0;
+
+    const emptyNote = cls.totalStudents === 0 ? ' ⚠️ _Tidak ada siswa_' : '';
+
+    text += `🏫 *${cls.className}* (${cls.totalStudents} siswa)${emptyNote}\n`;
     text += `  ✅ Tepat Waktu: ${cls.stats.onTime} | ⏰ Telat: ${cls.stats.late}\n`;
     text += `  🤒 Sakit: ${cls.stats.sakit} | 📝 Izin: ${cls.stats.izin} | ❌ Alpha: ${cls.stats.alpha}\n`;
     text += `  ⬜ Belum Absen: ${cls.stats.belumHadir}\n`;

@@ -48,4 +48,10 @@ router.post('/send', async (req, res) => {
   }
 });
 
+// routes wa.js
+router.get('/wa/send-stats', (req, res) => {
+  const { getSendStats } = require('../config/whatsapp');
+  res.json({ success: true, stats: getSendStats() });
+});
+
 module.exports = router;
