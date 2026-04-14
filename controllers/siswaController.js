@@ -38,6 +38,7 @@ const { generateRekapText } = require('../helper/generateRecapText');
 const { generateClassSpecificText } = require('../helper/generateClassSpecificText');
 const { generateRekapPDF } = require('../helper/generateRekapPDF');
 const { generateClassRekapPDF } = require('../utils/generateClassRekapPDF');
+const { MessageMedia } = require('whatsapp-web.js');
 
 // const invalidateStudentCache = async (schoolId) => {
 //   if (!schoolId) return;
