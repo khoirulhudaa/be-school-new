@@ -3345,10 +3345,37 @@ exports.shareRekapHarian = async (req, res) => {
       `[shareRekap] Selesai. WA: ${results.wa.length}, Email: ${results.email.length}, Gagal: ${results.errors.length}`
     );
  
+    // Kumpulkan semua warning (kelas tanpa nomor WA)
+    const skippedClasses = [];
+    for (const cls of acc.values()) {
+      if (!cls.walikelas?.phone) {
+        skippedClasses.push(cls.className);
+      }
+    }
+
+    const warnings = [];
+    if (skippedClasses.length > 0) {
+      warnings.push({
+        type: 'no_phone',
+        message: `${skippedClasses.length} walikelas tidak punya nomor WA`,
+        list: skippedClasses.map(c => `• ${c}`)
+      });
+    }
+    if (!school?.kepalaSekolahPhone) {
+      warnings.push({
+        type: 'no_kepsek_phone',
+        message: 'Nomor WA Kepala Sekolah belum diisi di profil sekolah',
+        list: []
+      });
+    }
+
     res.json({
       success: true,
-      message: `Rekap dikirim: ${results.wa.length} WA, ${results.email.length} email, ${results.errors.length} gagal`,
+      message: results.wa.length > 0
+        ? `Rekap dikirim: ${results.wa.length} WA, ${results.email.length} email, ${results.errors.length} gagal`
+        : 'Tidak ada pesan terkirim — periksa nomor WA walikelas di data kelas',
       results,
+      warnings,         // ← list warning per kategori
       rateLimit: getSendStats(),
     });
  
