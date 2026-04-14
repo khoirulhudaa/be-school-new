@@ -41,33 +41,112 @@ const { generateClassRekapPDF } = require('../utils/generateClassRekapPDF');
 const { MessageMedia } = require('whatsapp-web.js');
 const progressClients = new Map();
 
-exports.shareRekapProgress = (req, res) => {
-  const { schoolId } = req.query;
-  if (!schoolId) return res.status(400).end();
+exports.shareRekapProgress = async (req, res) => {
+  const { schoolId, date } = req.query;
+  
+  if (!schoolId) {
+    return res.status(400).json({ success: false, message: 'School ID diperlukan' });
+  }
 
+  // 1. Setup Header SSE agar browser tetap mendengarkan
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.flushHeaders();
 
-  // Kirim heartbeat supaya koneksi tidak timeout
-  const heartbeat = setInterval(() => {
-    res.write(': ping\n\n');
-  }, 15000);
-
+  // Simpan res ke Map agar bisa diakses oleh fungsi processSharingRekap
   progressClients.set(String(schoolId), res);
 
+  try {
+    // 2. Ambil Data Rekap (Ganti ini dengan fungsi/query DB kamu yang asli)
+    // const rekapData = await Siswa.getRekapHarian(schoolId, date);
+    
+    if (!rekapData || !rekapData.data) {
+      emitProgress(schoolId, { error: 'Data rekap tidak ditemukan untuk tanggal ini' });
+      return res.end();
+    }
+
+    // 3. Jalankan proses pengiriman tanpa 'await' agar SSE tidak blocking
+    // Kita berikan Nama Sekolah (misal dari req.user atau rekapData)
+    const schoolName = rekapData.schoolName || "Sekolah KiraProject";
+    processSharingRekap(schoolId, rekapData, date, schoolName);
+
+  } catch (error) {
+    console.error("SSE Error:", error);
+    emitProgress(schoolId, { error: 'Terjadi kesalahan internal pada server' });
+  }
+
+  // Hapus dari Map jika user menutup browser/tab
   req.on('close', () => {
-    clearInterval(heartbeat);
     progressClients.delete(String(schoolId));
   });
 };
 
+/**
+ * Fungsi Background untuk Proses Pengiriman WA & Update Kuota
+ */
+const processSharingRekap = async (schoolId, rekapData, targetDate, schoolName) => {
+  const client = getClient();
+  const totalItems = rekapData.data.length;
+
+  // Cek Koneksi WA di awal
+  if (!client || !getIsReady()) {
+    emitProgress(schoolId, { error: 'WhatsApp belum terhubung atau sedang reconnecting' });
+    return;
+  }
+
+  for (const [index, cls] of rekapData.data.entries()) {
+    try {
+      // A. CEK KUOTA (Rate Limit 50/day)
+      if (!canSendMessage()) {
+        emitProgress(schoolId, { error: 'Limit pengiriman harian (50) sudah tercapai.' });
+        break; // Hentikan loop pengiriman
+      }
+
+      // B. GENERATE ASSET (PDF & Pesan)
+      const classPdfBuffer = await generateClassRekapPDF(cls, targetDate, schoolName);
+      const media = new MessageMedia(
+        'application/pdf', 
+        classPdfBuffer.toString('base64'), 
+        `REKAP_${cls.className.replace(/\s+/g, '_')}.pdf`
+      );
+      const text = generateClassSpecificText(cls, targetDate);
+
+      // C. KIRIM PESAN
+      const phone = cls.walikelas?.phone;
+      if (phone) {
+        const chatId = `${phone.replace(/\D/g, '')}@c.us`; // pastikan format hanya angka
+        await client.sendMessage(chatId, media, { caption: text });
+        
+        // --- POIN KRITIS: Update kuota setelah sukses kirim ---
+        incrementSendCount();
+      }
+
+      // D. UPDATE PROGRESS KE FRONTEND
+      const progress = Math.round(((index + 1) / totalItems) * 100);
+      emitProgress(schoolId, { 
+        progress, 
+        message: `Berhasil mengirim rekap ke Kelas ${cls.className}` 
+      });
+
+    } catch (err) {
+      console.error(`Gagal mengirim kelas ${cls.className}:`, err);
+      emitProgress(schoolId, { message: `Gagal mengirim Kelas ${cls.className}, lanjut ke kelas berikutnya...` });
+    }
+  }
+
+  // E. BERITAHU SELESAI
+  emitProgress(schoolId, { done: true, message: 'Semua rekap berhasil diproses!' });
+};
+
+/**
+ * Helper untuk mengirim data ke stream SSE
+ */
 const emitProgress = (schoolId, data) => {
-  const client = progressClients.get(String(schoolId));
-  if (client) {
-    client.write(`data: ${JSON.stringify(data)}\n\n`);
+  const res = progressClients.get(String(schoolId));
+  if (res) {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
   }
 };
 
