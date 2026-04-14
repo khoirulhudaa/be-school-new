@@ -44,57 +44,6 @@ exports.getAllClasses = async (req, res) => {
   }
 };
 
-// exports.createClass = async (req, res) => {
-//   try {
-//     const { schoolId, className } = req.body;
-
-//     // 1. Validasi input wajib
-//     if (!schoolId || !className?.trim()) {
-//       return res.status(400).json({ 
-//         success: false, 
-//         message: 'schoolId dan className wajib diisi' 
-//       });
-//     }
-
-//     const normalizedName = className.trim();
-
-//     // 2. Cek duplikat (MySQL default case-insensitive)
-//     const existing = await Class.findOne({
-//       where: {
-//         schoolId,
-//         className: normalizedName   // ← ini sudah cukup di MySQL (case-insensitive)
-//       }
-//     });
-
-//     if (existing) {
-//       return res.status(409).json({ 
-//         success: false, 
-//         message: `Kelas sudah pernah dibuat!` 
-//       });
-//     }
-
-//     // 3. Buat data baru
-//     const newClass = await Class.create({ 
-//       schoolId, 
-//       className: normalizedName 
-//     });
-
-//     res.status(201).json({ success: true, data: newClass });
-//   } catch (err) {
-//     console.error('Error createClass:', err);
-    
-//     // Tangani error unique constraint jika Anda sudah tambahkan index di DB
-//     if (err.name === 'SequelizeUniqueConstraintError') {
-//       return res.status(409).json({ 
-//         success: false, 
-//         message: 'Nama kelas sudah digunakan untuk sekolah ini (duplikat)' 
-//       });
-//     }
-
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
-
 exports.createClass = async (req, res) => {
   try {
     const { schoolId, className, waliKelas, waliKelasPhone, waliKelasEmail } = req.body;
@@ -137,6 +86,56 @@ exports.createClass = async (req, res) => {
       });
     }
     res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.createClassBulk = async (req, res) => {
+  try {
+    const { schoolId, classes } = req.body;
+
+    if (!schoolId || !Array.isArray(classes)) {
+      return res.status(400).json({ success: false, message: 'Data tidak valid' });
+    }
+
+    const results = { success: 0, failed: [] };
+
+    for (const item of classes) {
+      const normalizedName = item.className?.trim();
+
+      if (!normalizedName) {
+        results.failed.push({ className: '(Kosong)', reason: 'Nama kelas wajib diisi' });
+        continue;
+      }
+
+      // Cek Duplikat di database
+      const existing = await Class.findOne({
+        where: { schoolId, className: normalizedName }
+      });
+
+      if (existing) {
+        results.failed.push({ className: normalizedName, reason: 'Kelas sudah terdaftar' });
+        continue;
+      }
+
+      // Simpan data
+      await Class.create({
+        schoolId,
+        className: normalizedName,
+        waliKelas: item.waliKelas || null,
+        waliKelasPhone: item.waliKelasPhone || null,
+        waliKelasEmail: item.waliKelasEmail || null
+      });
+
+      results.success++;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: results
+    });
+  } catch (err) {
+    console.error('Bulk Create Error:', err);
+    res.status(500).json({ success: false, message: 'Internal Server Error' });
   }
 };
 

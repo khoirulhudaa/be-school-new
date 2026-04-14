@@ -6,6 +6,7 @@ const optionalAuth = require('../middlewares/optionalLimiter');
 
 router.get('/', optionalAuth, globalLimiter, kelasController.getAllClasses);
 router.post('/', kelasController.createClass);
+router.post('/bulk', kelasController.createClassBulk);
 router.put('/:id', kelasController.updateClass);
 router.delete('/:id/:schoolId', kelasController.deleteClass);
 
