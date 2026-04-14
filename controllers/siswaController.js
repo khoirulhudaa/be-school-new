@@ -308,7 +308,7 @@ exports.updateStudent = async (req, res) => {
   try {
     const { id } = req.params;
     const { 
-      name, nis, nisn, gender, birthPlace, birthDate, nik, 
+      name, nis, nisn, gender, birthPlace, birthDate, nik, address,
       isActive, class: className, batch, 
       email, password, rfidUid // Tambahkan ini
     } = req.body;
@@ -372,7 +372,7 @@ exports.updateStudent = async (req, res) => {
 
     // Hash Password jika ada perubahan - TAMBAHAN
     let updatedData = {
-      name, nis, nisn, gender, birthPlace, birthDate, nik, isActive, 
+      name, nis, nisn, gender, birthPlace, birthDate, nik, isActive, address,
       class: className, batch, photoUrl, email, rfidUid
     };
 
@@ -407,7 +407,7 @@ exports.updateStudent = async (req, res) => {
 exports.createStudent = async (req, res) => {
   try {
     const { 
-      name, nis, nisn, gender, birthPlace, birthDate, nik, 
+      name, nis, nisn, gender, birthPlace, birthDate, nik, address,
       schoolId, class: className, batch, 
       email, password, rfidUid // Ambil email & password dari req.body
     } = req.body;
@@ -457,6 +457,7 @@ exports.createStudent = async (req, res) => {
       nis, 
       nisn, 
       gender, 
+      address,
       birthPlace, 
       birthDate, 
       nik, 
@@ -553,6 +554,7 @@ exports.bulkCreateStudents = async (req, res) => {
             email:      finalEmail,
             password:   hashedPassword,
             photoUrl:   null,
+            address:    s.address    || null, // <--- TAMBAHKAN INI
             class:      s.class      || null,
             batch:      s.batch      || null,
             qrCodeData: `QR-${s.nis}-${Date.now()}`

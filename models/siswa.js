@@ -13,6 +13,7 @@ const Student = sequelize.define('Student', {
   },
   nis: { type: DataTypes.STRING, allowNull: false },
   nisn: { type: DataTypes.STRING, allowNull: true },
+  address: { type: DataTypes.TEXT, allowNull: true },
   nik: { type: DataTypes.STRING, allowNull: true },
   gender: { type: DataTypes.STRING(20), allowNull: true },
   birthPlace: { type: DataTypes.STRING, allowNull: true },
