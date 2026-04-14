@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getIsReady, getQRCode, getClient } = require('../config/whatsapp');
 const qrcode = require('qrcode'); // npm install qrcode
+const { shareRekapProgress } = require('../controllers/siswaController');
 
 // GET /wa/status — cek apakah WA sudah login
 router.get('/status', (req, res) => {
@@ -53,5 +54,7 @@ router.get('/wa/send-stats', (req, res) => {
   const { getSendStats } = require('../config/whatsapp');
   res.json({ success: true, stats: getSendStats() });
 });
+
+router.get('/share-rekap-progress', shareRekapProgress);
 
 module.exports = router;

@@ -39,6 +39,37 @@ const { generateClassSpecificText } = require('../helper/generateClassSpecificTe
 const { generateRekapPDF } = require('../helper/generateRekapPDF');
 const { generateClassRekapPDF } = require('../utils/generateClassRekapPDF');
 const { MessageMedia } = require('whatsapp-web.js');
+const progressClients = new Map();
+
+exports.shareRekapProgress = (req, res) => {
+  const { schoolId } = req.query;
+  if (!schoolId) return res.status(400).end();
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.flushHeaders();
+
+  // Kirim heartbeat supaya koneksi tidak timeout
+  const heartbeat = setInterval(() => {
+    res.write(': ping\n\n');
+  }, 15000);
+
+  progressClients.set(String(schoolId), res);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    progressClients.delete(String(schoolId));
+  });
+};
+
+const emitProgress = (schoolId, data) => {
+  const client = progressClients.get(String(schoolId));
+  if (client) {
+    client.write(`data: ${JSON.stringify(data)}\n\n`);
+  }
+};
 
 // const invalidateStudentCache = async (schoolId) => {
 //   if (!schoolId) return;
@@ -366,113 +397,6 @@ exports.createStudent = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
-// exports.bulkCreateStudents = async (req, res) => {
-//   try {
-//     const { students, schoolId } = req.body;
-
-//     if (!schoolId || !Array.isArray(students) || students.length === 0) {
-//       return res.status(400).json({ success: false, message: 'Data tidak valid' });
-//     }
-
-//     const nisList = students.map(s => s.nis).filter(Boolean);
-
-//     // Cek semua NIS sekaligus dalam 1 query
-//     const existingStudents = await Student.findAll({
-//       where: { nis: { [Op.in]: nisList }, schoolId: parseInt(schoolId) },
-//       attributes: ['nis', 'name'],
-//       raw: true
-//     });
-
-//     // Cek RFID duplikat sekaligus
-//     const rfidList = students.map(s => s.rfidUid).filter(Boolean);
-//     const existingRfids = rfidList.length > 0 ? await Student.findAll({
-//       where: { rfidUid: { [Op.in]: rfidList } },
-//       attributes: ['rfidUid', 'name'],
-//       raw: true
-//     }) : [];
-
-//     const duplicateNis = existingStudents.map(s => ({ nis: s.nis, name: s.name }));
-//     const duplicateRfid = existingRfids.map(s => ({ rfidUid: s.rfidUid, name: s.name }));
-
-//     // Filter data yang bisa diproses
-//     const existingNisSet = new Set(existingStudents.map(s => s.nis));
-//     const existingRfidSet = new Set(existingRfids.map(s => s.rfidUid));
-    
-//     const validStudents = students.filter(s => 
-//       !existingNisSet.has(s.nis) && 
-//       (!s.rfidUid || !existingRfidSet.has(s.rfidUid))
-//     );
-
-//     // Proses yang valid
-//     const created = [];
-//     const failed = [];
-
-//     for (const s of validStudents) {
-//       try {
-//         const finalEmail = s.email || `${s.nis}@gmail.com`;
-//         const hashedPassword = await bcrypt.hash(s.password || 'sekolah123', 10);
-        
-//         let photoUrl = null;
-        
-//         const student = await Student.create({
-//           name: s.name,
-//           nis: s.nis,
-//           nisn: s.nisn,
-//           gender: s.gender,
-//           birthPlace: s.birthPlace,
-//           birthDate: s.birthDate,
-//           nik: s.nik,
-//           rfidUid: s.rfidUid || null,
-//           schoolId: parseInt(schoolId),
-//           email: finalEmail,
-//           password: hashedPassword,
-//           photoUrl,
-//           class: s.class,
-//           batch: s.batch,
-//           qrCodeData: `QR-${s.nis}-${Date.now()}`
-//         });
-
-//         created.push({ nis: s.nis, name: s.name });
-//       } catch (err) {
-//         let reason = err.message; // default
-
-//         if (err.name === 'SequelizeUniqueConstraintError') {
-//           const fields = err.errors?.map(e => `${e.path} = "${e.value}"`).join(', ');
-//           reason = `Duplikat pada: ${fields}`;
-//         } else if (err.name === 'SequelizeValidationError') {
-//           const fields = err.errors?.map(e => `${e.path}: ${e.message}`).join('; ');
-//           reason = `Validasi gagal — ${fields}`;
-//         } else if (err.name === 'SequelizeDatabaseError') {
-//           reason = `Database error: ${err.original?.sqlMessage || err.message}`;
-//         }
-
-//         failed.push({ nis: s.nis, name: s.name, reason });
-//       }
-//     }
-
-//     await invalidateStudentCache(parseInt(schoolId));
-
-//     return res.json({
-//       success: true,
-//       summary: {
-//         total: students.length,
-//         berhasil: created.length,
-//         dilewati: duplicateNis.length + duplicateRfid.length,
-//         gagal: failed.length,
-//       },
-//       detail: {
-//         berhasil: created,
-//         nisDuplikat: duplicateNis,      // [{nis, name}] — sudah ada di DB
-//         rfidDuplikat: duplicateRfid,    // [{rfidUid, name}]
-//         gagal: failed                   // [{nis, name, reason}]
-//       }
-//     });
-
-//   } catch (err) {
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
 
 exports.bulkCreateStudents = async (req, res) => {
   try {
@@ -2724,302 +2648,6 @@ exports.getFrequentLate = async (req, res) => {
   }
 };
 
-// exports.shareRekapHarian = async (req, res) => {
-//   try {
-//     const { schoolId, date, via = 'wa' } = req.query;
-
-//     if (!schoolId) {
-//       return res.status(400).json({ success: false, message: 'schoolId diperlukan' });
-//     }
-
-//     // Cek status WA jika via wa
-//     if (via === 'wa' || via === 'all') {
-//       if (!getIsReady()) {
-//         try {
-//           await waitUntilReady(30000);
-//         } catch {
-//           return res.status(400).json({ 
-//             success: false, 
-//             message: 'WhatsApp belum terhubung. Silakan scan QR di halaman pengaturan WA.' 
-//           });
-//         }
-//       }
-
-//       // Cek rate limit sebelum mulai
-//       const stats = getSendStats();
-//       if (!canSendMessage()) {
-//         return res.status(429).json({
-//           success: false,
-//           message: `Batas pengiriman WA hari ini sudah tercapai (${stats.max} pesan). Coba lagi besok.`,
-//           stats
-//         });
-//       }
-
-//       console.log(`[WA RateLimit] Sisa kuota hari ini: ${stats.remaining}/${stats.max}`);
-//     }
-
-//     const targetDate = date || moment().format('YYYY-MM-DD');
-//     const dateMoment = moment2.tz(targetDate, 'Asia/Jakarta');
-//     const startDate = dateMoment.clone().startOf('day').format('YYYY-MM-DD HH:mm:ss');
-//     const endDate   = dateMoment.clone().endOf('day').format('YYYY-MM-DD HH:mm:ss');
-//     const deadline  = "07:00:00";
-
-//     // ─── HELPER NORMALISASI NOMOR ────────────────────────────────
-//     const normalizePhone = (phone) => {
-//       if (!phone) return null;
-//       let p = String(phone).replace(/\D/g, '');
-//       if (p.startsWith('0')) p = '62' + p.slice(1);
-//       if (p.startsWith('+')) p = p.slice(1);
-//       if (!p.startsWith('62')) p = '62' + p;
-//       if (p.length < 10 || p.length > 15) {
-//         console.warn(`[normalizePhone] Nomor mencurigakan (${p.length} digit): ${p}`);
-//         return null;
-//       }
-//       return p;
-//     };
-
-//     // Ambil data siswa + rekap kelas
-//     const allStudents = await Student.findAll({
-//       where: { schoolId: parseInt(schoolId), isActive: true, isGraduated: false },
-//       attributes: ['id', 'name', 'nis', 'class'],
-//       include: [{
-//         model: Attendance,
-//         as: 'studentAttendances',
-//         where: { createdAt: { [Op.between]: [startDate, endDate] }, userRole: 'student' },
-//         attributes: ['status', 'createdAt'],
-//         required: false,
-//         limit: 1,
-//         order: [['createdAt', 'ASC']]
-//       }],
-//       raw: false
-//     });
-
-//     console.log(`[shareRekap] allStudents.length: ${allStudents.length}`);
-
-//     // Susun rekap per kelas
-//     let totalAllStudents = 0, totalAllHadir = 0, totalAllBelumHadir = 0;
-//     const acc = new Map();
-
-//     for (const student of allStudents) {
-//       const className = student.class || "Tanpa Kelas";
-//       if (!acc.has(className)) {
-//         acc.set(className, {
-//           className,
-//           totalStudents: 0,
-//           stats: { onTime: 0, late: 0, izin: 0, sakit: 0, alpha: 0, belumHadir: 0 }
-//         });
-//       }
-//       const classObj = acc.get(className);
-//       const attendance = student.studentAttendances?.[0];
-//       totalAllStudents++;
-
-//       if (attendance) {
-//         const scanTime = moment2(attendance.createdAt).tz('Asia/Jakarta').format("HH:mm:ss");
-//         if (attendance.status === 'Hadir') {
-//           totalAllHadir++;
-//           scanTime <= deadline ? classObj.stats.onTime++ : classObj.stats.late++;
-//         } else {
-//           const k = attendance.status.toLowerCase();
-//           if (classObj.stats[k] !== undefined) classObj.stats[k]++;
-//         }
-//       } else {
-//         classObj.stats.belumHadir++;
-//         totalAllBelumHadir++;
-//       }
-//       classObj.totalStudents++;
-//     }
-
-//     // Ambil data kelas dan profil sekolah
-//     const Class = require('../models/kelas');
-//     const classes = await Class.findAll({ where: { schoolId: parseInt(schoolId) } });
-//     const school  = await SchoolProfile.findOne({ where: { schoolId: parseInt(schoolId) } });
-
-//     console.log(`[shareRekap] school.kepalaSekolahPhone (raw): ${school?.kepalaSekolahPhone}`);
-//     console.log(`[shareRekap] classes dari DB:`, classes.map(c => ({
-//       className: c.className,
-//       waliKelasPhone: c.waliKelasPhone,
-//       waliKelasEmail: c.waliKelasEmail
-//     })));
-
-//     // Map walikelas ke data rekap + buat entry kosong untuk kelas tanpa siswa
-//     classes.forEach(cls => {
-//       const normalizedClassName = cls.className?.trim();
-      
-//       let matchedKey = null;
-//       for (const [key] of acc) {
-//         if (key.trim().toLowerCase() === normalizedClassName?.toLowerCase()) {
-//           matchedKey = key;
-//           break;
-//         }
-//       }
-
-//       if (!matchedKey) {
-//         acc.set(normalizedClassName, {
-//           className: normalizedClassName,
-//           totalStudents: 0,
-//           stats: { onTime: 0, late: 0, izin: 0, sakit: 0, alpha: 0, belumHadir: 0 },
-//         });
-//         matchedKey = normalizedClassName;
-//         console.log(`[shareRekap] Kelas "${normalizedClassName}" tidak ada siswanya, entry kosong dibuat`);
-//       }
-
-//       acc.get(matchedKey).walikelas = {
-//         phone: normalizePhone(cls.waliKelasPhone),
-//         email: cls.waliKelasEmail || null,
-//         name:  cls.waliKelas      || null,
-//       };
-//     });
-
-//     console.log(`[shareRekap] acc after mapping:`, Array.from(acc.values()).map(c => ({
-//       className: c.className,
-//       walikelasPhone: c.walikelas?.phone,
-//       walikelasEmail: c.walikelas?.email,
-//     })));
-
-//     const rekapData = {
-//       summary: { totalAllStudents, totalAllHadir, totalAllBelumHadir },
-//       data: Array.from(acc.values())
-//     };
-
-//     const results = { wa: [], email: [], errors: [] };
-
-//     // ─── KIRIM WA ───────────────────────────────────────────────
-//     if (via === 'wa' || via === 'all') {
-//       const waClient = getClient();
-
-//       if (!waClient) {
-//         return res.status(400).json({ 
-//           success: false, 
-//           message: 'WA client tidak tersedia. Pastikan WhatsApp sudah terhubung.' 
-//         });
-//       }
-
-//       const sendWA = async (rawPhone, message, label) => {
-//         // Cek rate limit per pesan
-//         if (!canSendMessage()) {
-//           console.warn(`[WA RateLimit] Limit harian tercapai, skip ${label}`);
-//           results.errors.push({ to: label, via: 'wa', error: 'Batas kirim harian tercapai' });
-//           return;
-//         }
-
-//         const phone = normalizePhone(rawPhone);
-//         if (!phone) {
-//           console.warn(`[shareRekap] Skip ${label}: nomor tidak valid (${rawPhone})`);
-//           results.errors.push({ to: label, via: 'wa', error: `Nomor tidak valid: ${rawPhone}` });
-//           return;
-//         }
-
-//         try {
-//           const chatId = `${phone}@c.us`;
-//           console.log(`[shareRekap] Mengirim WA ke ${label} (${chatId})...`);
-//           await waClient.sendMessage(chatId, message);
-          
-//           incrementSendCount();
-//           results.wa.push({ to: label, phone, status: 'sent' });
-//           console.log(`[shareRekap] ✅ WA terkirim ke ${label} (${phone})`);
-
-//           // Delay makin panjang setelah 10 pesan agar lebih aman
-//           const delay = results.wa.length > 10 ? 3000 : 1500;
-//           await new Promise(r => setTimeout(r, delay));
-//         } catch (err) {
-//           console.error(`[shareRekap] ❌ Gagal kirim WA ke ${label} (${phone}):`, err.message);
-//           results.errors.push({ to: label, via: 'wa', error: err.message });
-//         }
-//       };
-
-//       // Kirim ke kepsek
-//       if (school?.kepalaSekolahPhone) {
-//         const rekapText = generateRekapText(rekapData, targetDate);
-//         await sendWA(school.kepalaSekolahPhone, rekapText, 'Kepala Sekolah');
-//       } else {
-//         console.warn('[shareRekap] kepalaSekolahPhone tidak ditemukan di profil sekolah');
-//       }
-
-//       // Kirim ke setiap wali kelas
-//       for (const cls of acc.values()) {
-//         if (cls.walikelas?.phone) {
-//           const classText = generateClassSpecificText(cls, targetDate);
-//           await sendWA(cls.walikelas.phone, classText, `Walikelas ${cls.className}`);
-//         } else {
-//           console.warn(`[shareRekap] Walikelas ${cls.className} tidak punya nomor WA, dilewati`);
-//         }
-//       }
-
-//       // Log sisa kuota setelah kirim
-//       console.log(`[WA RateLimit] Setelah kirim:`, getSendStats());
-//     }
-
-//     // ─── KIRIM EMAIL ─────────────────────────────────────────────
-//     if ((via === 'email' || via === 'all') && process.env.SMTP_USER) {
-//       const nodemailer = require('nodemailer');
-//       const transporter = nodemailer.createTransport({
-//         host: process.env.SMTP_HOST || 'smtp.gmail.com',
-//         port: 587,
-//         secure: false,
-//         auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-//       });
-
-//       const sendEmail = async (to, subject, text, label) => {
-//         if (!to) {
-//           console.warn(`[shareRekap] Skip email ${label}: alamat email kosong`);
-//           results.errors.push({ to: label, via: 'email', error: 'Email kosong' });
-//           return;
-//         }
-//         try {
-//           console.log(`[shareRekap] Mengirim email ke ${label} (${to})...`);
-//           await transporter.sendMail({
-//             from: `"KiraProject" <${process.env.SMTP_USER}>`,
-//             to, subject,
-//             text: text.replace(/\*/g, '').replace(/━/g, '—')
-//           });
-//           results.email.push({ to: label, email: to, status: 'sent' });
-//           console.log(`[shareRekap] ✅ Email terkirim ke ${label} (${to})`);
-//         } catch (err) {
-//           console.error(`[shareRekap] ❌ Gagal kirim email ke ${label} (${to}):`, err.message);
-//           results.errors.push({ to: label, via: 'email', error: err.message });
-//         }
-//       };
-
-//       if (school?.kepalaSekolahEmail) {
-//         await sendEmail(
-//           school.kepalaSekolahEmail,
-//           `📊 Rekap Kehadiran Harian ${targetDate}`,
-//           generateRekapText(rekapData, targetDate),
-//           'Kepala Sekolah'
-//         );
-//       } else {
-//         console.warn('[shareRekap] kepalaSekolahEmail tidak ditemukan di profil sekolah');
-//       }
-
-//       for (const cls of acc.values()) {
-//         if (cls.walikelas?.email) {
-//           await sendEmail(
-//             cls.walikelas.email,
-//             `📚 Rekap Kelas ${cls.className} — ${targetDate}`,
-//             generateClassSpecificText(cls, targetDate),
-//             `Walikelas ${cls.className}`
-//           );
-//         } else {
-//           console.warn(`[shareRekap] Walikelas ${cls.className} tidak punya email, dilewati`);
-//         }
-//       }
-//     }
-
-//     console.log(`[shareRekap] Selesai. WA: ${results.wa.length}, Email: ${results.email.length}, Gagal: ${results.errors.length}`);
-
-//     res.json({
-//       success: true,
-//       message: `Rekap dikirim: ${results.wa.length} WA, ${results.email.length} email, ${results.errors.length} gagal`,
-//       results,
-//       rateLimit: getSendStats() // info sisa kuota di response
-//     });
-
-//   } catch (err) {
-//     console.error('[shareRekapHarian] Error:', err);
-//     res.status(500).json({ success: false, message: err.message });
-//   }
-// };
-
 exports.shareRekapHarian = async (req, res) => {
   try {
     const { schoolId, date, via = 'wa' } = req.query;
@@ -3165,6 +2793,20 @@ exports.shareRekapHarian = async (req, res) => {
  
     const results = { wa: [], email: [], errors: [] };
     const waClient = getClient();
+
+    // Hitung total penerima SEBELUM mulai kirim
+    const totalRecipients =
+      (school?.kepalaSekolahPhone ? 1 : 0) +
+      Array.from(acc.values()).filter(c => c.walikelas?.phone).length;
+
+    let sentCount = 0;
+
+    emitProgress(schoolId, {
+      status: 'start',
+      message: `Memulai pengiriman ke ${totalRecipients} penerima...`,
+      current: 0,
+      total: totalRecipients,
+    });
  
     // ─── HELPER: Kirim PDF via WA ─────────────────────────────────
     const sendWAWithPDF = async (rawPhone, pdfBuffer, filename, caption, label) => {
@@ -3197,12 +2839,31 @@ exports.shareRekapHarian = async (req, res) => {
         results.wa.push({ to: label, phone, status: 'sent' });
         console.log(`[shareRekap] ✅ PDF terkirim ke ${label} (${phone})`);
  
-        // Delay antar pesan — makin panjang setelah 10 pesan
+        sentCount++;
+        emitProgress(schoolId, {
+          status: 'progress',
+          message: `✅ Terkirim ke ${label}`,
+          current: sentCount,
+          total: totalRecipients,
+          label,
+        });
+
         const delay = results.wa.length > 10 ? 3000 : 1500;
         await new Promise(r => setTimeout(r, delay));
-      } catch (err) {
-        console.error(`[shareRekap] ❌ Gagal kirim PDF ke ${label} (${phone}):`, err.message);
+       } catch (err) {
+        console.error(`[shareRekap] ❌ Gagal kirim PDF ke ${label}:`, err.message);
         results.errors.push({ to: label, via: 'wa', error: err.message });
+
+        // ← TAMBAHKAN INI
+        sentCount++;
+        emitProgress(schoolId, {
+          status: 'progress',
+          message: `❌ Gagal ke ${label}: ${err.message}`,
+          current: sentCount,
+          total: totalRecipients,
+          label,
+          isError: true,
+        });
       }
     };
  
@@ -3369,6 +3030,14 @@ exports.shareRekapHarian = async (req, res) => {
         list: []
       });
     }
+
+    emitProgress(schoolId, {
+      status: 'done',
+      message: `Selesai: ${results.wa.length} terkirim, ${results.errors.length} gagal`,
+      current: totalRecipients,
+      total: totalRecipients,
+      results,
+    });
 
     res.json({
       success: true,

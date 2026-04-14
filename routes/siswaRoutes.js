@@ -38,7 +38,7 @@ router.post('/mark-absence', studentController.markAbsence);
 router.get('/detail/:id', studentController.getUserDetail);
 // --- 3. API STATISTIK & LAPORAN ---
 router.get('/share-rekap', studentController.shareRekapHarian);
-
+router.get('/share-rekap-progress', studentController.shareRekapProgress);
 // Statistik Dashboard (Hadir, Sakit, Izin, Alpha hari ini)
 router.get('/today-stats', studentController.getTodayStats);
 router.get('/summary-attendances', studentController.getAttendanceSummary);
