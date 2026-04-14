@@ -3026,6 +3026,19 @@ exports.shareRekapHarian = async (req, res) => {
     if (!schoolId) {
       return res.status(400).json({ success: false, message: 'schoolId diperlukan' });
     }
+
+    const normalizePhone = (phone) => {
+      if (!phone) return null;
+      let p = String(phone).replace(/\D/g, '');
+      if (p.startsWith('0')) p = '62' + p.slice(1);
+      if (p.startsWith('+')) p = p.slice(1);
+      if (!p.startsWith('62')) p = '62' + p;
+      if (p.length < 10 || p.length > 15) {
+        console.warn(`[normalizePhone] Nomor mencurigakan (${p.length} digit): ${p}`);
+        return null;
+      }
+      return p;
+    };
  
     // Cek status WA jika via wa
     if (via === 'wa' || via === 'all') {
