@@ -2,7 +2,7 @@
 const PDFDocument = require('pdfkit');
 
 /**
- * Generate buffer PDF laporan rekap harian
+ * Generate buffer PDF laporan rekap harian (untuk Kepala Sekolah)
  * @param {object} rekapData - { summary, data }
  * @param {string} targetDate - 'YYYY-MM-DD'
  * @param {string} schoolName - nama sekolah
@@ -22,118 +22,133 @@ const generateRekapPDF = (rekapData, targetDate, schoolName = 'Sekolah') => {
 
     // ── HEADER ──────────────────────────────────────────────────
     doc
+      .rect(40, 40, W, 70)
+      .fill('#1e3a5f');
+
+    doc
+      .fillColor('white')
       .fontSize(16)
       .font('Helvetica-Bold')
-      .text('LAPORAN REKAP KEHADIRAN HARIAN', { align: 'center' });
+      .text('LAPORAN REKAP KEHADIRAN HARIAN', 40, 55, { align: 'center', width: W });
 
     doc
-      .fontSize(11)
+      .fontSize(10)
       .font('Helvetica')
-      .text(schoolName, { align: 'center' })
-      .text(`Tanggal: ${targetDate}`, { align: 'center' })
-      .moveDown(0.5);
+      .text(schoolName.toUpperCase(), 40, 77, { align: 'center', width: W })
+      .text(`Tanggal: ${targetDate}`, 40, 91, { align: 'center', width: W });
 
-    // Garis pemisah
-    doc
-      .moveTo(40, doc.y)
-      .lineTo(40 + W, doc.y)
-      .lineWidth(1)
-      .strokeColor('#cccccc')
-      .stroke()
-      .moveDown(0.5);
+    doc.moveDown(0.5);
+    doc.y = 125;
 
-    // ── SUMMARY TOTAL ────────────────────────────────────────────
-    doc
-      .fontSize(11)
-      .font('Helvetica-Bold')
-      .text('RINGKASAN TOTAL', { underline: true })
-      .moveDown(0.3);
+    // ── SUMMARY BOX ──────────────────────────────────────────────
+    const hadirPct = summary.totalAllStudents > 0
+      ? ((summary.totalAllHadir / summary.totalAllStudents) * 100).toFixed(1)
+      : '0';
 
-    const summaryRows = [
-      ['Total Siswa Aktif',  summary.totalAllStudents],
-      ['Hadir',             summary.totalAllHadir],
-      ['Belum / Tidak Hadir', summary.totalAllBelumHadir],
-      ['Persentase Kehadiran',
-        summary.totalAllStudents > 0
-          ? `${((summary.totalAllHadir / summary.totalAllStudents) * 100).toFixed(1)}%`
-          : '0%'
-      ],
+    const boxW = (W - 15) / 4;
+    const boxes = [
+      { label: 'Total Siswa',   value: summary.totalAllStudents, color: '#2563eb' },
+      { label: 'Hadir',         value: summary.totalAllHadir,    color: '#16a34a' },
+      { label: 'Tidak Hadir',   value: summary.totalAllBelumHadir, color: '#dc2626' },
+      { label: 'Kehadiran',     value: `${hadirPct}%`,           color: '#7c3aed' },
     ];
 
-    summaryRows.forEach(([label, val]) => {
+    boxes.forEach((box, i) => {
+      const bx = 40 + i * (boxW + 5);
+      doc.rect(bx, doc.y, boxW, 55).fill(box.color);
       doc
-        .font('Helvetica-Bold').fontSize(10).text(label, 40, doc.y, { continued: true, width: 200 })
-        .font('Helvetica').text(`: ${val}`, { align: 'left' });
+        .fillColor('white')
+        .fontSize(22)
+        .font('Helvetica-Bold')
+        .text(String(box.value), bx, doc.y + 8, { width: boxW, align: 'center' });
+      doc
+        .fontSize(8)
+        .font('Helvetica')
+        .text(box.label.toUpperCase(), bx, doc.y + 35, { width: boxW, align: 'center' });
     });
 
-    doc.moveDown(0.8);
+    doc.y += 65;
+    doc.moveDown(0.5);
 
-    // Garis pemisah
+    // ── TABEL HEADER ────────────────────────────────────────────
     doc
-      .moveTo(40, doc.y)
-      .lineTo(40 + W, doc.y)
-      .strokeColor('#cccccc')
-      .stroke()
-      .moveDown(0.5);
-
-    // ── TABEL PER KELAS ──────────────────────────────────────────
-    doc
-      .fontSize(11)
+      .fillColor('#1e3a5f')
+      .fontSize(12)
       .font('Helvetica-Bold')
-      .text('DETAIL PER KELAS', { underline: true })
-      .moveDown(0.5);
+      .text('REKAP PER KELAS', 40, doc.y);
 
-    // Header kolom tabel
-    const colX   = [40, 150, 210, 255, 295, 340, 385, 435];
-    const colW   = [110, 55, 45, 40, 45, 45, 50, 50];
-    const headers = ['Kelas', 'Siswa', 'Tepat', 'Terlambat', 'Izin', 'Sakit', 'Alpha', 'Blm Hadir'];
+    doc.moveDown(0.4);
 
-    const drawRow = (cells, isHeader = false) => {
+    // Kolom: Kelas | Siswa | Tepat | Terlambat | Izin | Sakit | Alpha | Blm Hadir | %Hadir
+    const cols = [
+      { label: 'Kelas',       x: 40,  w: 100, align: 'left'   },
+      { label: 'Siswa',       x: 140, w: 42,  align: 'center' },
+      { label: 'Tepat',       x: 182, w: 40,  align: 'center' },
+      { label: 'Terlambat',   x: 222, w: 52,  align: 'center' },
+      { label: 'Izin',        x: 274, w: 38,  align: 'center' },
+      { label: 'Sakit',       x: 312, w: 38,  align: 'center' },
+      { label: 'Alpha',       x: 350, w: 38,  align: 'center' },
+      { label: 'Blm Hadir',   x: 388, w: 52,  align: 'center' },
+      { label: '% Hadir',     x: 440, w: 55,  align: 'center' },
+    ];
+
+    const ROW_H = 20;
+
+    const drawTableRow = (cells, isHeader = false, isEven = false) => {
       const rowY = doc.y;
-      const rowH = 18;
 
-      // Background header
       if (isHeader) {
-        doc.rect(40, rowY, W, rowH).fill('#1e3a5f');
+        doc.rect(40, rowY, W, ROW_H).fill('#1e3a5f');
         doc.fillColor('white');
+      } else if (isEven) {
+        doc.rect(40, rowY, W, ROW_H).fill('#f1f5f9');
+        doc.fillColor('#1e293b');
       } else {
-        doc.fillColor('black');
+        doc.fillColor('#1e293b');
       }
 
-      cells.forEach((text, i) => {
+      cells.forEach((cell, i) => {
         doc
-          .fontSize(isHeader ? 8 : 9)
+          .fontSize(isHeader ? 7.5 : 9)
           .font(isHeader ? 'Helvetica-Bold' : 'Helvetica')
-          .text(String(text), colX[i], rowY + 4, {
-            width: colW[i],
-            align: i === 0 ? 'left' : 'center',
-            lineBreak: false
+          .text(String(cell), cols[i].x, rowY + (ROW_H - 9) / 2 + 1, {
+            width: cols[i].w,
+            align: cols[i].align,
+            lineBreak: false,
           });
       });
 
-      doc.y = rowY + rowH;
-
-      // Garis bawah baris
+      // Border bawah
       doc
-        .moveTo(40, doc.y)
-        .lineTo(40 + W, doc.y)
+        .moveTo(40, rowY + ROW_H)
+        .lineTo(40 + W, rowY + ROW_H)
         .lineWidth(0.3)
-        .strokeColor('#dddddd')
+        .strokeColor('#cbd5e1')
         .stroke();
+
+      doc.y = rowY + ROW_H;
     };
 
-    drawRow(headers, true);
+    // Border tabel
+    const tableStartY = doc.y;
+    drawTableRow(cols.map(c => c.label), true);
 
-    // Sort kelas alphabetical
-    const sortedData = [...data].sort((a, b) => a.className?.localeCompare(b.className));
+    const sortedData = [...data].sort((a, b) =>
+      (a.className || '').localeCompare(b.className || '')
+    );
 
     sortedData.forEach((cls, idx) => {
-      // Zebra stripe
-      if (idx % 2 === 0) {
-        doc.rect(40, doc.y, W, 18).fill('#f9f9f9');
+      // Page break check
+      if (doc.y > doc.page.height - 80) {
+        doc.addPage();
       }
 
-      drawRow([
+      const hadirKls = cls.stats.onTime + cls.stats.late;
+      const pctKls = cls.totalStudents > 0
+        ? `${((hadirKls / cls.totalStudents) * 100).toFixed(0)}%`
+        : '0%';
+
+      drawTableRow([
         cls.className || '-',
         cls.totalStudents,
         cls.stats.onTime,
@@ -142,23 +157,32 @@ const generateRekapPDF = (rekapData, targetDate, schoolName = 'Sekolah') => {
         cls.stats.sakit,
         cls.stats.alpha,
         cls.stats.belumHadir,
-      ]);
+        pctKls,
+      ], false, idx % 2 === 0);
     });
 
-    doc.fillColor('black').moveDown(1);
+    // Border luar tabel
+    doc
+      .rect(40, tableStartY, W, doc.y - tableStartY)
+      .lineWidth(0.5)
+      .strokeColor('#94a3b8')
+      .stroke();
+
+    doc.moveDown(1.5);
 
     // ── FOOTER ───────────────────────────────────────────────────
     doc
       .moveTo(40, doc.y)
       .lineTo(40 + W, doc.y)
-      .strokeColor('#cccccc')
+      .lineWidth(0.5)
+      .strokeColor('#cbd5e1')
       .stroke()
       .moveDown(0.4);
 
     doc
       .fontSize(8)
       .font('Helvetica')
-      .fillColor('#888888')
+      .fillColor('#94a3b8')
       .text(
         `Digenerate otomatis oleh KiraProject • ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}`,
         { align: 'center' }
