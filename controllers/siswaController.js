@@ -2888,7 +2888,7 @@ exports.shareRekapHarian = async (req, res) => {
             school.kepalaSekolahPhone,
             rekapPdfBuffer,
             `Rekap_Harian_${targetDate}.pdf`,
-            `📊 *Laporan Rekap Kehadiran Harian*\n📅 Tanggal: ${targetDate}\n\nTerlampir laporan lengkap seluruh kelas.\n\n_KiraProject School Management_`,
+            `*Laporan Rekap Kehadiran Harian*\nTanggal: ${targetDate}\n\nTerlampir laporan lengkap seluruh kelas`,
             'Kepala Sekolah'
           );
         } catch (pdfErr) {
@@ -2914,7 +2914,7 @@ exports.shareRekapHarian = async (req, res) => {
             cls.walikelas.phone,
             classPdfBuffer,
             `Rekap_${cls.className}_${targetDate}.pdf`,
-            `*Rekap Kehadiran Kelas ${cls.className}*\n Tanggal: ${targetDate}\n\nTerlampir laporan kehadiran kelas Anda`,
+            `*Rekap Kehadiran Kelas ${cls.className}*\nTanggal: ${targetDate}\n\nTerlampir laporan kehadiran kelas Anda`,
             `Walikelas ${cls.className}`
           );
         } catch (pdfErr) {
