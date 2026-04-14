@@ -53,21 +53,39 @@ const generateRekapPDF = (rekapData, targetDate, schoolName = 'Sekolah') => {
       { label: 'Kehadiran',     value: `${hadirPct}%`,           color: '#7c3aed' },
     ];
 
+    // SIMPAN nilai y awal agar semua box punya start yang sama
+    const startY = doc.y; 
+    const boxHeight = 55;
+
     boxes.forEach((box, i) => {
       const bx = 40 + i * (boxW + 5);
-      doc.rect(bx, doc.y, boxW, 55).fill(box.color);
+      
+      // Gambar Kotak
+      doc.rect(bx, startY, boxW, boxHeight).fill(box.color);
+      
+      // Tulis Angka (Value)
       doc
         .fillColor('white')
-        .fontSize(22)
+        .fontSize(20) // Sedikit dikecilkan agar aman
         .font('Helvetica-Bold')
-        .text(String(box.value), bx, doc.y + 8, { width: boxW, align: 'center' });
+        // Gunakan startY + offset agar tidak terpengaruh auto-increment doc.y
+        .text(String(box.value), bx, startY + 10, { 
+            width: boxW, 
+            align: 'center' 
+        });
+        
+      // Tulis Label
       doc
         .fontSize(8)
         .font('Helvetica')
-        .text(box.label.toUpperCase(), bx, doc.y + 35, { width: boxW, align: 'center' });
+        .text(box.label.toUpperCase(), bx, startY + 35, { 
+            width: boxW, 
+            align: 'center' 
+        });
     });
 
-    doc.y += 65;
+    // Setelah loop selesai, paksa doc.y pindah ke bawah seluruh kotak
+    doc.y = startY + boxHeight + 20;
     doc.moveDown(0.5);
 
     // ── TABEL HEADER ────────────────────────────────────────────
