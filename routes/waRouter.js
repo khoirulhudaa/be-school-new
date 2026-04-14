@@ -55,6 +55,26 @@ router.get('/wa/send-stats', (req, res) => {
   res.json({ success: true, stats: getSendStats() });
 });
 
+router.post('/reconnect', async (req, res) => {
+  try {
+    const { getIsReady, initWhatsApp } = require('../config/whatsapp');
+    
+    if (getIsReady()) {
+      return res.json({ success: true, message: 'WA sudah terhubung' });
+    }
+
+    // Reinit dengan session yang ada (tidak hapus session)
+    initWhatsApp();
+    
+    res.json({ 
+      success: true, 
+      message: 'Mencoba reconnect dengan session lama...' 
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 router.get('/share-rekap-progress', shareRekapProgress);
 
 module.exports = router;

@@ -29,6 +29,11 @@ const initWhatsApp = () => {
   const chromiumPath = getChromiumPath();
   console.log('🔍 Chromium path:', chromiumPath || 'NOT FOUND');
 
+  if (client) {
+    console.log('[WA] Client sudah ada, skip re-init');
+    return client;
+  }
+
   client = new Client({
     authStrategy: new LocalAuth({
       dataPath: './wa_session'
