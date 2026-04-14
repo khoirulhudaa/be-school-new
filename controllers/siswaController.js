@@ -3253,7 +3253,7 @@ exports.shareRekapHarian = async (req, res) => {
             cls.walikelas.phone,
             classPdfBuffer,
             `Rekap_${cls.className}_${targetDate}.pdf`,
-            `📚 *Rekap Kehadiran Kelas ${cls.className}*\n📅 Tanggal: ${targetDate}\n\nTerlampir laporan kehadiran kelas Anda.\n\n_KiraProject School Management_`,
+            `*Rekap Kehadiran Kelas ${cls.className}*\n Tanggal: ${targetDate}\n\nTerlampir laporan kehadiran kelas Anda`,
             `Walikelas ${cls.className}`
           );
         } catch (pdfErr) {
